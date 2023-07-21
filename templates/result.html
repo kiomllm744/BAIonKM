@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prescription Form</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <form action="submit_form.php" method="post" target="_blank"> <!-- Add action and target attributes -->
+        <h1>Prescription Form</h1>
+        <input type="text" id="disease" name="disease" placeholder="Enter the disease" required><br>
+
+        <div class="herbs-container">
+            <input type="text" class="herbs-input" name="herbs[]" placeholder="Enter the herbs" required>
+        </div>
+
+        <div class="herbs-container">
+        </div>
+
+        <input type="button" value="Add Prescription" id="add-btn">
+        <input type="button" value="Remove Prescription" id="remove-btn">
+        <input type="submit" value="Search"> <!-- Change type to submit -->
+        <input type="reset" value="Clear">
+    </form>
+
+    <script src="script.js"></script>
+</body>
+</html>

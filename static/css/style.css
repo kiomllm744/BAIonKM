@@ -1,0 +1,96 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f3f3f3;
+}
+
+form {
+    text-align: center;
+    padding: 20px;
+    border-radius: 10px;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #444;
+}
+
+form label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: #555;
+}
+
+form input[type="text"],
+form textarea {
+    width: 900px;
+    padding: 10px;
+    margin-bottom: 15px;
+    margin: 0; /* Fix the margin */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+form input[type="submit"],
+form input[type="button"] {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 0 5px;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+form input[type="reset"] {
+    padding: 10px 20px;
+    background-color: #e41414;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 0 5px;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+form input[type="submit"]:hover,
+form input[type="button"]:hover,
+form input[type="reset"]:hover {
+    background-color: #45a049;
+}
+
+.herbs-container {
+    margin-top: 15px;
+    text-align: left;
+}
+
+.herbs-container label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: normal;
+}
+
+.herbs-input {
+    display: block;
+    width: 280px;
+    padding: 5px;
+    margin-bottom: 20px;
+    margin: 0; /* Fix the margin */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.herbs-input-wrapper {
+    margin-top: 15px; /* Add spacing between the herb text boxes */
+}
+
