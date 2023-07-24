@@ -2,11 +2,10 @@
 <html>
 <head>
     <title>Prescription Form</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <form action="submit_form.php" method="post" target="_blank"> <!-- Add action and target attributes -->
-        <h1>Prescription Form</h1>
+    <form action="{{ url_for('submit_form') }}" method="post">
         <input type="text" id="disease" name="disease" placeholder="Enter the disease" required><br>
 
         <div class="herbs-container">
@@ -14,14 +13,21 @@
         </div>
 
         <div class="herbs-container">
+            <!-- Additional herb inputs will be dynamically added here (handled by script.js) -->
         </div>
 
         <input type="button" value="Add Prescription" id="add-btn">
         <input type="button" value="Remove Prescription" id="remove-btn">
-        <input type="submit" value="Search"> <!-- Change type to submit -->
+        <input type="submit" value="Search">
         <input type="reset" value="Clear">
-    </form>
 
-    <script src="script.js"></script>
+        {% if error %}
+            <p class="error-message">{{ error }}</p>
+        {% endif %}
+        <div class="herbs-data-container" style="display: none;">
+        <input type="text" name="herbs_data" id="herbs-data-input">
+        </div>
+    </form>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

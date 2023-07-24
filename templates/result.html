@@ -1,27 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Prescription Form</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Search Results</title>
 </head>
 <body>
-    <form action="submit_form.php" method="post" target="_blank"> <!-- Add action and target attributes -->
-        <h1>Prescription Form</h1>
-        <input type="text" id="disease" name="disease" placeholder="Enter the disease" required><br>
+    <h1>Search Results</h1>
+    <div>
+        <!-- Display the common genes between the disease and each herb list -->
+        <h2>Common Genes with Disease</h2>
+        <ul>
+            {% for common_genes in data.all_common_genes %}
+            <li>
+                <p>Herb List {{ loop.index }}:</p>
+                <ul>
+                    {% for gene in common_genes %}
+                    <li>{{ gene }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 
-        <div class="herbs-container">
-            <input type="text" class="herbs-input" name="herbs[]" placeholder="Enter the herbs" required>
-        </div>
+    <div>
+        <!-- Display the unique genes for each herb list -->
+        <h2>Unique Genes for Each Herb List</h2>
+        <ul>
+            {% for unique_genes in data.all_unique_genes %}
+            <li>
+                <p>Herb List {{ loop.index }}:</p>
+                <ul>
+                    {% for gene in unique_genes %}
+                    <li>{{ gene }}</li>
+                    {% endfor %}
+                </ul>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 
-        <div class="herbs-container">
-        </div>
-
-        <input type="button" value="Add Prescription" id="add-btn">
-        <input type="button" value="Remove Prescription" id="remove-btn">
-        <input type="submit" value="Search"> <!-- Change type to submit -->
-        <input type="reset" value="Clear">
-    </form>
-
-    <script src="script.js"></script>
+    <div>
+        <!-- Display the data returned from Enrichr -->
+        <h2>Enrichr Data</h2>
+        <ul>
+            {% for enrichr_data in data.json_data %}
+            <li>
+                <p>User List ID: {{ enrichr_data.userListId }}</p>
+                <p>Short Id: {{ enrichr_data.shortId }}</p>
+                <p>Link: <a href="{{ enrichr_data.userListId }}" target="_blank">{{ enrichr_data.userListId }}</a></p>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 </body>
 </html>

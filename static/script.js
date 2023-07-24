@@ -18,7 +18,6 @@ function addHerbsInput() {
 
     herbsCount++;
 
-
     const newHerbsInput = document.createElement('input');
     newHerbsInput.type = 'text';
     newHerbsInput.name = 'herbs[]'; // Note the square brackets to handle multiple values
@@ -26,7 +25,7 @@ function addHerbsInput() {
     newHerbsInput.required = true;
     newHerbsInput.className = 'herbs-input';
 
-      // Create a div to wrap the new herb input
+    // Create a div to wrap the new herb input
     const herbInputWrapper = document.createElement('div');
     herbInputWrapper.className = 'herbs-container '; // Add a class to style the spacing
 
@@ -46,6 +45,37 @@ function removeHerbsInput() {
     herbsCount--;
 }
 
+// Function to collect the user's input into a list of lists of herbs
+function collectHerbsData() {
+    const herbInputs = document.querySelectorAll('.herbs-input');
+    const herbsLists = Array.from(herbInputs).map(input => input.value);
+    return herbsLists;
+}
+
+
 // Add click event listeners to the buttons
 addBtn.addEventListener('click', addHerbsInput);
 removeBtn.addEventListener('click', removeHerbsInput);
+
+// Add a submit event listener to the form
+const form = document.querySelector('form');
+form.addEventListener('submit', (event) => {
+    // Stop the form submission to handle it manually
+    event.preventDefault();
+
+    // Collect the user's input into a list of lists of herbs
+    const herbsData = collectHerbsData();
+
+    // Update the value of the existing hidden input field with the collected data
+    document.getElementById('herbs-data-input').value = JSON.stringify(herbsData);
+
+
+    // --- Start of added code ---
+    // Print the data on the console before submitting the form
+    console.log('Collected Herbs Data:');
+    console.log(herbsData);
+    // --- End of added code ---
+
+    // Submit the form
+    form.submit();
+});
