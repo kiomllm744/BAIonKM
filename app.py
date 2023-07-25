@@ -87,8 +87,8 @@ def search_herb_directory(herb_names):
         # Assuming herb_name contains the input term
         herb_records = session.query(Herb).filter(func.lower(Herb.herbName) == herb_name.lower()).all()
         gene_symbols = [record.Genes for record in herb_records]
-        print(herb_name)
-        print(len(gene_symbols))
+        # print(herb_name)
+        # print(len(gene_symbols))
 
         if not gene_symbols:  # If the list is empty, the herb is not found in the database
             missing_herbs.append(herb_name)
@@ -115,6 +115,7 @@ def find_common_genes(disease_gene_names, all_herbs_gene_symbols):
         single_herb_genes_set = set(single_herb_list_gene_symbols)
 
         common_genes = disease_genes_set & single_herb_genes_set  # Find common elements
+        # print(len(common_genes))
 
         # Add the common genes for the current herb set to the list
         all_common_genes.append(list(common_genes))
@@ -134,6 +135,8 @@ def find_unique_genes(all_common_genes):
         herb_list_index = i + 1
         unique_genes_for_list = set(genes) - set().union(*all_common_genes[:i], *all_common_genes[i + 1:]) if len(
             all_common_genes) > 1 else set(genes)
+        print(unique_genes_for_list)
+        print(len(unique_genes_for_list))
         all_unique_genes.append(unique_genes_for_list)  # Append unique genes to the main list
 
     return all_unique_genes
@@ -150,12 +153,64 @@ def upload_gene_lists(gene_lists):
         }
         response = requests.post(ENRICHR_URL, files=payload)
         if not response.ok:
-            raise Exception('Error analyzing gene list')
+             raise Exception('Error analyzing gene list')
         data = json.loads(response.text)
         all_data.append(data)
 
     return all_data
 
+
+# def enrichment_analysis(data_list, library):
+#     ENRICHR_URL = 'https://maayanlab.cloud/Enrichr/enrich'
+#     query_string = '?userListId=%s&backgroundType=%s'
+#     gene_set_library = library
+#
+#     for data in data_list:
+#         user_list_id = data['userListId']
+#         response = requests.get(ENRICHR_URL + query_string % (user_list_id, gene_set_library))
+#         if not response.ok:
+#             raise Exception(f"Error fetching enrichment results for userListId: {user_list_id}")
+#
+#         enrichment_data = json.loads(response.text)
+#         df = pd.DataFrame(enrichment_data)
+#
+#         # Column names for the new DataFrame
+#         column_names = ['Rank', 'Term name', 'P-value', 'Z-score', 'Combined score', 'Overlapping genes',
+#                         'Adjusted p-value', 'Old p-value', 'Old adjusted p-value']
+#
+#         # Create an empty DataFrame
+#         new_df = pd.DataFrame(columns=column_names)
+#
+#         # Iterate over the rows in the DataFrame
+#         for _, row in df.iterrows():
+#             for element in row:
+#                 # Extract the values from the element
+#                 rank = element[0]
+#                 term_name = element[1]
+#                 p_value = element[2]
+#                 z_score = element[3]
+#                 combined_score = element[4]
+#                 overlapping_genes = ', '.join(element[5])
+#                 adjusted_p_value = element[6]
+#                 old_p_value = element[7]
+#                 old_adjusted_p_value = element[8]
+#
+#                 # Check if the adjusted_p_value is greater than 0.01
+#                 if adjusted_p_value < 0.05:
+#                     # Create a new row with extracted values
+#                     new_row = pd.DataFrame([[rank, term_name, p_value, z_score, combined_score, overlapping_genes,
+#                                              adjusted_p_value, old_p_value, old_adjusted_p_value]],
+#                                            columns=column_names)
+#
+#                     # Append the new row to the new DataFrame
+#                     # new_df = new_df.append(new_row, ignore_index=True)
+#                     new_df = pd.concat([new_df, new_row], ignore_index=True)
+#
+#         # Filter the new DataFrame to get only the top 15 entries with adjusted_p_value > 0.01
+#         filtered_df = new_df.head(30)
+#
+#         # Add the filtered DataFrame to the data dictionary
+#         data['enrichment_data'] = filtered_df.to_dict(orient='records')
 
 def enrichment_analysis(data_list, library):
     ENRICHR_URL = 'https://maayanlab.cloud/Enrichr/enrich'
@@ -175,8 +230,8 @@ def enrichment_analysis(data_list, library):
         column_names = ['Rank', 'Term name', 'P-value', 'Z-score', 'Combined score', 'Overlapping genes',
                         'Adjusted p-value', 'Old p-value', 'Old adjusted p-value']
 
-        # Create an empty DataFrame
-        new_df = pd.DataFrame(columns=column_names)
+        # Create an empty DataFrame to store the enrichment data for the current herb set
+        data['enrichment_data'] = []
 
         # Iterate over the rows in the DataFrame
         for _, row in df.iterrows():
@@ -199,15 +254,14 @@ def enrichment_analysis(data_list, library):
                                              adjusted_p_value, old_p_value, old_adjusted_p_value]],
                                            columns=column_names)
 
-                    # Append the new row to the new DataFrame
-                    # new_df = new_df.append(new_row, ignore_index=True)
-                    new_df = pd.concat([new_df, new_row], ignore_index=True)
+                    # Append the new row to the enrichment data for the current herb set
+                    data['enrichment_data'].append(new_row.to_dict(orient='records')[0])
 
-        # Filter the new DataFrame to get only the top 15 entries with adjusted_p_value > 0.01
-        filtered_df = new_df.head(30)
+        # Filter the enrichment data to get only the top 15 entries with adjusted_p_value > 0.01
+        data['enrichment_data'] = data['enrichment_data'][:15]
 
-        # Add the filtered DataFrame to the data dictionary
-        data['enrichment_data'] = filtered_df.to_dict(orient='records')
+    return data_list
+
 
 
 # Route handler for the homepage
@@ -253,12 +307,17 @@ def submit_form():
         if all_common_genes:
 
             all_unique_genes = find_unique_genes(all_common_genes)
+            print(all_unique_genes)
+            print(len(all_unique_genes))
 
             if all_unique_genes:
                 # Call the Enrichr API to upload gene lists and perform enrichment analysis
                 json_data = upload_gene_lists(all_unique_genes)
                 library = 'DisGeNET'
-                enrichment_analysis(json_data, library)
+                enrichment_data = enrichment_analysis(json_data, library)
+
+            # Pass the enrichment_data to the results page
+            return render_template('result.html', enrichment_data=enrichment_data)
 
     # If the method is not POST (e.g., accessing the page directly), redirect to the homepage
     return redirect(url_for('index'))
