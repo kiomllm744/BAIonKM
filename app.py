@@ -7,6 +7,7 @@ import secrets
 import pandas as pd
 import json
 import requests
+from sqlalchemy import func
 
 # Create a Flask application instance
 app = Flask(__name__)
@@ -24,7 +25,8 @@ Session = sessionmaker(bind=engine)
 
 class Disease(db.Model):
     __tablename__ = 'diseases'
-    geneNID = db.Column(db.TEXT, primary_key=True)
+    Serial_Number_D = db.Column(db.INTEGER, primary_key=True, autoincrement=True)
+    geneNID = db.Column(db.TEXT)
     diseaseNID = db.Column(db.TEXT)
     diseaseId = db.Column(db.TEXT)
     geneId = db.Column(db.TEXT)
@@ -35,7 +37,7 @@ class Disease(db.Model):
 
 class Herb(db.Model):
     __tablename__ = 'herbs'
-    Serial_Number = db.Column(db.TEXT, primary_key=True)
+    Serial_Number_H = db.Column(db.INTEGER, primary_key=True, autoincrement=True)
     Compound = db.Column(db.TEXT)
     TCMID_ID = db.Column(db.TEXT)
     Genes = db.Column(db.TEXT)
@@ -47,23 +49,61 @@ def search_disease(disease_name):
     session = Session()
     matching_records = session.query(Disease).filter(Disease.diseaseName.ilike(disease_name.lower())).all()
     session.close()
-
     disease_gene_symbols = [record.geneName for record in matching_records]
-
     return disease_gene_symbols
+
+
+# def search_herb_directory(herb_names):
+#     session = Session()
+#     single_herb_list_gene_symbols = []
+#     missing_herbs = []  # List to store missing herbs
+#
+#     for herb_name in herb_names:
+#         herb_records = session.query(Herb).filter(func.lower(Herb.herbName) == herb_name.lower()).all()
+#         gene_symbols = [record.Genes for record in herb_records]
+#         print(herb_name)
+#         print(len(gene_symbols))
+#         if not gene_symbols:  # If the list is empty, the herb is not found in the database
+#             missing_herbs.append(herb_name)
+#         else:
+#             # Since there could be multiple records for the same herb name, we need to extend the gene symbols list
+#             for genes_list in gene_symbols:
+#                 single_herb_list_gene_symbols.extend(genes_list.split(', '))
+#     session.close()
+#
+#     if missing_herbs:
+#         # Display a message or log the missing herbs
+#         print(f"The following herbs were not found in the database: {', '.join(missing_herbs)}")
+#
+#     return single_herb_list_gene_symbols
 
 
 def search_herb_directory(herb_names):
     session = Session()
     single_herb_list_gene_symbols = []
+    missing_herbs = []  # List to store missing herbs
 
     for herb_name in herb_names:
-        herb_records = session.query(Herb).filter(Herb.herbName.ilike(f'%{herb_name}%')).all()
+        # Assuming herb_name contains the input term
+        herb_records = session.query(Herb).filter(func.lower(Herb.herbName) == herb_name.lower()).all()
         gene_symbols = [record.Genes for record in herb_records]
-        single_herb_list_gene_symbols.extend(gene_symbols)
+        print(herb_name)
+        print(len(gene_symbols))
+
+        if not gene_symbols:  # If the list is empty, the herb is not found in the database
+            missing_herbs.append(herb_name)
+        else:
+            # Extend the single_herb_list_gene_symbols with the gene_symbols list directly
+            single_herb_list_gene_symbols.extend(gene_symbols)
 
     session.close()
+
+    if missing_herbs:
+        # Display a message or log the missing herbs
+        print(f"The following herbs were not found in the database: {', '.join(missing_herbs)}")
+
     return single_herb_list_gene_symbols
+
 
 
 def find_common_genes(disease_gene_names, all_herbs_gene_symbols):
@@ -203,11 +243,10 @@ def submit_form():
             herb_names = [herb.strip() for herb in herb_names_list]
             single_herb_list_gene_symbols = search_herb_directory(herb_names)
             print(len(single_herb_list_gene_symbols))
-            print(single_herb_list_gene_symbols)
             all_herbs_gene_symbols.append(single_herb_list_gene_symbols)
 
-        print(len(single_herb_list_gene_symbols))
-        print(single_herb_list_gene_symbols)
+        print(len(all_herbs_gene_symbols))
+        # print(all_herbs_gene_symbols)
 
         all_common_genes = find_common_genes(disease_gene_symbols, all_herbs_gene_symbols)
 
