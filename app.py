@@ -53,31 +53,6 @@ def search_disease(disease_name):
     return disease_gene_symbols
 
 
-# def search_herb_directory(herb_names):
-#     session = Session()
-#     single_herb_list_gene_symbols = []
-#     missing_herbs = []  # List to store missing herbs
-#
-#     for herb_name in herb_names:
-#         herb_records = session.query(Herb).filter(func.lower(Herb.herbName) == herb_name.lower()).all()
-#         gene_symbols = [record.Genes for record in herb_records]
-#         print(herb_name)
-#         print(len(gene_symbols))
-#         if not gene_symbols:  # If the list is empty, the herb is not found in the database
-#             missing_herbs.append(herb_name)
-#         else:
-#             # Since there could be multiple records for the same herb name, we need to extend the gene symbols list
-#             for genes_list in gene_symbols:
-#                 single_herb_list_gene_symbols.extend(genes_list.split(', '))
-#     session.close()
-#
-#     if missing_herbs:
-#         # Display a message or log the missing herbs
-#         print(f"The following herbs were not found in the database: {', '.join(missing_herbs)}")
-#
-#     return single_herb_list_gene_symbols
-
-
 def search_herb_directory(herb_names):
     session = Session()
     single_herb_list_gene_symbols = []
@@ -160,57 +135,7 @@ def upload_gene_lists(gene_lists):
     return all_data
 
 
-# def enrichment_analysis(data_list, library):
-#     ENRICHR_URL = 'https://maayanlab.cloud/Enrichr/enrich'
-#     query_string = '?userListId=%s&backgroundType=%s'
-#     gene_set_library = library
-#
-#     for data in data_list:
-#         user_list_id = data['userListId']
-#         response = requests.get(ENRICHR_URL + query_string % (user_list_id, gene_set_library))
-#         if not response.ok:
-#             raise Exception(f"Error fetching enrichment results for userListId: {user_list_id}")
-#
-#         enrichment_data = json.loads(response.text)
-#         df = pd.DataFrame(enrichment_data)
-#
-#         # Column names for the new DataFrame
-#         column_names = ['Rank', 'Term name', 'P-value', 'Z-score', 'Combined score', 'Overlapping genes',
-#                         'Adjusted p-value', 'Old p-value', 'Old adjusted p-value']
-#
-#         # Create an empty DataFrame
-#         new_df = pd.DataFrame(columns=column_names)
-#
-#         # Iterate over the rows in the DataFrame
-#         for _, row in df.iterrows():
-#             for element in row:
-#                 # Extract the values from the element
-#                 rank = element[0]
-#                 term_name = element[1]
-#                 p_value = element[2]
-#                 z_score = element[3]
-#                 combined_score = element[4]
-#                 overlapping_genes = ', '.join(element[5])
-#                 adjusted_p_value = element[6]
-#                 old_p_value = element[7]
-#                 old_adjusted_p_value = element[8]
-#
-#                 # Check if the adjusted_p_value is greater than 0.01
-#                 if adjusted_p_value < 0.05:
-#                     # Create a new row with extracted values
-#                     new_row = pd.DataFrame([[rank, term_name, p_value, z_score, combined_score, overlapping_genes,
-#                                              adjusted_p_value, old_p_value, old_adjusted_p_value]],
-#                                            columns=column_names)
-#
-#                     # Append the new row to the new DataFrame
-#                     # new_df = new_df.append(new_row, ignore_index=True)
-#                     new_df = pd.concat([new_df, new_row], ignore_index=True)
-#
-#         # Filter the new DataFrame to get only the top 15 entries with adjusted_p_value > 0.01
-#         filtered_df = new_df.head(30)
-#
-#         # Add the filtered DataFrame to the data dictionary
-#         data['enrichment_data'] = filtered_df.to_dict(orient='records')
+
 
 def enrichment_analysis(data_list, library):
     ENRICHR_URL = 'https://maayanlab.cloud/Enrichr/enrich'
