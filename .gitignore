@@ -13,7 +13,9 @@ venv/
 .vscode/
 .idea/
 
-# Database (keep template, ignore instance)
+# Database - TOO LARGE for GitHub (184MB)
+# Will be uploaded separately to cloud storage
+*.db
 instance/
 
 # Logs
