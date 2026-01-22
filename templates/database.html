@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Explorer - EnrichR Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 24px;
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #6b7280;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        
+        .tab-btn:hover {
+            color: #6366f1;
+        }
+        
+        .tab-btn.active {
+            color: #6366f1;
+            border-bottom-color: #6366f1;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .data-table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        
+        .data-table th {
+            background: #f8fafc;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #4b5563;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f8fafc;
+        }
+        
+        .data-table tbody tr {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+            max-width: 400px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+        
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding: 16px 0;
+        }
+        
+        .pagination-info {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        
+        .pagination-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .pagination-btn {
+            padding: 8px 16px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pagination-btn:hover:not(:disabled) {
+            border-color: #6366f1;
+            color: #6366f1;
+        }
+        
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination-btn.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: white;
+        }
+        
+        .pagination-btn.page-num {
+            min-width: 40px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        
+        .pagination-ellipsis {
+            padding: 8px 4px;
+            color: #6b7280;
+        }
+        
+        .page-numbers {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .page-jump {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 12px;
+            padding-left: 12px;
+            border-left: 1px solid #e5e7eb;
+        }
+        
+        .page-jump label {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        
+        .page-jump input {
+            width: 60px;
+            padding: 6px 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        
+        .page-jump input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+        
+        .page-jump button {
+            padding: 6px 12px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .page-jump button:hover {
+            background: #4f46e5;
+        }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .badge-purple {
+            background: #ede9fe;
+            color: #7c3aed;
+        }
+        
+        .badge-green {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .badge-blue {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        
+        .table-stats {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .table-stat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 28px;
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .table-stat.herbs {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .table-stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        .table-stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: #6b7280;
+        }
+        
+        .loading i {
+            font-size: 2rem;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+            display: block;
+            color: #6366f1;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Modal for gene details */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow: hidden;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+        
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .modal-header h3 {
+            font-size: 1.25rem;
+            color: #1f2937;
+            margin: 0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .modal-close:hover {
+            color: #374151;
+        }
+        
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            max-height: calc(80vh - 80px);
+        }
+        
+        .gene-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .gene-chip {
+            background: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #374151;
+            font-family: monospace;
+        }
+        
+        /* Compound Cards Layout */
+        .modal-summary {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .summary-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .summary-badge:nth-child(2) {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .compounds-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .compound-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        
+        .compound-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .compound-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .compound-name i {
+            opacity: 0.8;
+        }
+        
+        .compound-count {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        
+        .genes-box {
+            padding: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            background: white;
+        }
+        
+        .gene-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: #0369a1;
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        
+        .gene-tag:hover {
+            background: #e0f2fe;
+            border-color: #7dd3fc;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        
+        .gene-tag small {
+            color: #64748b;
+            font-weight: 400;
+            font-size: 0.75rem;
+        }
+        
+        /* Make modal wider for compound view */
+        .modal {
+            max-width: 900px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-dna"></i>
+                <span>EnrichR Portal</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <i class="fas fa-search"></i>
+                    <span>Analysis</span>
+                </a>
+                <a href="/database" class="nav-item active">
+                    <i class="fas fa-database"></i>
+                    <span>Database</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Results</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About</span>
+                </a>
+            </nav>
+            <div class="sidebar-stats">
+                <div class="stat-item">
+                    <i class="fas fa-disease"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="disease-count">--</span>
+                        <span class="stat-label">Diseases</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-leaf"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="herb-count">--</span>
+                        <span class="stat-label">Herbs</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-content">
+                    <h1><i class="fas fa-database"></i> Database Explorer</h1>
+                    <p>Browse diseases and herbs in the database with their associated genes</p>
+                </div>
+            </header>
+
+            <section class="card">
+                <div class="card-body">
+                    <!-- Stats -->
+                    <div class="table-stats">
+                        <div class="table-stat">
+                            <div class="table-stat-value" id="total-diseases">--</div>
+                            <div class="table-stat-label">Diseases (DisGeNET)</div>
+                        </div>
+                        <div class="table-stat herbs">
+                            <div class="table-stat-value" id="total-herbs">--</div>
+                            <div class="table-stat-label">Herbs (BATMAN-TCM)</div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="diseases">
+                            <i class="fas fa-virus"></i> Diseases
+                        </button>
+                        <button class="tab-btn" data-tab="herbs">
+                            <i class="fas fa-leaf"></i> Herbs
+                        </button>
+                    </div>
+
+                    <!-- Diseases Tab -->
+                    <div class="tab-content active" id="diseases-tab">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="disease-search" placeholder="Search diseases...">
+                        </div>
+                        <div class="data-table-container">
+                            <table class="data-table" id="diseases-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Disease Name</th>
+                                        <th>Associated Genes</th>
+                                        <th>Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="diseases-tbody">
+                                    <tr><td colspan="4" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination">
+                            <div class="pagination-info" id="diseases-info">Showing 0 of 0</div>
+                            <div class="pagination-buttons">
+                                <button class="pagination-btn" id="diseases-prev" disabled><i class="fas fa-chevron-left"></i></button>
+                                <div class="page-numbers" id="diseases-pages"></div>
+                                <button class="pagination-btn" id="diseases-next"><i class="fas fa-chevron-right"></i></button>
+                                <div class="page-jump">
+                                    <label>Go to:</label>
+                                    <input type="number" id="diseases-page-input" min="1" placeholder="#">
+                                    <button onclick="goToDiseasePage()">Go</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Herbs Tab -->
+                    <div class="tab-content" id="herbs-tab">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="herb-search" placeholder="Search herbs...">
+                        </div>
+                        <div class="data-table-container">
+                            <table class="data-table" id="herbs-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Herb Name (Pinyin)</th>
+                                        <th>Target Genes</th>
+                                        <th>Compounds</th>
+                                        <th>Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="herbs-tbody">
+                                    <tr><td colspan="5" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination">
+                            <div class="pagination-info" id="herbs-info">Showing 0 of 0</div>
+                            <div class="pagination-buttons">
+                                <button class="pagination-btn" id="herbs-prev" disabled><i class="fas fa-chevron-left"></i></button>
+                                <div class="page-numbers" id="herbs-pages"></div>
+                                <button class="pagination-btn" id="herbs-next"><i class="fas fa-chevron-right"></i></button>
+                                <div class="page-jump">
+                                    <label>Go to:</label>
+                                    <input type="number" id="herbs-page-input" min="1" placeholder="#">
+                                    <button onclick="goToHerbPage()">Go</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Gene Details Modal -->
+    <div class="modal-overlay" id="gene-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title">Gene Details</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-content">
+                    <div class="loading"><i class="fas fa-spinner"></i>Loading genes...</div>
+                </div>
+                <div class="pagination" id="modal-pagination" style="display:none;">
+                    <div class="pagination-info" id="modal-info">Showing 0 of 0</div>
+                    <div class="pagination-buttons">
+                        <button class="pagination-btn" id="modal-prev" disabled><i class="fas fa-chevron-left"></i></button>
+                        <div class="page-numbers" id="modal-pages"></div>
+                        <button class="pagination-btn" id="modal-next"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        const state = {
+            diseases: { page: 1, search: '', data: null },
+            herbs: { page: 1, search: '', data: null },
+            modal: { type: '', name: '', page: 1 }
+        };
+
+        const PER_PAGE = 50;
+
+        // Generate page number buttons
+        function generatePageNumbers(currentPage, totalPages, containerId, onPageClick) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            const maxVisiblePages = 7;
+            let pages = [];
+            
+            if (totalPages <= maxVisiblePages) {
+                // Show all pages
+                for (let i = 1; i <= totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                // Always show first page
+                pages.push(1);
+                
+                if (currentPage > 3) {
+                    pages.push('...');
+                }
+                
+                // Show pages around current page
+                let start = Math.max(2, currentPage - 1);
+                let end = Math.min(totalPages - 1, currentPage + 1);
+                
+                // Adjust if near the beginning
+                if (currentPage <= 3) {
+                    end = 4;
+                }
+                // Adjust if near the end
+                if (currentPage >= totalPages - 2) {
+                    start = totalPages - 3;
+                }
+                
+                for (let i = start; i <= end; i++) {
+                    if (i > 1 && i < totalPages) {
+                        pages.push(i);
+                    }
+                }
+                
+                if (currentPage < totalPages - 2) {
+                    pages.push('...');
+                }
+                
+                // Always show last page
+                pages.push(totalPages);
+            }
+            
+            pages.forEach(page => {
+                if (page === '...') {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'pagination-ellipsis';
+                    ellipsis.textContent = '...';
+                    container.appendChild(ellipsis);
+                } else {
+                    const btn = document.createElement('button');
+                    btn.className = `pagination-btn page-num${page === currentPage ? ' active' : ''}`;
+                    btn.textContent = page;
+                    btn.addEventListener('click', () => onPageClick(page));
+                    container.appendChild(btn);
+                }
+            });
+        }
+
+        // Go to specific page functions
+        function goToDiseasePage() {
+            const input = document.getElementById('diseases-page-input');
+            const page = parseInt(input.value);
+            if (page && page >= 1 && state.diseases.data && page <= state.diseases.data.total_pages) {
+                state.diseases.page = page;
+                loadDiseases();
+                input.value = '';
+            }
+        }
+
+        function goToHerbPage() {
+            const input = document.getElementById('herbs-page-input');
+            const page = parseInt(input.value);
+            if (page && page >= 1 && state.herbs.data && page <= state.herbs.data.total_pages) {
+                state.herbs.page = page;
+                loadHerbs();
+                input.value = '';
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadDiseases();
+            loadHerbs();
+            setupEventListeners();
+        });
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                document.getElementById('disease-count').textContent = formatNumber(stats.diseases);
+                document.getElementById('herb-count').textContent = formatNumber(stats.herbs);
+                document.getElementById('total-diseases').textContent = formatNumber(stats.diseases);
+                document.getElementById('total-herbs').textContent = formatNumber(stats.herbs);
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        // Load diseases
+        async function loadDiseases() {
+            const tbody = document.getElementById('diseases-tbody');
+            tbody.innerHTML = '<tr><td colspan="4" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>';
+
+            try {
+                const params = new URLSearchParams({
+                    page: state.diseases.page,
+                    per_page: PER_PAGE,
+                    search: state.diseases.search
+                });
+                
+                const response = await fetch(`/api/database/diseases?${params}`);
+                const data = await response.json();
+                state.diseases.data = data;
+
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#6b7280;">No diseases found</td></tr>';
+                } else {
+                    tbody.innerHTML = data.data.map((d, i) => `
+                        <tr onclick="showDiseaseGenes('${escapeHtml(d.name)}')">
+                            <td>${(data.page - 1) * PER_PAGE + i + 1}</td>
+                            <td><strong>${escapeHtml(d.name)}</strong></td>
+                            <td><span class="badge badge-purple">${d.gene_count} genes</span></td>
+                            <td><span class="badge badge-blue">DisGeNET</span></td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Update pagination
+                const start = (data.page - 1) * PER_PAGE + 1;
+                const end = Math.min(data.page * PER_PAGE, data.total);
+                document.getElementById('diseases-info').textContent = `Showing ${start}-${end} of ${data.total}`;
+                document.getElementById('diseases-prev').disabled = data.page <= 1;
+                document.getElementById('diseases-next').disabled = data.page >= data.total_pages;
+                document.getElementById('diseases-page-input').max = data.total_pages;
+                
+                // Generate page number buttons
+                generatePageNumbers(data.page, data.total_pages, 'diseases-pages', (page) => {
+                    state.diseases.page = page;
+                    loadDiseases();
+                });
+
+            } catch (error) {
+                console.error('Failed to load diseases:', error);
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#ef4444;">Error loading data</td></tr>';
+            }
+        }
+
+        // Load herbs
+        async function loadHerbs() {
+            const tbody = document.getElementById('herbs-tbody');
+            tbody.innerHTML = '<tr><td colspan="5" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>';
+
+            try {
+                const params = new URLSearchParams({
+                    page: state.herbs.page,
+                    per_page: PER_PAGE,
+                    search: state.herbs.search
+                });
+                
+                const response = await fetch(`/api/database/herbs?${params}`);
+                const data = await response.json();
+                state.herbs.data = data;
+
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#6b7280;">No herbs found</td></tr>';
+                } else {
+                    tbody.innerHTML = data.data.map((h, i) => `
+                        <tr onclick="showHerbGenes('${escapeHtml(h.name)}')">
+                            <td>${(data.page - 1) * PER_PAGE + i + 1}</td>
+                            <td><strong>${escapeHtml(h.name)}</strong></td>
+                            <td><span class="badge badge-purple">${h.gene_count} genes</span></td>
+                            <td><span class="badge badge-green">${h.compound_count} compounds</span></td>
+                            <td><span class="badge badge-blue">BATMAN-TCM</span></td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Update pagination
+                const start = (data.page - 1) * PER_PAGE + 1;
+                const end = Math.min(data.page * PER_PAGE, data.total);
+                document.getElementById('herbs-info').textContent = `Showing ${start}-${end} of ${data.total}`;
+                document.getElementById('herbs-prev').disabled = data.page <= 1;
+                document.getElementById('herbs-next').disabled = data.page >= data.total_pages;
+                document.getElementById('herbs-page-input').max = data.total_pages;
+                
+                // Generate page number buttons
+                generatePageNumbers(data.page, data.total_pages, 'herbs-pages', (page) => {
+                    state.herbs.page = page;
+                    loadHerbs();
+                });
+
+            } catch (error) {
+                console.error('Failed to load herbs:', error);
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#ef4444;">Error loading data</td></tr>';
+            }
+        }
+
+        // Show disease genes in modal
+        async function showDiseaseGenes(name) {
+            state.modal = { type: 'disease', name, page: 1 };
+            document.getElementById('modal-title').textContent = `Genes for: ${name}`;
+            document.getElementById('gene-modal').classList.add('active');
+            loadModalGenes();
+        }
+
+        // Show herb genes in modal
+        async function showHerbGenes(name) {
+            state.modal = { type: 'herb', name, page: 1 };
+            document.getElementById('modal-title').textContent = `Genes for: ${name}`;
+            document.getElementById('gene-modal').classList.add('active');
+            loadModalGenes();
+        }
+
+        // Load genes in modal
+        async function loadModalGenes() {
+            const content = document.getElementById('modal-content');
+            content.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i>Loading genes...</div>';
+
+            try {
+                const endpoint = state.modal.type === 'disease' 
+                    ? `/api/database/disease/${encodeURIComponent(state.modal.name)}/genes`
+                    : `/api/database/herb/${encodeURIComponent(state.modal.name)}/genes`;
+                
+                const params = new URLSearchParams({
+                    page: state.modal.page,
+                    per_page: 100
+                });
+
+                const response = await fetch(`${endpoint}?${params}`);
+                const data = await response.json();
+
+                if (state.modal.type === 'herb') {
+                    // Herb: Show compounds with genes grouped
+                    if (!data.compounds || data.compounds.length === 0) {
+                        content.innerHTML = '<p style="text-align:center;color:#6b7280;">No compounds found</p>';
+                    } else {
+                        content.innerHTML = `
+                            <div class="modal-summary">
+                                <span class="summary-badge"><i class="fas fa-flask"></i> ${data.total_compounds} Compounds</span>
+                                <span class="summary-badge"><i class="fas fa-dna"></i> ${data.total_genes} Gene Associations</span>
+                            </div>
+                            <div class="compounds-grid">
+                                ${data.compounds.map(c => `
+                                    <div class="compound-card">
+                                        <div class="compound-header">
+                                            <span class="compound-name"><i class="fas fa-flask"></i> ${escapeHtml(c.compound || 'Unknown')}</span>
+                                            <span class="compound-count">${c.gene_count} genes</span>
+                                        </div>
+                                        <div class="genes-box">
+                                            ${c.genes.map(g => `
+                                                <span class="gene-tag">${escapeHtml(g.gene)} <small>(${escapeHtml(g.gene_id || '?')})</small></span>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    }
+                    // Hide pagination for herbs (showing all at once)
+                    document.getElementById('modal-pagination').style.display = 'none';
+                } else {
+                    // Disease: Show table format
+                    if (!data.data || data.data.length === 0) {
+                        content.innerHTML = '<p style="text-align:center;color:#6b7280;">No genes found</p>';
+                    } else {
+                        content.innerHTML = `
+                            <div class="data-table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Gene Symbol</th>
+                                            <th>Gene ID</th>
+                                            <th>Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.data.map(g => `
+                                            <tr>
+                                                <td><strong>${escapeHtml(g.gene || '-')}</strong></td>
+                                                <td>${escapeHtml(g.gene_id || '-')}</td>
+                                                <td>${escapeHtml(g.score || '-')}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    }
+
+                    // Update modal pagination for diseases
+                    const pagination = document.getElementById('modal-pagination');
+                    if (data.total_pages > 1) {
+                        pagination.style.display = 'flex';
+                        const start = (data.page - 1) * 100 + 1;
+                        const end = Math.min(data.page * 100, data.total);
+                        document.getElementById('modal-info').textContent = `Showing ${start}-${end} of ${data.total}`;
+                        document.getElementById('modal-prev').disabled = data.page <= 1;
+                        document.getElementById('modal-next').disabled = data.page >= data.total_pages;
+                        
+                        // Generate page number buttons for modal
+                        generatePageNumbers(data.page, data.total_pages, 'modal-pages', (page) => {
+                            state.modal.page = page;
+                            loadModalGenes();
+                        });
+                    } else {
+                        pagination.style.display = 'none';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Failed to load genes:', error);
+                content.innerHTML = '<p style="text-align:center;color:#ef4444;">Error loading genes</p>';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('gene-modal').classList.remove('active');
+        }
+
+        // Event listeners
+        function setupEventListeners() {
+            // Tab switching
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
+                });
+            });
+
+            // Disease search
+            let diseaseSearchTimer;
+            document.getElementById('disease-search').addEventListener('input', (e) => {
+                clearTimeout(diseaseSearchTimer);
+                diseaseSearchTimer = setTimeout(() => {
+                    state.diseases.search = e.target.value;
+                    state.diseases.page = 1;
+                    loadDiseases();
+                }, 300);
+            });
+
+            // Herb search
+            let herbSearchTimer;
+            document.getElementById('herb-search').addEventListener('input', (e) => {
+                clearTimeout(herbSearchTimer);
+                herbSearchTimer = setTimeout(() => {
+                    state.herbs.search = e.target.value;
+                    state.herbs.page = 1;
+                    loadHerbs();
+                }, 300);
+            });
+
+            // Disease pagination
+            document.getElementById('diseases-prev').addEventListener('click', () => {
+                if (state.diseases.page > 1) {
+                    state.diseases.page--;
+                    loadDiseases();
+                }
+            });
+            document.getElementById('diseases-next').addEventListener('click', () => {
+                state.diseases.page++;
+                loadDiseases();
+            });
+
+            // Herb pagination
+            document.getElementById('herbs-prev').addEventListener('click', () => {
+                if (state.herbs.page > 1) {
+                    state.herbs.page--;
+                    loadHerbs();
+                }
+            });
+            document.getElementById('herbs-next').addEventListener('click', () => {
+                state.herbs.page++;
+                loadHerbs();
+            });
+
+            // Modal pagination
+            document.getElementById('modal-prev').addEventListener('click', () => {
+                if (state.modal.page > 1) {
+                    state.modal.page--;
+                    loadModalGenes();
+                }
+            });
+            document.getElementById('modal-next').addEventListener('click', () => {
+                state.modal.page++;
+                loadModalGenes();
+            });
+
+            // Close modal on overlay click
+            document.getElementById('gene-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'gene-modal') {
+                    closeModal();
+                }
+            });
+
+            // Close modal on escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            });
+            
+            // Enter key for page jump inputs
+            document.getElementById('diseases-page-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    goToDiseasePage();
+                }
+            });
+            
+            document.getElementById('herbs-page-input').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    goToHerbPage();
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

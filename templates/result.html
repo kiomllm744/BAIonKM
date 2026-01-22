@@ -1,87 +1,1380 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Results Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results - EnrichR Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f9f9f9;
+            font-family: 'Inter', sans-serif;
+            background: #f1f5f9;
+            min-height: 100vh;
         }
-
-        h1 {
+        
+        /* Top Navigation */
+        .top-nav {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            text-decoration: none;
+            margin-right: 40px;
+        }
+        
+        .nav-brand-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-brand-icon i {
+            font-size: 1.1rem;
+            color: white;
+        }
+        
+        .nav-brand-text {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .nav-link {
+            color: #94a3b8;
+            text-decoration: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        
+        .nav-link.active {
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+        }
+        
+        /* Main Content */
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 28px;
+        }
+        
+        /* Header */
+        .page-header {
+            margin-bottom: 24px;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .page-header h1 {
+            font-size: 1.75rem;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .page-header p {
+            color: #6b7280;
+        }
+        
+        .page-header strong {
+            color: #6366f1;
+        }
+        
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .summary-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .summary-icon.blue { background: #dbeafe; color: #2563eb; }
+        .summary-icon.green { background: #d1fae5; color: #059669; }
+        .summary-icon.purple { background: #ede9fe; color: #7c3aed; }
+        
+        .summary-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        
+        .summary-label {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .card-header i {
+            color: #6366f1;
+            font-size: 1.1rem;
+        }
+        
+        .card-header h2 {
+            font-size: 1rem;
+            color: #1f2937;
+            flex: 1;
+        }
+        
+        .card-header .badge {
+            background: #ede9fe;
+            color: #7c3aed;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        /* AI Analysis Card - Special Styling */
+        .ai-card {
+            border: 2px solid #e0e7ff;
+            background: linear-gradient(to bottom, #fefeff, #f8faff);
+        }
+        
+        .ai-card .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom: none;
+        }
+        
+        .ai-card .card-header i {
+            color: white;
+        }
+        
+        .ai-card .card-header h2 {
+            color: white;
+        }
+        
+        .ai-card .card-header .badge {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        /* AI Summary Table */
+        .ai-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .ai-summary-table th {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .ai-summary-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+            color: #374151;
+            background: white;
+        }
+        
+        .ai-summary-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .ai-summary-table tbody tr:hover {
+            background: #f8fafc;
+        }
+        
+        .ai-summary-table .feature-cell {
+            font-weight: 600;
+            color: #4f46e5;
+            background: #f8fafc;
+        }
+        
+        /* AI Actions */
+        .ai-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .btn-detailed {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-detailed:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-detailed.active {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        }
+        
+        /* Detailed Analysis Panel */
+        .detailed-analysis {
+            display: none;
             margin-top: 20px;
-            color: #333;
+            padding: 24px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .detailed-analysis.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .detailed-analysis h2 {
+            color: #4f46e5;
+            font-size: 1.1rem;
+            margin: 20px 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e7ff;
+        }
+        
+        .detailed-analysis h2:first-child {
+            margin-top: 0;
+        }
+        
+        .detailed-analysis p {
+            line-height: 1.7;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+        
+        .detailed-analysis ul {
+            padding-left: 24px;
+            margin: 12px 0;
+        }
+        
+        .detailed-analysis li {
+            line-height: 1.7;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .detailed-analysis strong {
+            color: #4f46e5;
+        }
+        
+        /* AI Loading */
+        .ai-loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .ai-loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .ai-loading p {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+        
+        /* AI Error */
+        .ai-error, .ai-unavailable {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .ai-error i, .ai-unavailable i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            color: #f59e0b;
+        }
+        
+        .ai-unavailable i {
+            color: #9ca3af;
+        }
+        
+        .ai-error h4, .ai-unavailable h4 {
+            color: #374151;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .ai-error p, .ai-unavailable p {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        
+        .ai-unavailable code {
+            display: block;
+            background: #1f2937;
+            color: #10b981;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin: 16px auto;
+            max-width: 300px;
+            font-size: 0.85rem;
+        }
+        
+        .btn-retry {
+            margin-top: 16px;
+            padding: 10px 20px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .btn-retry:hover {
+            background: #4f46e5;
         }
 
-        .results-container {
+        /* Clinical Questions Card */
+        .clinical-card {
+            border: 2px solid #d1fae5;
+            background: linear-gradient(to bottom, #fefffe, #f0fdf4);
+        }
+        
+        .clinical-card .card-header {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+            border-bottom: none;
+        }
+        
+        .clinical-card .card-header i {
+            color: white;
+        }
+        
+        .clinical-card .card-header h2 {
+            color: white;
+        }
+        
+        .clinical-card .card-header .badge {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        /* Clinical Questions Grid */
+        .clinical-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        
+        .clinical-group-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #d1fae5;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        
+        .clinical-group-card:hover {
+            box-shadow: 0 4px 16px rgba(5, 150, 105, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .clinical-group-header {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            padding: 16px 20px;
+            border-bottom: 1px solid #a7f3d0;
+        }
+        
+        .clinical-group-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .clinical-group-label i {
+            font-size: 0.8rem;
+        }
+        
+        .clinical-suspected-driver {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #047857;
+            margin: 0;
+        }
+        
+        .clinical-group-body {
+            padding: 20px;
+        }
+        
+        .clinical-questions-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .clinical-questions-list li {
+            position: relative;
+            padding: 12px 0 12px 28px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #374151;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .clinical-questions-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .clinical-questions-list li::before {
+            content: "?";
+            position: absolute;
+            left: 0;
+            top: 12px;
+            width: 20px;
+            height: 20px;
+            background: #d1fae5;
+            color: #059669;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .clinical-group-footer {
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .btn-rationale {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: transparent;
+            color: #059669;
+            border: 1px solid #059669;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .btn-rationale:hover {
+            background: #059669;
+            color: white;
+        }
+        
+        .btn-rationale.active {
+            background: #059669;
+            color: white;
+        }
+        
+        .rationale-panel {
+            display: none;
+            padding: 16px 20px;
+            background: #f0fdf4;
+            border-top: 1px solid #d1fae5;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #374151;
+        }
+        
+        .rationale-panel.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        .rationale-panel strong {
+            color: #047857;
+        }
+        
+        .clinical-loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .clinical-loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #d1fae5;
+            border-top-color: #059669;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        .clinical-count-badge {
+            background: rgba(255,255,255,0.3);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-left: 8px;
+        }
+        
+        /* Prescription Grid */
+        .prescription-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        
+        .prescription-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        
+        .prescription-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        
+        .rx-badge {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .herb-tags {
             display: flex;
             flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 30px;
+            gap: 6px;
+            margin-bottom: 12px;
         }
-
-        .result-table {
-            width: 250px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin: 10px;
-            padding: 10px;
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        
+        .herb-tag {
+            background: #f0fdf4;
+            color: #166534;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            border: 1px solid #bbf7d0;
         }
-
-        .result-table h2 {
-            margin: 0;
-            padding-bottom: 10px;
-            color: #555;
+        
+        .prescription-stats {
+            display: flex;
+            gap: 20px;
+            padding-top: 12px;
+            border-top: 1px solid #f3f4f6;
         }
-
-        table {
+        
+        .prescription-stat {
+            text-align: center;
+        }
+        
+        .prescription-stat-value {
+            display: block;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #6366f1;
+        }
+        
+        .prescription-stat-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+        
+        /* Enrichment Grid */
+        .enrichment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+        
+        .enrichment-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .enrichment-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .enrichment-table {
             width: 100%;
+            font-size: 0.85rem;
+            border-collapse: collapse;
         }
-
-        th {
-            background-color: #f2f2f2;
-            padding: 8px;
-            text-align: center;
-            border-bottom: 1px solid #ddd;
+        
+        .enrichment-table th {
+            background: #f8fafc;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
         }
-
-        td {
-            padding: 8px;
+        
+        .enrichment-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #4b5563;
+        }
+        
+        .enrichment-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .enrichment-table .term-name {
+            max-width: 180px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+        
+        .pvalue {
+            color: #059669;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        
+        .score {
+            color: #6366f1;
+            font-weight: 600;
+        }
+        
+        .result-count {
+            background: #ede9fe;
+            color: #7c3aed;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        
+        .no-results {
             text-align: center;
-            border-bottom: 1px solid #ddd;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .no-results i {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            color: #d1d5db;
+        }
+        
+        /* Actions */
+        .page-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .btn-secondary:hover {
+            border-color: #6366f1;
+            color: #6366f1;
+        }
+        
+        /* Alert */
+        .alert {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 24px;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            color: #92400e;
+        }
+        
+        .alert-warning i {
+            color: #f59e0b;
         }
     </style>
 </head>
 <body>
-    <h1>Enrichment Analysis Results</h1>
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <a href="/" class="nav-brand">
+            <div class="nav-brand-icon">
+                <i class="fas fa-dna"></i>
+            </div>
+            <span class="nav-brand-text">EnrichR Portal</span>
+        </a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">
+                <i class="fas fa-search"></i> New Analysis
+            </a>
+            <a href="/database" class="nav-link">
+                <i class="fas fa-database"></i> Database
+            </a>
+            <a href="/results" class="nav-link active">
+                <i class="fas fa-chart-bar"></i> Results
+            </a>
+            <a href="/about" class="nav-link">
+                <i class="fas fa-info-circle"></i> About
+            </a>
+        </div>
+    </nav>
 
-    <div class="results-container">
-        {% if enrichment_data %}
-            {% for data in enrichment_data %}
-                <div class="result-table">
-                    <h2>Prescription {{ loop.index }}</h2>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Term Name</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in data['enrichment_data'][:15] %}
-                                <tr>
-                                    <td>{{ item['Term name'] }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Page Header -->
+        <div class="page-header">
+            <a href="/" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Analysis
+            </a>
+            <h1>Analysis Results</h1>
+            <p>Enrichment analysis for <strong>{{ results.disease_name }}</strong></p>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-icon blue">
+                    <i class="fas fa-virus"></i>
                 </div>
+                <div>
+                    <span class="summary-value">{{ results.disease_gene_count }}</span>
+                    <span class="summary-label">Disease Genes</span>
+                </div>
+            </div>
+            
+            {% for prescription in results.prescriptions %}
+            <div class="summary-card">
+                <div class="summary-icon green">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div>
+                    <span class="summary-value">{{ prescription.common_gene_count | default(0) }}</span>
+                    <span class="summary-label">Rx {{ prescription.index }} Common</span>
+                </div>
+            </div>
             {% endfor %}
-        {% else %}
-            <p>No enrichment data available.</p>
+        </div>
+
+        <!-- Errors/Warnings -->
+        {% if results.errors %}
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                <strong>Warnings:</strong>
+                <ul style="margin: 8px 0 0 16px;">
+                    {% for error in results.errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
         {% endif %}
+
+        <!-- Prescription Summary Card -->
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-clipboard-list"></i>
+                <h2>Prescription Summary</h2>
+            </div>
+            <div class="card-body">
+                <div class="prescription-grid">
+                    {% for prescription in results.prescriptions %}
+                    <div class="prescription-item">
+                        <div class="prescription-item-header">
+                            <span class="rx-badge">Rx {{ prescription.index }}</span>
+                        </div>
+                        <div class="herb-tags">
+                            {% for herb in prescription.herbs %}
+                            <span class="herb-tag">{{ herb }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="prescription-stats">
+                            <div class="prescription-stat">
+                                <span class="prescription-stat-value">{{ prescription.gene_count }}</span>
+                                <span class="prescription-stat-label">Herb Genes</span>
+                            </div>
+                            <div class="prescription-stat">
+                                <span class="prescription-stat-value">{{ prescription.common_gene_count | default(0) }}</span>
+                                <span class="prescription-stat-label">Common</span>
+                            </div>
+                            <div class="prescription-stat">
+                                <span class="prescription-stat-value">{{ prescription.unique_gene_count | default(0) }}</span>
+                                <span class="prescription-stat-label">Unique</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Analysis Card -->
+        <div class="card ai-card">
+            <div class="card-header">
+                <i class="fas fa-robot"></i>
+                <h2>AI Comparative Analysis</h2>
+                <span class="badge">Powered by Gemini 2.0</span>
+            </div>
+            <div class="card-body">
+                <!-- Loading State -->
+                <div id="ai-loading" class="ai-loading">
+                    <div class="ai-loading-spinner"></div>
+                    <p>Analyzing pathways with AI...</p>
+                </div>
+                
+                <!-- AI Results -->
+                <div id="ai-results" style="display: none;">
+                    <!-- Summary Table -->
+                    <div id="ai-table-container"></div>
+                    
+                    <!-- Actions -->
+                    <div class="ai-actions">
+                        <button class="btn-detailed" id="btn-toggle-details" onclick="toggleDetailedAnalysis()">
+                            <i class="fas fa-microscope"></i>
+                            <span>View Detailed Analysis</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Detailed Analysis Panel -->
+                    <div id="detailed-analysis" class="detailed-analysis"></div>
+                </div>
+                
+                <!-- Error State -->
+                <div id="ai-error" class="ai-error" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h4>Analysis Failed</h4>
+                    <p id="ai-error-message">An error occurred</p>
+                    <button class="btn-retry" onclick="runAiAnalysis()">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>
+                
+                <!-- Unavailable State -->
+                <div id="ai-unavailable" class="ai-unavailable" style="display: none;">
+                    <i class="fas fa-key"></i>
+                    <h4>API Key Required</h4>
+                    <p>Set your Gemini API key to enable AI analysis:</p>
+                    <code>GEMINI_API_KEY=your_key</code>
+                    <p>Get a free key at <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #6366f1;">Google AI Studio</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clinical Questions Card -->
+        <div class="card clinical-card">
+            <div class="card-header">
+                <i class="fas fa-stethoscope"></i>
+                <h2>Clinical Interview Questions</h2>
+                <span class="badge">Diagnostic Support</span>
+            </div>
+            <div class="card-body">
+                <!-- Loading State -->
+                <div id="clinical-loading" class="clinical-loading">
+                    <div class="clinical-loading-spinner"></div>
+                    <p>Generating clinical questions...</p>
+                </div>
+                
+                <!-- Clinical Results Grid -->
+                <div id="clinical-results" class="clinical-grid" style="display: none;"></div>
+                
+                <!-- Unavailable/No Data State -->
+                <div id="clinical-unavailable" style="display: none; text-align: center; padding: 40px; color: #6b7280;">
+                    <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
+                    <p>Clinical questions will be generated after pathway analysis completes.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enrichment Results Card -->
+        {% if results.enrichment_data %}
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-chart-bar"></i>
+                <h2>Enrichment Analysis (DisGeNET)</h2>
+            </div>
+            <div class="card-body">
+                <div class="enrichment-grid">
+                    {% for data in results.enrichment_data %}
+                    <div class="enrichment-item">
+                        <div class="enrichment-item-header">
+                            <span class="rx-badge">Rx {{ loop.index }}</span>
+                            <span class="result-count">{{ data.enrichment_data | length }} results</span>
+                        </div>
+                        
+                        {% if data.enrichment_data %}
+                        <table class="enrichment-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Term</th>
+                                    <th>P-value</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in data.enrichment_data %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <span class="term-name" title="{{ item['Term name'] }}">{{ item['Term name'] }}</span>
+                                    </td>
+                                    <td><span class="pvalue">{{ "%.2e" | format(item['Adjusted p-value']) }}</span></td>
+                                    <td><span class="score">{{ "%.1f" | format(item['Combined score']) }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <div class="no-results">
+                            <i class="fas fa-search"></i>
+                            <p>No significant enrichment results</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Page Actions -->
+        <div class="page-actions">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> New Analysis
+            </a>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Print Results
+            </button>
+        </div>
     </div>
+
+    <script>
+        const resultsData = {{ results | tojson | safe }};
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAndRunAiAnalysis();
+        });
+        
+        async function checkAndRunAiAnalysis() {
+            try {
+                const statusResponse = await fetch('/api/ai-analysis/status');
+                const status = await statusResponse.json();
+                
+                if (!status.available) {
+                    showAiUnavailable();
+                    showClinicalUnavailable();
+                    return;
+                }
+                
+                await runAiAnalysis();
+            } catch (error) {
+                console.error('Error:', error);
+                showAiError('Failed to initialize AI');
+                showClinicalUnavailable();
+            }
+        }
+        
+        async function runAiAnalysis() {
+            // Show loading states
+            document.getElementById('ai-loading').style.display = 'block';
+            document.getElementById('ai-results').style.display = 'none';
+            document.getElementById('ai-error').style.display = 'none';
+            document.getElementById('ai-unavailable').style.display = 'none';
+            
+            document.getElementById('clinical-loading').style.display = 'block';
+            document.getElementById('clinical-results').style.display = 'none';
+            document.getElementById('clinical-unavailable').style.display = 'none';
+            
+            try {
+                const prescriptionEnrichments = {};
+                
+                if (resultsData.enrichment_data) {
+                    resultsData.enrichment_data.forEach((rxData, index) => {
+                        const rxKey = `Prescription ${index + 1}`;
+                        const rxEnrichment = [];
+                        
+                        if (rxData.enrichment_data) {
+                            rxData.enrichment_data.forEach(item => {
+                                rxEnrichment.push({
+                                    term: item['Term name'],
+                                    adjusted_p_value: item['Adjusted p-value'],
+                                    combined_score: item['Combined score']
+                                });
+                            });
+                        }
+                        
+                        prescriptionEnrichments[rxKey] = { 'DisGeNET': rxEnrichment };
+                    });
+                }
+                
+                const response = await fetch('/api/ai-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        disease_name: resultsData.disease_name,
+                        prescription_enrichments: prescriptionEnrichments
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'AI analysis failed');
+                }
+                
+                const aiResults = await response.json();
+                
+                // Hide loading states
+                document.getElementById('ai-loading').style.display = 'none';
+                document.getElementById('clinical-loading').style.display = 'none';
+                
+                if (aiResults.has_ai_analysis) {
+                    document.getElementById('ai-results').style.display = 'block';
+                    
+                    // Render summary table
+                    if (aiResults.summary_table && aiResults.summary_table.length > 0) {
+                        renderSummaryTable(aiResults.summary_table);
+                    } else {
+                        document.getElementById('ai-table-container').innerHTML = 
+                            '<p style="color: #6b7280; text-align: center; padding: 20px;">No comparison table data available.</p>';
+                    }
+                    
+                    // Store detailed analysis for toggle
+                    if (aiResults.detailed_analysis) {
+                        document.getElementById('detailed-analysis').innerHTML = 
+                            formatMarkdown(aiResults.detailed_analysis);
+                    } else {
+                        document.getElementById('btn-toggle-details').style.display = 'none';
+                    }
+                    
+                    // Render clinical questions as cards
+                    if (aiResults.clinical_questions && Array.isArray(aiResults.clinical_questions)) {
+                        document.getElementById('clinical-results').style.display = 'grid';
+                        renderClinicalCards(aiResults.clinical_questions);
+                    } else {
+                        showClinicalUnavailable();
+                    }
+                } else {
+                    showAiError(aiResults.error || 'No analysis results available');
+                    showClinicalUnavailable();
+                }
+                
+            } catch (err) {
+                console.error('AI error:', err);
+                showAiError(err.message);
+                showClinicalUnavailable();
+            }
+        }
+        
+        function renderSummaryTable(tableData) {
+            if (!tableData || tableData.length === 0) {
+                document.getElementById('ai-table-container').innerHTML = 
+                    '<p style="color: #6b7280; text-align: center; padding: 20px;">No summary data available</p>';
+                return;
+            }
+            
+            // Get column headers from first row
+            const columns = Object.keys(tableData[0]);
+            
+            let html = '<table class="ai-summary-table"><thead><tr>';
+            columns.forEach(col => {
+                html += `<th>${col}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            tableData.forEach(row => {
+                html += '<tr>';
+                columns.forEach((col, idx) => {
+                    const cellClass = idx === 0 ? 'feature-cell' : '';
+                    html += `<td class="${cellClass}">${row[col] || '-'}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('ai-table-container').innerHTML = html;
+        }
+        
+        function renderClinicalCards(clinicalData) {
+            if (!clinicalData || !Array.isArray(clinicalData) || clinicalData.length === 0) {
+                showClinicalUnavailable();
+                return;
+            }
+            
+            let html = '';
+            
+            clinicalData.forEach((group, index) => {
+                const groupLabel = group.group_label || `Group ${index + 1}`;
+                const suspectedDriver = group.suspected_driver || 'Analysis pending';
+                const questions = group.clinical_questions || [];
+                const rationale = group.rationale_hidden || '';
+                const cardId = `clinical-card-${index}`;
+                
+                html += `
+                <div class="clinical-group-card">
+                    <div class="clinical-group-header">
+                        <div class="clinical-group-label">
+                            <i class="fas fa-user-md"></i>
+                            ${escapeHtml(groupLabel)}
+                        </div>
+                        <p class="clinical-suspected-driver">
+                            <strong>Suspected Driver:</strong> ${escapeHtml(suspectedDriver)}
+                        </p>
+                    </div>
+                    <div class="clinical-group-body">
+                        <ul class="clinical-questions-list">
+                            ${questions.map(q => `<li>${escapeHtml(q)}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="clinical-group-footer">
+                        <button class="btn-rationale" onclick="toggleRationale('${cardId}', this)">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Show Rationale</span>
+                        </button>
+                    </div>
+                    <div id="${cardId}-rationale" class="rationale-panel">
+                        ${formatMarkdown(rationale)}
+                    </div>
+                </div>`;
+            });
+            
+            document.getElementById('clinical-results').innerHTML = html;
+        }
+        
+        function toggleRationale(cardId, btn) {
+            const panel = document.getElementById(`${cardId}-rationale`);
+            const isShowing = panel.classList.contains('show');
+            
+            if (isShowing) {
+                panel.classList.remove('show');
+                btn.innerHTML = '<i class="fas fa-lightbulb"></i><span>Show Rationale</span>';
+                btn.classList.remove('active');
+            } else {
+                panel.classList.add('show');
+                btn.innerHTML = '<i class="fas fa-times"></i><span>Hide Rationale</span>';
+                btn.classList.add('active');
+            }
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function toggleDetailedAnalysis() {
+            const panel = document.getElementById('detailed-analysis');
+            const btn = document.getElementById('btn-toggle-details');
+            
+            if (panel.classList.contains('show')) {
+                panel.classList.remove('show');
+                btn.innerHTML = '<i class="fas fa-microscope"></i><span>View Detailed Analysis</span>';
+                btn.classList.remove('active');
+            } else {
+                panel.classList.add('show');
+                btn.innerHTML = '<i class="fas fa-times"></i><span>Hide Detailed Analysis</span>';
+                btn.classList.add('active');
+            }
+        }
+        
+        function formatMarkdown(text) {
+            if (!text) return '';
+            return text
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gm, '<h2>$1</h2>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^\* (.*$)/gm, '<li>$1</li>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)\n(<li>)/g, '$1$2')
+                .replace(/(<li>[\s\S]*?<\/li>)+/g, '<ul>$&</ul>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+        }
+        
+        function showAiError(message) {
+            document.getElementById('ai-loading').style.display = 'none';
+            document.getElementById('ai-results').style.display = 'none';
+            document.getElementById('ai-unavailable').style.display = 'none';
+            document.getElementById('ai-error').style.display = 'block';
+            document.getElementById('ai-error-message').textContent = message;
+        }
+        
+        function showAiUnavailable() {
+            document.getElementById('ai-loading').style.display = 'none';
+            document.getElementById('ai-results').style.display = 'none';
+            document.getElementById('ai-error').style.display = 'none';
+            document.getElementById('ai-unavailable').style.display = 'block';
+        }
+        
+        function showClinicalUnavailable() {
+            document.getElementById('clinical-loading').style.display = 'none';
+            document.getElementById('clinical-results').style.display = 'none';
+            document.getElementById('clinical-unavailable').style.display = 'block';
+        }
+    </script>
 </body>
 </html>
