@@ -8,7 +8,7 @@ import requests
 
 # Google Drive file ID - UPDATE THIS with your actual file ID
 # Get from the sharing link: https://drive.google.com/file/d/FILE_ID_HERE/view
-GDRIVE_FILE_ID = "YOUR_GOOGLE_DRIVE_FILE_ID_HERE"
+GDRIVE_FILE_ID = "1VuGmIvan8cXLai2LvzF1WUwI5FqTKtrB"
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "diseaseportal.db")
 
