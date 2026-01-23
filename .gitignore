@@ -1,0 +1,31 @@
+# Environment variables (contains API keys)
+.env
+
+# Database files (too large for GitHub - download separately)
+*.db
+diseaseportal.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Instance folder
+instance/
