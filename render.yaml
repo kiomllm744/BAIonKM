@@ -2,12 +2,10 @@ services:
   - type: web
     name: disease-portal
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    buildCommand: pip install -r requirements.txt && python download_db.py
+    startCommand: streamlit run streamlit_app.py --server.port $PORT --server.headless true
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: GEMINI_API_KEY
         sync: false
-      - key: FLASK_ENV
-        value: production

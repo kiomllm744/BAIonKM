@@ -37,3 +37,12 @@ utils/
 # Temporary files
 *.tmp
 *.bak
+
+# Streamlit secrets (keep config.toml, ignore secrets)
+.streamlit/secrets.toml
+
+# Old Flask files (keeping for reference but not needed for Streamlit)
+# app.py
+# routes.py
+# templates/
+# static/
