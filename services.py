@@ -8,13 +8,13 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import func, create_engine, text
 from sqlalchemy.orm import sessionmaker
-from models import Disease, Herb
+from models import Disease, Herb, DATABASE_URI
 from config import Config
 
 
 # Create engine with optimized settings
 engine = create_engine(
-    Config.SQLALCHEMY_DATABASE_URI,
+    DATABASE_URI,
     pool_pre_ping=True,
     pool_recycle=300,
     connect_args={'check_same_thread': False}  # SQLite specific

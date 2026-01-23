@@ -5,11 +5,15 @@ import secrets
 import os
 
 # Try to import streamlit secrets (for Streamlit Cloud deployment)
-try:
-    import streamlit as st
-    STREAMLIT_SECRETS = st.secrets if hasattr(st, 'secrets') else {}
-except:
-    STREAMLIT_SECRETS = {}
+def get_streamlit_secret(key, default=None):
+    """Safely get a secret from Streamlit, returning default if not available."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return st.secrets[key]
+    except:
+        pass
+    return default
 
 class Config:
     """Base configuration class."""
@@ -31,5 +35,5 @@ class Config:
     
     # LLM Settings (Gemini API)
     # Priority: Environment variable > Streamlit secrets
-    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or STREAMLIT_SECRETS.get('GEMINI_API_KEY')
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or get_streamlit_secret('GEMINI_API_KEY')
 
