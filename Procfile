@@ -1,1 +1,1 @@
-web: streamlit run streamlit_app.py --server.port $PORT --server.headless true
+web: python download_db.py && gunicorn app:app --bind 0.0.0.0:$PORT
