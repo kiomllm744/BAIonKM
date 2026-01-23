@@ -876,79 +876,30 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    .sidebar {
-        width: 80px;
-    }
-    
-    .logo span,
-    .nav-item span,
-    .stat-info {
-        display: none;
-    }
-    
-    .logo {
-        justify-content: center;
-        padding: 20px;
-    }
-    
-    .nav-item {
-        justify-content: center;
-    }
-    
-    .stat-item {
-        justify-content: center;
-    }
-    
-    .main-content {
-        margin-left: 80px;
-    }
+/* ==========================================
+   Korean Language Support Styles
+   ========================================== */
+
+/* Korean text in suggestions */
+.herb-english {
+    color: var(--text-muted);
+    font-size: 0.85em;
 }
 
-@media (max-width: 768px) {
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: fixed;
-        bottom: 0;
-        top: auto;
-        flex-direction: row;
-    }
-    
-    .logo {
-        display: none;
-    }
-    
-    .nav-menu {
-        display: flex;
-        padding: 8px;
-        flex: 1;
-        justify-content: space-around;
-    }
-    
-    .nav-item {
-        padding: 12px;
-        margin: 0;
-    }
-    
-    .sidebar-stats {
-        display: none;
-    }
-    
-    .main-content {
-        margin-left: 0;
-        margin-bottom: 70px;
-        padding: 16px;
-    }
-    
-    .summary-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-    
-    .enrichment-grid {
-        grid-template-columns: 1fr;
-    }
+.suggestion-item .herb-english {
+    margin-left: 4px;
+}
+
+/* Herb tags with Korean names */
+.herb-tag {
+    font-size: 0.85rem;
+}
+
+/* Ensure Korean characters display properly */
+.suggestion-item,
+.herb-tag,
+.tags-input {
+    font-family: 'Inter', 'Malgun Gothic', '맑은 고딕', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* Print Styles */

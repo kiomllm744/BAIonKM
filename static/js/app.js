@@ -160,13 +160,21 @@ function setupHerbAutocomplete(input) {
         debounceTimer = setTimeout(async () => {
             let suggestions = await fetchSuggestions('/api/herbs', query);
             
-            // Filter out already selected herbs
+            // Filter out already selected herbs (check english name)
             const selectedHerbs = state.prescriptions[prescriptionIndex] || [];
-            suggestions = suggestions.filter(s => !selectedHerbs.includes(s));
+            suggestions = suggestions.filter(s => {
+                const englishName = typeof s === 'object' ? s.english : s;
+                return !selectedHerbs.includes(englishName);
+            });
             
             state.activeDropdown = dropdown;
-            showSuggestionsWithKeyboard(dropdown, suggestions, query, (value) => {
-                addHerbTagInline(prescriptionIndex, value, tagsContainer, input);
+            showSuggestionsWithKeyboard(dropdown, suggestions, query, (value, koreanName) => {
+                // Cache the Korean name from the suggestion
+                const suggestionItem = dropdown.querySelector(`[data-value="${value}"]`);
+                const korean = suggestionItem ? suggestionItem.dataset.korean : null;
+                if (korean) herbKoreanCache[value] = korean;
+                
+                addHerbTagInline(prescriptionIndex, value, tagsContainer, input, korean);
                 input.value = '';
                 hideSuggestions(dropdown);
                 input.focus();
@@ -186,7 +194,13 @@ function setupHerbAutocomplete(input) {
         }
         
         handleKeyboardNavigation(e, dropdown, (value) => {
-            addHerbTagInline(prescriptionIndex, value, tagsContainer, input);
+            // Get Korean name from the selected item
+            const items = dropdown.querySelectorAll('.suggestion-item');
+            const selectedItem = items[state.selectedIndex];
+            const korean = selectedItem ? selectedItem.dataset.korean : null;
+            if (korean) herbKoreanCache[value] = korean;
+            
+            addHerbTagInline(prescriptionIndex, value, tagsContainer, input, korean);
             input.value = '';
             hideSuggestions(dropdown);
             input.focus();
@@ -256,13 +270,30 @@ function showSuggestionsWithKeyboard(container, suggestions, query, onSelect) {
     
     state.selectedIndex = 0; // Auto-select first item
     
+    // Check if this is herb suggestions (objects with english/korean) or disease suggestions (strings)
+    const isHerbSuggestion = suggestions.length > 0 && typeof suggestions[0] === 'object' && suggestions[0].english;
+    
     // Add count header for better UX
     const countHeader = `<div class="suggestions-count"><i class="fas fa-search"></i> Found ${suggestions.length} matching result${suggestions.length !== 1 ? 's' : ''}</div>`;
     
-    container.innerHTML = countHeader + suggestions.map((s, i) => 
-        `<div class="suggestion-item${i === 0 ? ' active' : ''}" data-value="${escapeHtml(s)}">${highlightMatch(s, query)}</div>`
-    ).join('');
+    let itemsHtml;
+    if (isHerbSuggestion) {
+        // Bilingual herb display: Korean (English)
+        itemsHtml = suggestions.map((s, i) => {
+            const displayText = s.korean ? `${s.korean} (${s.english})` : s.english;
+            const highlightedText = s.korean ? 
+                `${highlightMatch(s.korean, query)} <span class="herb-english">(${highlightMatch(s.english, query)})</span>` :
+                highlightMatch(s.english, query);
+            return `<div class="suggestion-item${i === 0 ? ' active' : ''}" data-value="${escapeHtml(s.english)}" data-korean="${escapeHtml(s.korean || '')}">${highlightedText}</div>`;
+        }).join('');
+    } else {
+        // Regular string suggestions (diseases)
+        itemsHtml = suggestions.map((s, i) => 
+            `<div class="suggestion-item${i === 0 ? ' active' : ''}" data-value="${escapeHtml(s)}">${highlightMatch(s, query)}</div>`
+        ).join('');
+    }
     
+    container.innerHTML = countHeader + itemsHtml;
     container.style.display = 'block';
     
     // Add click and hover handlers
@@ -285,10 +316,31 @@ function hideSuggestions(container) {
 }
 
 // ==========================================
+// Herb Name Cache for Korean Display
+// ==========================================
+
+// Cache Korean names to avoid repeated API calls
+const herbKoreanCache = {};
+
+async function getKoreanName(englishName) {
+    if (herbKoreanCache[englishName] !== undefined) {
+        return herbKoreanCache[englishName];
+    }
+    try {
+        const response = await fetch(`/api/herbs/validate?name=${encodeURIComponent(englishName)}`);
+        const data = await response.json();
+        herbKoreanCache[englishName] = data.korean || '';
+        return herbKoreanCache[englishName];
+    } catch {
+        return '';
+    }
+}
+
+// ==========================================
 // Inline Herb Tags Management
 // ==========================================
 
-function addHerbTagInline(prescriptionIndex, herbName, tagsContainer, input) {
+async function addHerbTagInline(prescriptionIndex, herbName, tagsContainer, input, koreanName = null) {
     if (!state.prescriptions[prescriptionIndex]) {
         state.prescriptions[prescriptionIndex] = [];
     }
@@ -299,11 +351,19 @@ function addHerbTagInline(prescriptionIndex, herbName, tagsContainer, input) {
     
     state.prescriptions[prescriptionIndex].push(herbName);
     
+    // Get Korean name if not provided
+    if (koreanName === null) {
+        koreanName = await getKoreanName(herbName);
+    }
+    
     const tag = document.createElement('span');
     tag.className = 'herb-tag';
     tag.dataset.herb = herbName;
+    
+    // Display Korean name with English in parentheses, or just English if no Korean
+    const displayName = koreanName ? `${koreanName} (${herbName})` : herbName;
     tag.innerHTML = `
-        ${escapeHtml(herbName)}
+        ${escapeHtml(displayName)}
         <span class="remove-tag" title="Remove">&times;</span>
     `;
     
@@ -338,7 +398,7 @@ function updatePlaceholder(prescriptionIndex, input) {
 }
 
 // ==========================================
-// Bulk Herb Adding (Paste Support)
+// Bulk Herb Adding (Paste Support with Korean)
 // ==========================================
 
 async function addBulkHerbs(prescriptionIndex, herbs, tagsContainer, input) {
@@ -350,24 +410,26 @@ async function addBulkHerbs(prescriptionIndex, herbs, tagsContainer, input) {
     showToast('Validating herbs...', 'info');
     
     for (const herb of herbs) {
-        // Check if already added
-        if (state.prescriptions[prescriptionIndex]?.includes(herb)) {
-            duplicateHerbs.push(herb);
-            continue;
-        }
+        // Validate against database (works for both Korean and English input)
+        const validated = await validateHerb(herb);
         
-        // Validate against database
-        const isValid = await validateHerb(herb);
-        if (isValid) {
-            validHerbs.push(isValid); // Use the exact name from database
+        if (validated) {
+            // Check if already added (by English name)
+            if (state.prescriptions[prescriptionIndex]?.includes(validated.english)) {
+                duplicateHerbs.push(herb);
+                continue;
+            }
+            validHerbs.push(validated);
         } else {
             invalidHerbs.push(herb);
         }
     }
     
-    // Add valid herbs as tags
-    for (const herb of validHerbs) {
-        addHerbTagInline(prescriptionIndex, herb, tagsContainer, input);
+    // Add valid herbs as tags (with Korean names from validation)
+    for (const herbData of validHerbs) {
+        const englishName = typeof herbData === 'object' ? herbData.english : herbData;
+        const koreanName = typeof herbData === 'object' ? herbData.korean : null;
+        await addHerbTagInline(prescriptionIndex, englishName, tagsContainer, input, koreanName);
     }
     
     // Show results
@@ -391,7 +453,13 @@ async function validateHerb(herbName) {
     try {
         const response = await fetch(`/api/herbs/validate?name=${encodeURIComponent(herbName)}`);
         const data = await response.json();
-        return data.valid ? data.name : null;
+        if (data.valid) {
+            // Cache the Korean name
+            if (data.korean) herbKoreanCache[data.english || data.name] = data.korean;
+            // Return object with both names
+            return { english: data.english || data.name, korean: data.korean || '' };
+        }
+        return null;
     } catch (error) {
         console.error('Error validating herb:', error);
         return null;

@@ -11,6 +11,13 @@ from models import Disease, Herb, AnalysisResult
 from services import analyze_prescriptions
 from config import Config
 from llm_service import generate_full_ai_analysis
+from herb_mappings import (
+    search_herbs_bilingual, 
+    validate_herb_bilingual, 
+    get_korean_name,
+    get_english_name,
+    KOREAN_TO_ENGLISH
+)
 
 # Create blueprint
 main_bp = Blueprint('main', __name__)
@@ -254,7 +261,11 @@ def get_disease_suggestions():
 
 @main_bp.route('/api/herbs')
 def get_herb_suggestions():
-    """API endpoint to get herb name suggestions, sorted by relevance."""
+    """API endpoint to get herb name suggestions with Korean support.
+    
+    Supports searching in both English (Pinyin) and Korean (한글).
+    Returns: [{'english': 'huang qi', 'korean': '황기'}, ...]
+    """
     query = request.args.get('q', '').strip()
     
     if len(query) < 1:
@@ -262,58 +273,88 @@ def get_herb_suggestions():
     
     session = Session()
     try:
-        # Get more results for better sorting
-        matching_herbs = session.query(Herb.herbName).filter(
-            Herb.herbName.ilike(f'%{query}%')
-        ).distinct().limit(Config.MAX_SUGGESTIONS * 3).all()
+        # Get all unique herb names from database
+        all_herbs = session.query(Herb.herbName).distinct().all()
+        all_herb_names = [h[0] for h in all_herbs]
         
-        suggestions = [herb[0] for herb in matching_herbs]
+        # Check if query is Korean (contains Hangul characters)
+        is_korean_query = any('\uac00' <= char <= '\ud7a3' for char in query)
         
-        # Sort by relevance
-        query_lower = query.lower()
+        if is_korean_query:
+            # Search using bilingual function for Korean input
+            results = search_herbs_bilingual(query, all_herb_names)
+        else:
+            # English search with Korean names added
+            query_lower = query.lower()
+            matching_herbs = [h for h in all_herb_names if query_lower in h.lower()]
+            
+            # Sort by relevance
+            def relevance_score(name):
+                name_lower = name.lower()
+                if name_lower == query_lower:
+                    return (0, len(name), name_lower)
+                elif name_lower.startswith(query_lower):
+                    return (1, len(name), name_lower)
+                elif any(word.startswith(query_lower) for word in name_lower.split()):
+                    return (2, len(name), name_lower)
+                else:
+                    pos = name_lower.find(query_lower)
+                    return (3, pos, len(name), name_lower)
+            
+            matching_herbs.sort(key=relevance_score)
+            
+            # Add Korean names
+            results = []
+            for herb in matching_herbs[:Config.MAX_SUGGESTIONS]:
+                results.append({
+                    'english': herb,
+                    'korean': get_korean_name(herb)
+                })
         
-        def relevance_score(name):
-            name_lower = name.lower()
-            # Exact match (highest priority)
-            if name_lower == query_lower:
-                return (0, len(name), name_lower)
-            # Starts with query
-            elif name_lower.startswith(query_lower):
-                return (1, len(name), name_lower)
-            # Word starts with query
-            elif any(word.startswith(query_lower) for word in name_lower.split()):
-                return (2, len(name), name_lower)
-            # Contains query in middle
-            else:
-                pos = name_lower.find(query_lower)
-                return (3, pos, len(name), name_lower)
-        
-        suggestions.sort(key=relevance_score)
-        
-        return jsonify(suggestions[:Config.MAX_SUGGESTIONS])
+        return jsonify(results[:Config.MAX_SUGGESTIONS])
     finally:
         session.close()
 
 
 @main_bp.route('/api/herbs/validate')
 def validate_herb():
-    """API endpoint to validate if a herb exists in the database."""
+    """API endpoint to validate if a herb exists (supports Korean and English)."""
     name = request.args.get('name', '').strip()
     
     if not name:
-        return jsonify({'valid': False, 'name': None})
+        return jsonify({'valid': False, 'english': None, 'korean': None})
     
     session = Session()
     try:
-        # Try exact match first (case-insensitive)
+        # Get all herb names for validation
+        all_herbs = session.query(Herb.herbName).distinct().all()
+        all_herb_names = [h[0] for h in all_herbs]
+        
+        # Use bilingual validation
+        result = validate_herb_bilingual(name, all_herb_names)
+        
+        if result['valid']:
+            return jsonify({
+                'valid': True,
+                'name': result['english'],  # Always return English for internal use
+                'english': result['english'],
+                'korean': result['korean']
+            })
+        
+        # Fallback: Try exact match in database (case-insensitive)
         herb = session.query(Herb.herbName).filter(
             func.lower(Herb.herbName) == name.lower()
         ).first()
         
         if herb:
-            return jsonify({'valid': True, 'name': herb[0]})
+            return jsonify({
+                'valid': True, 
+                'name': herb[0],
+                'english': herb[0],
+                'korean': get_korean_name(herb[0])
+            })
         
-        return jsonify({'valid': False, 'name': None})
+        return jsonify({'valid': False, 'name': None, 'english': None, 'korean': None})
     finally:
         session.close()
 
