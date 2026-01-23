@@ -19,7 +19,7 @@ DATABASE_URI = f'sqlite:///{DATABASE_PATH}'
 
 class Disease(Base):
     """Model representing disease-gene associations from DisGeNET."""
-    __tablename__ = 'disease'
+    __tablename__ = 'diseases'
     
     Serial_Number_D = Column(Integer, primary_key=True, autoincrement=True)
     geneNID = Column(Text)

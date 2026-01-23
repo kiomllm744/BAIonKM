@@ -143,7 +143,7 @@ def get_db_connection():
 def get_all_diseases():
     """Get all unique disease names from database."""
     conn = get_db_connection()
-    df = pd.read_sql("SELECT DISTINCT diseaseName FROM disease ORDER BY diseaseName", conn)
+    df = pd.read_sql("SELECT DISTINCT diseaseName FROM diseases ORDER BY diseaseName", conn)
     conn.close()
     return df['diseaseName'].tolist()
 
@@ -162,7 +162,7 @@ def get_database_stats():
     """Get database statistics."""
     conn = get_db_connection()
     
-    disease_count = pd.read_sql("SELECT COUNT(DISTINCT diseaseName) as count FROM disease", conn).iloc[0]['count']
+    disease_count = pd.read_sql("SELECT COUNT(DISTINCT diseaseName) as count FROM diseases", conn).iloc[0]['count']
     herb_count = pd.read_sql("SELECT COUNT(DISTINCT herbName) as count FROM herbs", conn).iloc[0]['count']
     
     conn.close()
@@ -503,9 +503,9 @@ elif page == "📊 Database Explorer":
         conn = get_db_connection()
         
         if search_disease:
-            query = f"SELECT diseaseName, COUNT(geneName) as gene_count FROM disease WHERE diseaseName LIKE '%{search_disease}%' GROUP BY diseaseName ORDER BY diseaseName LIMIT 100"
+            query = f"SELECT diseaseName, COUNT(geneName) as gene_count FROM diseases WHERE diseaseName LIKE '%{search_disease}%' GROUP BY diseaseName ORDER BY diseaseName LIMIT 100"
         else:
-            query = "SELECT diseaseName, COUNT(geneName) as gene_count FROM disease GROUP BY diseaseName ORDER BY diseaseName LIMIT 100"
+            query = "SELECT diseaseName, COUNT(geneName) as gene_count FROM diseases GROUP BY diseaseName ORDER BY diseaseName LIMIT 100"
         
         df = pd.read_sql(query, conn)
         conn.close()
