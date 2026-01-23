@@ -9,7 +9,20 @@ from datetime import datetime
 import sqlite3
 import os
 
-# Import our services
+# Check if database exists, if not try to download it
+DB_PATH = os.path.join(os.path.dirname(__file__), "diseaseportal.db")
+if not os.path.exists(DB_PATH):
+    st.warning("Database not found. Attempting to download...")
+    try:
+        from download_db import download_from_gdrive, GDRIVE_FILE_ID
+        download_from_gdrive(GDRIVE_FILE_ID, DB_PATH)
+        st.success("Database downloaded successfully!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Failed to download database: {e}")
+        st.stop()
+
+# Import our services (after database check)
 from services import (
     search_disease_genes,
     search_herb_genes_batch,
