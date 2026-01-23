@@ -1,7 +1,20 @@
+# Flask Disease Portal - Dependencies
+
+# Web Framework
 flask>=2.3.0
 flask-sqlalchemy>=3.0.0
+
+# Database
 sqlalchemy>=2.0.0
+
+# HTTP requests for APIs
 requests>=2.31.0
-python-dotenv>=1.0.0
+
+# Data processing
 pandas>=2.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Production server
 gunicorn>=21.0.0
