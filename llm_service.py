@@ -5,6 +5,7 @@ Returns structured JSON with summary_table, detailed_analysis, and clinical_ques
 import requests
 import json
 import re
+import traceback
 from config import Config
 
 
@@ -15,6 +16,7 @@ def get_gemini_response(prompt: str) -> str:
     api_key = Config.GEMINI_API_KEY
     
     if not api_key:
+        print("[LLM] Error: No Gemini API key configured")
         return None
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
@@ -36,8 +38,13 @@ def get_gemini_response(prompt: str) -> str:
     }
     
     try:
+        print(f"[LLM] Sending request to Gemini API (prompt length: {len(prompt)} chars)...")
         response = requests.post(url, headers=headers, json=data, timeout=90)
-        response.raise_for_status()
+        
+        if not response.ok:
+            print(f"[LLM] API Error: Status {response.status_code}")
+            print(f"[LLM] Response: {response.text[:500]}")
+            return None
         
         result = response.json()
         
@@ -46,18 +53,28 @@ def get_gemini_response(prompt: str) -> str:
             if "content" in candidate and "parts" in candidate["content"]:
                 parts = candidate["content"]["parts"]
                 if len(parts) > 0 and "text" in parts[0]:
-                    return parts[0]["text"]
+                    text = parts[0]["text"]
+                    print(f"[LLM] Received response (length: {len(text)} chars)")
+                    return text
         
+        # Check for blocked content or safety issues
+        if "candidates" in result and len(result["candidates"]) > 0:
+            candidate = result["candidates"][0]
+            if "finishReason" in candidate and candidate["finishReason"] != "STOP":
+                print(f"[LLM] Finish reason: {candidate['finishReason']}")
+        
+        print(f"[LLM] Unexpected response structure: {str(result)[:500]}")
         return None
         
     except requests.exceptions.Timeout:
-        print("API request timed out")
+        print("[LLM] API request timed out (90s)")
         return None
     except requests.exceptions.RequestException as e:
-        print(f"API Error: {str(e)}")
+        print(f"[LLM] API Request Error: {str(e)}")
         return None
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"[LLM] Unexpected Error: {str(e)}")
+        traceback.print_exc()
         return None
 
 
@@ -352,6 +369,8 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     - detailed_analysis: Full markdown analysis
     - clinical_questions: Diagnostic interview questions
     """
+    print(f"[LLM] Starting AI analysis for disease: {disease_name}")
+    
     ai_results = {
         'summary_table': [],
         'detailed_analysis': None,
@@ -363,13 +382,21 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     # Check if API key is configured
     if not Config.GEMINI_API_KEY:
         ai_results['error'] = "Gemini API key not configured"
+        print("[LLM] Error: No API key configured")
         return ai_results
     
     # Extract prescription enrichment data
     prescription_enrichments = results.get('prescription_enrichments', {})
+    print(f"[LLM] Found {len(prescription_enrichments)} prescription enrichments")
+    
+    # Debug: Print structure of enrichment data
+    for rx_key, rx_data in prescription_enrichments.items():
+        disgenet_data = rx_data.get('DisGeNET', [])
+        print(f"[LLM] {rx_key}: {len(disgenet_data)} DisGeNET entries")
     
     if len(prescription_enrichments) > 1:
         # Multiple prescriptions - do comparative analysis
+        print("[LLM] Running comparative analysis for multiple prescriptions")
         prescription_data = {}
         for rx_key, rx_data in prescription_enrichments.items():
             rx_disgenet = rx_data.get('DisGeNET', [])
@@ -377,22 +404,31 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
                 prescription_data[rx_key] = rx_disgenet
         
         if prescription_data:
+            print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
             # Generate comparative analysis
             analysis = generate_comparative_analysis(disease_name, prescription_data)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
+                print("[LLM] Comparative analysis completed successfully")
+            else:
+                ai_results['error'] = "Failed to generate comparative analysis"
+                print("[LLM] Comparative analysis returned None")
             
             # Generate clinical questions
             clinical = generate_clinical_questions(disease_name, prescription_data)
             if clinical:
                 ai_results['clinical_questions'] = clinical
+        else:
+            ai_results['error'] = "No valid enrichment data in any prescription"
+            print("[LLM] Error: No valid enrichment data in prescriptions")
     
     elif len(prescription_enrichments) == 1:
         # Single prescription analysis
         rx_key = list(prescription_enrichments.keys())[0]
         rx_data = prescription_enrichments[rx_key].get('DisGeNET', [])
+        print(f"[LLM] Single prescription mode: {rx_key} with {len(rx_data)} enrichment entries")
         
         if rx_data:
             # Generate single analysis
@@ -401,18 +437,28 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
+                print("[LLM] Single prescription analysis completed successfully")
+            else:
+                print("[LLM] Single prescription analysis returned None")
             
             # Generate clinical questions
             clinical = generate_single_clinical_questions(disease_name, rx_data)
             if clinical:
                 ai_results['clinical_questions'] = clinical
+        else:
+            ai_results['error'] = "No enrichment data available for analysis"
+            print("[LLM] Error: No enrichment data in single prescription")
     
     else:
+        # No prescription enrichments found
+        print("[LLM] No prescription enrichments found, checking fallback...")
+        
         # Fallback to general enrichment data
         enrichment = results.get('enrichment', {})
         disgenet_results = enrichment.get('DisGeNET', [])
         
         if disgenet_results:
+            print(f"[LLM] Using fallback enrichment data: {len(disgenet_results)} entries")
             analysis = generate_single_prescription_analysis(disease_name, disgenet_results)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
@@ -422,7 +468,11 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
             clinical = generate_single_clinical_questions(disease_name, disgenet_results)
             if clinical:
                 ai_results['clinical_questions'] = clinical
+        else:
+            ai_results['error'] = "No enrichment data available for analysis. Please ensure the prescription has valid gene-disease associations."
+            print("[LLM] Error: No enrichment data available in any location")
     
+    print(f"[LLM] Analysis complete. has_ai_analysis={ai_results['has_ai_analysis']}, error={ai_results.get('error')}")
     return ai_results
 
 

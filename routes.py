@@ -3,8 +3,9 @@ Flask routes for the Disease Portal application.
 """
 import json
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify
-from sqlalchemy import func, desc
+from functools import wraps
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, flash
+from sqlalchemy import func, desc, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from models import Disease, Herb, AnalysisResult
@@ -26,26 +27,78 @@ main_bp = Blueprint('main', __name__)
 engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
 Session = sessionmaker(bind=engine)
 
-# Ensure the analysis_results table exists
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('main.login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# Ensure the analysis_results table has the ai_analysis_json column
 def init_results_table():
-    """Create the analysis_results table if it doesn't exist."""
-    from sqlalchemy import MetaData, Table, Column, Integer, Text, DateTime
-    metadata = MetaData()
+    """Create/update the analysis_results table."""
+    from sqlalchemy import MetaData, Table, Column, Integer, Text, DateTime, inspect
     
-    analysis_results = Table(
-        'analysis_results', metadata,
-        Column('id', Integer, primary_key=True, autoincrement=True),
-        Column('disease_name', Text, nullable=False),
-        Column('prescriptions', Text, nullable=False),
-        Column('results_json', Text, nullable=False),
-        Column('common_genes_count', Integer, default=0),
-        Column('created_at', DateTime, default=datetime.utcnow)
-    )
+    inspector = inspect(engine)
     
-    metadata.create_all(engine)
+    # Check if table exists
+    if 'analysis_results' in inspector.get_table_names():
+        # Check if ai_analysis_json column exists
+        columns = [col['name'] for col in inspector.get_columns('analysis_results')]
+        if 'ai_analysis_json' not in columns:
+            # Add the column
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE analysis_results ADD COLUMN ai_analysis_json TEXT"))
+                conn.commit()
+                print("[DB] Added ai_analysis_json column to analysis_results table")
+    else:
+        # Create the table
+        metadata = MetaData()
+        analysis_results = Table(
+            'analysis_results', metadata,
+            Column('id', Integer, primary_key=True, autoincrement=True),
+            Column('disease_name', Text, nullable=False),
+            Column('prescriptions', Text, nullable=False),
+            Column('results_json', Text, nullable=False),
+            Column('ai_analysis_json', Text, nullable=True),
+            Column('common_genes_count', Integer, default=0),
+            Column('created_at', DateTime, default=datetime.utcnow)
+        )
+        metadata.create_all(engine)
+        print("[DB] Created analysis_results table")
 
 # Initialize table on import
 init_results_table()
+
+
+@main_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handle login for demo access."""
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        if username == Config.DEMO_USERNAME and password == Config.DEMO_PASSWORD:
+            session['logged_in'] = True
+            session['username'] = username
+            next_url = request.args.get('next') or url_for('main.results')
+            return redirect(next_url)
+        else:
+            return render_template('login.html', error='Invalid username or password')
+    
+    return render_template('login.html')
+
+
+@main_bp.route('/logout')
+def logout():
+    """Handle logout."""
+    session.pop('logged_in', None)
+    session.pop('username', None)
+    return redirect(url_for('main.index'))
 
 
 @main_bp.route('/')
@@ -61,8 +114,9 @@ def database():
 
 
 @main_bp.route('/results')
+@login_required
 def results():
-    """Render the results history page."""
+    """Render the results history page (login required)."""
     return render_template('results_history.html')
 
 
@@ -504,9 +558,10 @@ def get_result_detail(result_id):
 
 
 @main_bp.route('/results/<int:result_id>')
+@login_required
 def view_result(result_id):
-    """View a specific saved result."""
-    session = Session()
+    """View a specific saved result (login required)."""
+    db_session = Session()
     try:
         result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
         
@@ -518,6 +573,13 @@ def view_result(result_id):
             results_data['result_id'] = result.id
         except:
             results_data = {}
+        
+        # Include saved AI analysis if available
+        if result.ai_analysis_json:
+            try:
+                results_data['saved_ai_analysis'] = json.loads(result.ai_analysis_json)
+            except:
+                results_data['saved_ai_analysis'] = None
         
         return render_template('result.html', results=results_data)
     finally:
@@ -550,6 +612,8 @@ def ai_analysis():
     - summary_table: Comparison table data
     - detailed_analysis: Full markdown analysis
     - clinical_questions: Diagnostic interview questions
+    
+    If result_id is provided, saves the AI analysis to the database.
     """
     data = request.get_json()
     
@@ -558,6 +622,7 @@ def ai_analysis():
     
     disease_name = data.get('disease_name', '')
     prescription_enrichments = data.get('prescription_enrichments', {})
+    result_id = data.get('result_id')  # Optional: save to this result
     
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
@@ -576,6 +641,19 @@ def ai_analysis():
         
         # Generate full AI analysis (summary_table, detailed_analysis, clinical_questions)
         ai_results = generate_full_ai_analysis(disease_name, analysis_results)
+        
+        # Save AI analysis to database if result_id provided and analysis succeeded
+        if result_id and ai_results.get('has_ai_analysis'):
+            try:
+                session = Session()
+                result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+                if result:
+                    result.ai_analysis_json = json.dumps(ai_results, default=str)
+                    session.commit()
+                    print(f"[DB] Saved AI analysis for result {result_id}")
+                session.close()
+            except Exception as e:
+                print(f"[DB] Error saving AI analysis: {e}")
         
         return jsonify(ai_results)
         

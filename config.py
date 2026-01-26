@@ -32,3 +32,8 @@ class Config:
     # - Local: Use .env file
     # - Production: Set in server environment variables
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+    
+    # Demo Login Credentials (for professor access)
+    # You can change these or set via environment variables
+    DEMO_USERNAME = os.environ.get('DEMO_USERNAME', 'professor')
+    DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'kiom2026')

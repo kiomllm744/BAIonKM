@@ -89,6 +89,58 @@
             color: #818cf8;
         }
         
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+        }
+        
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+        
+        .user-badge i {
+            color: #10b981;
+        }
+        
+        .btn-nav-auth {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .btn-nav-login {
+            background: #6366f1;
+            color: white;
+        }
+        
+        .btn-nav-login:hover {
+            background: #4f46e5;
+        }
+        
+        .btn-nav-logout {
+            color: #94a3b8;
+            background: transparent;
+        }
+        
+        .btn-nav-logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+        
         /* Main Content */
         .main-content {
             max-width: 1400px;
@@ -108,11 +160,121 @@
             color: #6366f1;
             text-decoration: none;
             font-size: 0.9rem;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         
         .back-link:hover {
             text-decoration: underline;
+        }
+        
+        /* Disease Hero Card */
+        .disease-hero-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 32px 40px;
+            margin-bottom: 28px;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .disease-hero-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        
+        .disease-hero-card::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        
+        .disease-hero-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+        
+        .disease-hero-main {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .disease-hero-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .disease-hero-label i {
+            font-size: 0.75rem;
+        }
+        
+        .disease-hero-name {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: white;
+            margin: 0 0 8px 0;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .disease-hero-subtitle {
+            color: rgba(255,255,255,0.85);
+            font-size: 1rem;
+            margin: 0;
+        }
+        
+        .disease-hero-stats {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .disease-hero-stat {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 16px 24px;
+            text-align: center;
+            min-width: 120px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .disease-hero-stat-value {
+            display: block;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .disease-hero-stat-label {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .page-header h1 {
@@ -872,11 +1034,26 @@
                 <i class="fas fa-database"></i> Database
             </a>
             <a href="/results" class="nav-link active">
-                <i class="fas fa-chart-bar"></i> Results
+                <i class="fas fa-history"></i> History
             </a>
             <a href="/about" class="nav-link">
                 <i class="fas fa-info-circle"></i> About
             </a>
+        </div>
+        <div class="nav-user">
+            {% if session.get('logged_in') %}
+            <div class="user-badge">
+                <i class="fas fa-user-check"></i>
+                <span>{{ session.get('username', 'User') }}</span>
+            </div>
+            <a href="{{ url_for('main.logout') }}" class="btn-nav-auth btn-nav-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+            {% else %}
+            <a href="{{ url_for('main.login') }}" class="btn-nav-auth btn-nav-login">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </a>
+            {% endif %}
         </div>
     </nav>
 
@@ -887,22 +1064,39 @@
             <a href="/" class="back-link">
                 <i class="fas fa-arrow-left"></i> Back to Analysis
             </a>
-            <h1>Analysis Results</h1>
-            <p>Enrichment analysis for <strong>{{ results.disease_name }}</strong></p>
+        </div>
+
+        <!-- Disease Hero Card -->
+        <div class="disease-hero-card">
+            <div class="disease-hero-content">
+                <div class="disease-hero-main">
+                    <span class="disease-hero-label">
+                        <i class="fas fa-microscope"></i> Disease Analysis
+                    </span>
+                    <h1 class="disease-hero-name">{{ results.disease_name }}</h1>
+                    <p class="disease-hero-subtitle">
+                        <i class="fas fa-dna"></i> Gene-Disease Pathway Enrichment Analysis
+                    </p>
+                </div>
+                <div class="disease-hero-stats">
+                    <div class="disease-hero-stat">
+                        <span class="disease-hero-stat-value">{{ results.disease_gene_count }}</span>
+                        <span class="disease-hero-stat-label">Disease Genes</span>
+                    </div>
+                    <div class="disease-hero-stat">
+                        <span class="disease-hero-stat-value">{{ results.prescriptions | length }}</span>
+                        <span class="disease-hero-stat-label">Prescriptions</span>
+                    </div>
+                    <div class="disease-hero-stat">
+                        <span class="disease-hero-stat-value">{{ results.prescriptions | sum(attribute='common_gene_count') | default(0) }}</span>
+                        <span class="disease-hero-stat-label">Total Matches</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Summary Cards -->
         <div class="summary-grid">
-            <div class="summary-card">
-                <div class="summary-icon blue">
-                    <i class="fas fa-virus"></i>
-                </div>
-                <div>
-                    <span class="summary-value">{{ results.disease_gene_count }}</span>
-                    <span class="summary-label">Disease Genes</span>
-                </div>
-            </div>
-            
             {% for prescription in results.prescriptions %}
             <div class="summary-card">
                 <div class="summary-icon green">
@@ -910,7 +1104,7 @@
                 </div>
                 <div>
                     <span class="summary-value">{{ prescription.common_gene_count | default(0) }}</span>
-                    <span class="summary-label">Rx {{ prescription.index }} Common</span>
+                    <span class="summary-label">Rx {{ prescription.index }} Common Genes</span>
                 </div>
             </div>
             {% endfor %}
@@ -1117,6 +1311,13 @@
         });
         
         async function checkAndRunAiAnalysis() {
+            // Check if we have saved AI analysis from history
+            if (resultsData.saved_ai_analysis && resultsData.saved_ai_analysis.has_ai_analysis) {
+                console.log('[AI] Using saved AI analysis from history');
+                displayAiResults(resultsData.saved_ai_analysis);
+                return;
+            }
+            
             try {
                 const statusResponse = await fetch('/api/ai-analysis/status');
                 const status = await statusResponse.json();
@@ -1135,6 +1336,43 @@
             }
         }
         
+        function displayAiResults(aiResults) {
+            // Hide loading states
+            document.getElementById('ai-loading').style.display = 'none';
+            document.getElementById('clinical-loading').style.display = 'none';
+            
+            if (aiResults.has_ai_analysis) {
+                document.getElementById('ai-results').style.display = 'block';
+                
+                // Render summary table
+                if (aiResults.summary_table && aiResults.summary_table.length > 0) {
+                    renderSummaryTable(aiResults.summary_table);
+                } else {
+                    document.getElementById('ai-table-container').innerHTML = 
+                        '<p style="color: #6b7280; text-align: center; padding: 20px;">No comparison table data available.</p>';
+                }
+                
+                // Store detailed analysis for toggle
+                if (aiResults.detailed_analysis) {
+                    document.getElementById('detailed-analysis').innerHTML = 
+                        formatMarkdown(aiResults.detailed_analysis);
+                } else {
+                    document.getElementById('btn-toggle-details').style.display = 'none';
+                }
+                
+                // Render clinical questions as cards
+                if (aiResults.clinical_questions && Array.isArray(aiResults.clinical_questions)) {
+                    document.getElementById('clinical-results').style.display = 'grid';
+                    renderClinicalCards(aiResults.clinical_questions);
+                } else {
+                    showClinicalUnavailable();
+                }
+            } else {
+                showAiError(aiResults.error || 'No analysis results available');
+                showClinicalUnavailable();
+            }
+        }
+        
         async function runAiAnalysis() {
             // Show loading states
             document.getElementById('ai-loading').style.display = 'block';
@@ -1149,12 +1387,17 @@
             try {
                 const prescriptionEnrichments = {};
                 
-                if (resultsData.enrichment_data) {
+                console.log('[AI Debug] resultsData:', resultsData);
+                console.log('[AI Debug] enrichment_data:', resultsData.enrichment_data);
+                
+                if (resultsData.enrichment_data && resultsData.enrichment_data.length > 0) {
                     resultsData.enrichment_data.forEach((rxData, index) => {
                         const rxKey = `Prescription ${index + 1}`;
                         const rxEnrichment = [];
                         
-                        if (rxData.enrichment_data) {
+                        console.log(`[AI Debug] Processing ${rxKey}:`, rxData);
+                        
+                        if (rxData.enrichment_data && rxData.enrichment_data.length > 0) {
                             rxData.enrichment_data.forEach(item => {
                                 rxEnrichment.push({
                                     term: item['Term name'],
@@ -1164,8 +1407,25 @@
                             });
                         }
                         
+                        console.log(`[AI Debug] ${rxKey} enrichment entries:`, rxEnrichment.length);
                         prescriptionEnrichments[rxKey] = { 'DisGeNET': rxEnrichment };
                     });
+                } else {
+                    console.warn('[AI Debug] No enrichment_data found in results');
+                }
+                
+                console.log('[AI Debug] Final prescriptionEnrichments:', prescriptionEnrichments);
+                
+                // Check if we have any valid enrichment data
+                const hasEnrichmentData = Object.values(prescriptionEnrichments).some(
+                    rx => rx.DisGeNET && rx.DisGeNET.length > 0
+                );
+                
+                if (!hasEnrichmentData) {
+                    console.warn('[AI Debug] No enrichment data available for AI analysis');
+                    showAiError('No enrichment data available. The prescription may not have significant gene-disease associations.');
+                    showClinicalUnavailable();
+                    return;
                 }
                 
                 const response = await fetch('/api/ai-analysis', {
@@ -1173,7 +1433,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         disease_name: resultsData.disease_name,
-                        prescription_enrichments: prescriptionEnrichments
+                        prescription_enrichments: prescriptionEnrichments,
+                        result_id: resultsData.result_id  // Pass result_id to save AI analysis
                     })
                 });
                 

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - EnrichR Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 20px;
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #8b5cf6 100%);
+            padding: 40px 32px;
+            text-align: center;
+            color: white;
+        }
+        
+        .login-header .logo-icon {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 2rem;
+        }
+        
+        .login-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .login-header p {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        
+        .login-body {
+            padding: 32px;
+        }
+        
+        .login-form .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .login-form label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .login-form .input-wrapper {
+            position: relative;
+        }
+        
+        .login-form .input-wrapper i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        
+        .login-form .form-input {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            font-size: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+        }
+        
+        .login-form .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        
+        .login-form .btn-login {
+            width: 100%;
+            padding: 14px 24px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .login-form .btn-login:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+        
+        .alert-error {
+            background: var(--error-light);
+            color: var(--error-color);
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.875rem;
+        }
+        
+        .login-footer {
+            text-align: center;
+            padding: 20px 32px 32px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .login-footer p {
+            font-size: 0.813rem;
+            color: var(--text-muted);
+        }
+        
+        .login-footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .demo-info {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .demo-info h4 {
+            color: #166534;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .demo-info p {
+            font-size: 0.813rem;
+            color: #15803d;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="logo-icon">
+                        <i class="fas fa-dna"></i>
+                    </div>
+                    <h1>EnrichR Portal</h1>
+                    <p>Disease-Herb Gene Analysis Platform</p>
+                </div>
+                
+                <div class="login-body">
+                    <div class="demo-info">
+                        <h4><i class="fas fa-lightbulb"></i> Demo Access</h4>
+                        <p>Login to view saved analysis results and example cases.</p>
+                    </div>
+                    
+                    {% if error %}
+                    <div class="alert-error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        {{ error }}
+                    </div>
+                    {% endif %}
+                    
+                    <form class="login-form" method="POST" action="{{ url_for('main.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required autofocus>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <div class="input-wrapper">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn-login">
+                            <i class="fas fa-sign-in-alt"></i>
+                            Sign In
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="login-footer">
+                    <p><a href="/"><i class="fas fa-arrow-left"></i> Back to Analysis</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

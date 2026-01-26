@@ -47,6 +47,7 @@ class AnalysisResult(db.Model):
     disease_name = db.Column(db.Text, nullable=False)
     prescriptions = db.Column(db.Text, nullable=False)  # JSON string of herb lists
     results_json = db.Column(db.Text, nullable=False)   # Full results as JSON
+    ai_analysis_json = db.Column(db.Text, nullable=True)  # AI analysis results (Gemini)
     common_genes_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     

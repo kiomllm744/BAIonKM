@@ -26,8 +26,8 @@
                     <span>Database</span>
                 </a>
                 <a href="/results" class="nav-item">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>Results</span>
+                    <i class="fas fa-history"></i>
+                    <span>History</span>
                 </a>
                 <a href="/about" class="nav-item">
                     <i class="fas fa-info-circle"></i>
@@ -49,6 +49,24 @@
                         <span class="stat-label">Herbs</span>
                     </div>
                 </div>
+            </div>
+            <!-- Login/Logout Section -->
+            <div class="sidebar-user">
+                {% if session.get('logged_in') %}
+                <div class="user-info">
+                    <i class="fas fa-user-check"></i>
+                    <span>{{ session.get('username', 'User') }}</span>
+                </div>
+                <a href="{{ url_for('main.logout') }}" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('main.login') }}" class="btn-login">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Login</span>
+                </a>
+                {% endif %}
             </div>
         </aside>
 
