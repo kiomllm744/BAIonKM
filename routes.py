@@ -563,7 +563,7 @@ def view_result(result_id):
     """View a specific saved result (login required)."""
     db_session = Session()
     try:
-        result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+        result = db_session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
         
         if not result:
             return redirect(url_for('main.results'))
@@ -583,7 +583,7 @@ def view_result(result_id):
         
         return render_template('result.html', results=results_data)
     finally:
-        session.close()
+        db_session.close()
 
 
 @main_bp.route('/api/results/<int:result_id>', methods=['DELETE'])
