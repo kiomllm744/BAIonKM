@@ -6,6 +6,7 @@ flask-sqlalchemy>=3.0.0
 
 # Database
 sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0  # PostgreSQL support for Render
 
 # HTTP requests for APIs
 requests>=2.31.0
