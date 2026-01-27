@@ -13,12 +13,15 @@ from config import Config
 
 
 # Create engine with optimized settings
-engine = create_engine(
-    Config.SQLALCHEMY_DATABASE_URI,
-    pool_pre_ping=True,
-    pool_recycle=300,
-    connect_args={'check_same_thread': False}  # SQLite specific
-)
+# Only use check_same_thread for SQLite (not valid for PostgreSQL)
+engine_args = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
+if Config.SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+    engine_args['connect_args'] = {'check_same_thread': False}
+
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **engine_args)
 Session = sessionmaker(bind=engine)
 
 

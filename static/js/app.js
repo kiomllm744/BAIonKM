@@ -79,11 +79,27 @@ function formatNumber(num) {
 
 function setupDiseaseAutocomplete() {
     let debounceTimer;
+    let justSelected = false; // Flag to prevent reopening after selection
     const input = elements.diseaseInput;
     const dropdown = elements.diseaseSuggestions;
     
+    // Helper to handle selection
+    function selectDisease(value) {
+        justSelected = true;
+        input.value = value;
+        hideSuggestions(dropdown);
+        // Move focus to first herb input after disease selection
+        setTimeout(() => {
+            const firstHerbInput = document.querySelector('.herb-input');
+            if (firstHerbInput) {
+                firstHerbInput.focus();
+            }
+        }, 50);
+    }
+    
     input.addEventListener('input', function() {
         clearTimeout(debounceTimer);
+        justSelected = false; // Reset flag on new input
         const query = this.value.trim();
         state.selectedIndex = -1;
         
@@ -95,23 +111,29 @@ function setupDiseaseAutocomplete() {
         debounceTimer = setTimeout(async () => {
             const suggestions = await fetchSuggestions('/api/diseases', query);
             state.activeDropdown = dropdown;
-            showSuggestionsWithKeyboard(dropdown, suggestions, query, (value) => {
-                input.value = value;
-                hideSuggestions(dropdown);
-            });
+            showSuggestionsWithKeyboard(dropdown, suggestions, query, selectDisease);
         }, 150);
     });
     
     input.addEventListener('keydown', function(e) {
-        handleKeyboardNavigation(e, dropdown, (value) => {
-            input.value = value;
-            hideSuggestions(dropdown);
-        });
+        handleKeyboardNavigation(e, dropdown, selectDisease);
     });
     
     input.addEventListener('focus', function() {
-        if (this.value.length >= 1) {
+        // Don't reopen if we just selected something
+        if (justSelected) {
+            justSelected = false;
+            return;
+        }
+        if (this.value.length >= 1 && dropdown.style.display !== 'block') {
             this.dispatchEvent(new Event('input'));
+        }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            hideSuggestions(dropdown);
         }
     });
 }
