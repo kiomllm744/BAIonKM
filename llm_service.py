@@ -82,6 +82,7 @@ def extract_json_from_response(text: str) -> dict:
     """
     Extract JSON object from LLM response text.
     Handles cases where JSON is wrapped in markdown code blocks.
+    Also cleans control characters that can break JSON parsing.
     """
     if not text:
         return None
@@ -98,11 +99,43 @@ def extract_json_from_response(text: str) -> dict:
         else:
             return None
     
+    # Clean control characters that break JSON parsing
+    # Replace actual newlines/tabs inside strings with escaped versions
+    # First, we need to handle the JSON more carefully
+    def clean_json_string(s):
+        # Remove or replace problematic control characters
+        # Keep \n, \r, \t as they're valid in JSON when escaped
+        cleaned = s
+        # Replace unescaped control characters (ASCII 0-31 except \t \n \r)
+        for i in range(32):
+            if i not in (9, 10, 13):  # tab, newline, carriage return
+                cleaned = cleaned.replace(chr(i), '')
+        return cleaned
+    
+    json_str = clean_json_string(json_str)
+    
     try:
         return json.loads(json_str)
     except json.JSONDecodeError as e:
         print(f"JSON parse error: {e}")
-        return None
+        # Try a more aggressive cleanup: replace all control chars in string values
+        try:
+            # Try to fix common issues: unescaped newlines in strings
+            # Replace literal newlines that might be inside JSON strings
+            fixed = re.sub(r'(?<!\\)\n', '\\n', json_str)
+            fixed = re.sub(r'(?<!\\)\r', '\\r', fixed)
+            fixed = re.sub(r'(?<!\\)\t', '\\t', fixed)
+            return json.loads(fixed)
+        except json.JSONDecodeError as e2:
+            print(f"JSON parse error after cleanup: {e2}")
+            # Last resort: try to extract just the structure
+            try:
+                # Remove all newlines and extra whitespace
+                compact = ' '.join(json_str.split())
+                return json.loads(compact)
+            except:
+                print(f"[LLM] Could not parse JSON even after cleanup")
+                return None
 
 
 def format_enrichment_data_for_llm(enrichment_results: list, top_n: int = 10) -> str:

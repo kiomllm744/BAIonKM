@@ -648,9 +648,29 @@ def ai_analysis():
                 session = Session()
                 result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
                 if result:
-                    result.ai_analysis_json = json.dumps(ai_results, default=str)
-                    session.commit()
-                    print(f"[DB] Saved AI analysis for result {result_id}")
+                    # Ensure AI analysis can be serialized to JSON
+                    try:
+                        ai_json_str = json.dumps(ai_results, default=str, ensure_ascii=False)
+                        result.ai_analysis_json = ai_json_str
+                        session.commit()
+                        print(f"[DB] Saved AI analysis for result {result_id}")
+                    except (TypeError, ValueError) as json_err:
+                        print(f"[DB] JSON serialization error: {json_err}")
+                        # Try with more aggressive cleaning
+                        import re
+                        def clean_for_json(obj):
+                            if isinstance(obj, str):
+                                # Remove control characters
+                                return re.sub(r'[\x00-\x1f\x7f-\x9f]', '', obj)
+                            elif isinstance(obj, dict):
+                                return {k: clean_for_json(v) for k, v in obj.items()}
+                            elif isinstance(obj, list):
+                                return [clean_for_json(i) for i in obj]
+                            return obj
+                        cleaned_results = clean_for_json(ai_results)
+                        result.ai_analysis_json = json.dumps(cleaned_results, default=str)
+                        session.commit()
+                        print(f"[DB] Saved cleaned AI analysis for result {result_id}")
                 session.close()
             except Exception as e:
                 print(f"[DB] Error saving AI analysis: {e}")
