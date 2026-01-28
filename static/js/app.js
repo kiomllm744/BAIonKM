@@ -79,24 +79,13 @@ function formatNumber(num) {
 
 function setupDiseaseAutocomplete() {
     let debounceTimer;
-    let abortController = null; // For canceling pending API requests
-    let diseaseSelected = false; // Flag to prevent reopening after selection
+    let justSelected = false; // Flag to prevent reopening after selection
     const input = elements.diseaseInput;
     const dropdown = elements.diseaseSuggestions;
     
-    // Cancel any pending disease search request
-    function cancelPendingRequest() {
-        clearTimeout(debounceTimer);
-        if (abortController) {
-            abortController.abort();
-            abortController = null;
-        }
-    }
-    
     // Helper to handle selection
     function selectDisease(value) {
-        cancelPendingRequest(); // Cancel any pending requests
-        diseaseSelected = true;
+        justSelected = true;
         input.value = value;
         hideSuggestions(dropdown);
         // Move focus to first herb input after disease selection
@@ -109,8 +98,8 @@ function setupDiseaseAutocomplete() {
     }
     
     input.addEventListener('input', function() {
-        cancelPendingRequest(); // Cancel previous request
-        diseaseSelected = false; // Reset flag on new input
+        clearTimeout(debounceTimer);
+        justSelected = false; // Reset flag on new input
         const query = this.value.trim();
         state.selectedIndex = -1;
         
@@ -120,35 +109,10 @@ function setupDiseaseAutocomplete() {
         }
         
         debounceTimer = setTimeout(async () => {
-            // Don't search if disease was already selected
-            if (diseaseSelected) return;
-            
-            // Create new abort controller for this request
-            abortController = new AbortController();
-            
-            try {
-                const response = await fetch(
-                    `/api/diseases?q=${encodeURIComponent(query)}`,
-                    { signal: abortController.signal }
-                );
-                
-                // Check again if disease was selected while waiting
-                if (diseaseSelected) return;
-                
-                const suggestions = await response.json();
-                
-                // Final check before showing dropdown
-                if (diseaseSelected || document.activeElement !== input) return;
-                
-                state.activeDropdown = dropdown;
-                showSuggestionsWithKeyboard(dropdown, suggestions, query, selectDisease);
-            } catch (err) {
-                // Ignore abort errors (expected when we cancel)
-                if (err.name !== 'AbortError') {
-                    console.error('Disease search error:', err);
-                }
-            }
-        }, 200); // Slightly longer debounce for slow servers
+            const suggestions = await fetchSuggestions('/api/diseases', query);
+            state.activeDropdown = dropdown;
+            showSuggestionsWithKeyboard(dropdown, suggestions, query, selectDisease);
+        }, 150);
     });
     
     input.addEventListener('keydown', function(e) {
@@ -157,28 +121,18 @@ function setupDiseaseAutocomplete() {
     
     input.addEventListener('focus', function() {
         // Don't reopen if we just selected something
-        if (diseaseSelected) {
+        if (justSelected) {
+            justSelected = false;
             return;
         }
-        // Only show dropdown if actively typing (not just clicking back)
-        // This prevents dropdown from showing when user clicks back on filled input
-    });
-    
-    // When leaving the disease input, cancel requests and hide dropdown
-    input.addEventListener('blur', function() {
-        // Small delay to allow click on dropdown item
-        setTimeout(() => {
-            if (document.activeElement !== input && !dropdown.contains(document.activeElement)) {
-                cancelPendingRequest();
-                hideSuggestions(dropdown);
-            }
-        }, 150);
+        if (this.value.length >= 1 && dropdown.style.display !== 'block') {
+            this.dispatchEvent(new Event('input'));
+        }
     });
     
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-            cancelPendingRequest();
             hideSuggestions(dropdown);
         }
     });
