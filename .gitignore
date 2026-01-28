@@ -4,8 +4,8 @@
 .env.*.local
 *.env
 
-# Streamlit secrets (contains API keys)
-.streamlit/secrets.toml
+# Streamlit (not used - this is a Flask app)
+.streamlit/
 
 # Database files (too large for GitHub - download separately)
 *.db
