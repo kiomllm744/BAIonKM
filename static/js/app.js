@@ -21,7 +21,12 @@ const elements = {
     form: document.getElementById('analysis-form'),
     herbsDataInput: document.getElementById('herbs-data-input'),
     diseaseCount: document.getElementById('disease-count'),
-    herbCount: document.getElementById('herb-count')
+    herbCount: document.getElementById('herb-count'),
+    terminologyPanel: document.getElementById('terminology-panel'),
+    terminologyStatus: document.getElementById('terminology-status'),
+    terminologyInput: document.getElementById('terminology-input'),
+    terminologyUmls: document.getElementById('terminology-umls'),
+    terminologyOpenTargets: document.getElementById('terminology-opentargets')
 };
 
 // ==========================================
@@ -74,6 +79,102 @@ function formatNumber(num) {
 }
 
 // ==========================================
+// Live UMLS -> Open Targets Mapping
+// ==========================================
+
+let terminologyRequestId = 0;
+
+function setTerminologyStatus(label, className = '') {
+    if (!elements.terminologyStatus) return;
+    elements.terminologyStatus.textContent = label;
+    elements.terminologyStatus.className = `terminology-status ${className}`.trim();
+}
+
+function renderTerminologyEmpty(query = '') {
+    if (!elements.terminologyPanel) return;
+    setTerminologyStatus(query ? 'Waiting' : 'Idle');
+    elements.terminologyInput.innerHTML = query
+        ? `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`
+        : '<span class="terminology-empty">Type a disease, symptom, or clinical phrase</span>';
+    elements.terminologyUmls.innerHTML = '<span class="terminology-empty">No concepts loaded</span>';
+    elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">No candidates loaded</span>';
+}
+
+function renderTerminologyLoading(query) {
+    if (!elements.terminologyPanel) return;
+    setTerminologyStatus('Mapping', 'loading');
+    elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
+    elements.terminologyUmls.innerHTML = '<span class="terminology-empty">Searching UMLS...</span>';
+    elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Waiting for normalized terms</span>';
+}
+
+function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
+    if (!elements.terminologyPanel) return;
+    
+    const concepts = Array.isArray(payload?.concepts) ? payload.concepts : [];
+    const candidates = Array.isArray(openTargetsSuggestions) ? openTargetsSuggestions : [];
+    const hasUmls = concepts.length > 0;
+    
+    setTerminologyStatus(hasUmls ? 'Live' : 'Fallback', hasUmls ? 'ready' : 'fallback');
+    elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
+    
+    if (hasUmls) {
+        elements.terminologyUmls.innerHTML = concepts.slice(0, 4).map(concept => {
+            const semanticType = Array.isArray(concept.semantic_types) && concept.semantic_types.length
+                ? concept.semantic_types[0]
+                : 'Concept';
+            return `
+                <span class="terminology-chip umls" title="${escapeHtml(semanticType)}">
+                    <strong>${escapeHtml(concept.preferred_name || concept.name)}</strong>
+                    <small>${escapeHtml(concept.cui || '')}</small>
+                </span>
+            `;
+        }).join('');
+    } else if (payload && payload.umls_available === false) {
+        elements.terminologyUmls.innerHTML = '<span class="terminology-empty">UMLS key not configured</span>';
+    } else {
+        elements.terminologyUmls.innerHTML = '<span class="terminology-empty">No UMLS concept match</span>';
+    }
+    
+    if (candidates.length > 0) {
+        elements.terminologyOpenTargets.innerHTML = candidates.slice(0, 5).map(name => `
+            <span class="terminology-chip open-targets">
+                <strong>${escapeHtml(name)}</strong>
+            </span>
+        `).join('');
+    } else {
+        elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">No reliable Open Targets disease candidate. Use a specific disease name.</span>';
+    }
+}
+
+function renderTerminologyError(query) {
+    if (!elements.terminologyPanel) return;
+    setTerminologyStatus('Error', 'fallback');
+    elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
+    elements.terminologyUmls.innerHTML = '<span class="terminology-empty">UMLS lookup failed</span>';
+    elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Using direct Open Targets search</span>';
+}
+
+async function fetchTerminologyMapping(query, openTargetsPromise) {
+    const requestId = ++terminologyRequestId;
+    renderTerminologyLoading(query);
+    
+    try {
+        const [payload, openTargetsSuggestions] = await Promise.all([
+            fetch(`/api/translate-symptoms?q=${encodeURIComponent(query)}`).then(r => r.json()),
+            openTargetsPromise
+        ]);
+        
+        if (requestId !== terminologyRequestId) return;
+        renderTerminologyMapping(query, payload, openTargetsSuggestions);
+    } catch (error) {
+        console.error('Failed to fetch terminology mapping:', error);
+        if (requestId !== terminologyRequestId) return;
+        renderTerminologyError(query);
+    }
+}
+
+// ==========================================
 // Disease Autocomplete with Keyboard Navigation
 // ==========================================
 
@@ -82,11 +183,13 @@ function setupDiseaseAutocomplete() {
     let justSelected = false; // Flag to prevent reopening after selection
     const input = elements.diseaseInput;
     const dropdown = elements.diseaseSuggestions;
+    renderTerminologyEmpty();
     
     // Helper to handle selection
     function selectDisease(value) {
         justSelected = true;
         input.value = value;
+        fetchTerminologyMapping(value, fetchSuggestions('/api/diseases', value));
         hideSuggestions(dropdown);
         // Move focus to first herb input after disease selection
         setTimeout(() => {
@@ -105,11 +208,14 @@ function setupDiseaseAutocomplete() {
         
         if (query.length < 1) {
             hideSuggestions(dropdown);
+            renderTerminologyEmpty();
             return;
         }
         
         debounceTimer = setTimeout(async () => {
-            const suggestions = await fetchSuggestions('/api/diseases', query);
+            const suggestionsPromise = fetchSuggestions('/api/diseases', query);
+            fetchTerminologyMapping(query, suggestionsPromise);
+            const suggestions = await suggestionsPromise;
             state.activeDropdown = dropdown;
             showSuggestionsWithKeyboard(dropdown, suggestions, query, selectDisease);
         }, 150);

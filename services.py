@@ -1,19 +1,18 @@
 """
-Core services for gene analysis - OPTIMIZED VERSION.
-Contains the main business logic for disease-herb gene analysis.
+Core services for gene analysis - ONLINE REAL-TIME VERSION.
+Contains the main business logic for disease-herb gene analysis using Open Targets API.
 """
 import json
 import requests
-import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sqlalchemy import func, create_engine, text
+from sqlalchemy import func, create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Disease, Herb
+from models import Herb
 from config import Config
+from opentargets_service import search_disease_efo_id, fetch_live_associated_genes
+from umls_service import candidate_names_for_open_targets
 
-
-# Create engine with optimized settings
-# Only use check_same_thread for SQLite (not valid for PostgreSQL)
+# Create engine with optimized settings for local herbs caching
 engine_args = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
@@ -25,21 +24,75 @@ engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **engine_args)
 Session = sessionmaker(bind=engine)
 
 
-def search_disease_genes(disease_name):
+def resolve_disease_to_open_targets(disease_name):
     """
-    Search for genes associated with a disease.
-    OPTIMIZED: Uses indexed query.
+    Resolve a user disease/symptom string to an Open Targets disease ID.
+
+    UMLS is used to add standardized terminology candidates, but Open Targets
+    remains the final authority for EFO/MONDO IDs and gene associations.
     """
-    session = Session()
-    try:
-        # Use LOWER() which is now indexed
-        matching_records = session.query(Disease.geneName).filter(
-            func.lower(Disease.diseaseName) == disease_name.lower()
-        ).all()
-        disease_gene_symbols = [record[0] for record in matching_records]
-        return disease_gene_symbols
-    finally:
-        session.close()
+    disease_name = (disease_name or '').strip()
+    if not disease_name:
+        return None
+
+    if disease_name.startswith('EFO_') or disease_name.startswith('MONDO_') or disease_name.startswith('Orphanet_'):
+        return {
+            "efo_id": disease_name,
+            "name": disease_name,
+            "description": "",
+            "matched_input": disease_name,
+            "match_source": "user_identifier",
+            "umls_cui": None,
+            "umls_semantic_types": [],
+            "umls_root_source": None,
+            "candidates_checked": [disease_name],
+        }
+
+    candidates = candidate_names_for_open_targets(disease_name, limit=5)
+    checked = []
+    for candidate in candidates:
+        candidate_name = candidate["name"]
+        checked.append(candidate_name)
+        match = search_disease_efo_id(candidate_name)
+        if match:
+            return {
+                **match,
+                "matched_input": candidate_name,
+                "match_source": candidate.get("source", "open_targets"),
+                "umls_cui": candidate.get("cui"),
+                "umls_semantic_types": candidate.get("semantic_types", []),
+                "umls_root_source": candidate.get("root_source"),
+                "candidates_checked": checked,
+            }
+
+    return {
+        "efo_id": None,
+        "name": disease_name,
+        "description": "",
+        "matched_input": None,
+        "match_source": "unresolved",
+        "umls_cui": None,
+        "umls_semantic_types": [],
+        "umls_root_source": None,
+        "candidates_checked": checked,
+    }
+
+
+def search_disease_genes_with_scores(disease_name):
+    """
+    Search for genes associated with a disease along with their association scores.
+    Calls Open Targets GraphQL API in real-time online.
+    """
+    disease_name = (disease_name or '').strip()
+    if not disease_name:
+        return {}
+        
+    res = resolve_disease_to_open_targets(disease_name)
+    if not res or not res.get("efo_id"):
+        return {}
+    efo_id = res["efo_id"]
+        
+    return fetch_live_associated_genes(efo_id)
 
 
 def search_herb_genes_batch(herb_names):
@@ -75,12 +128,6 @@ def search_herb_genes_batch(herb_names):
         return gene_symbols, missing_herbs
     finally:
         session.close()
-
-
-# Keep original function for compatibility but use optimized version
-def search_herb_genes(herb_names):
-    """Alias for batch function."""
-    return search_herb_genes_batch(herb_names)
 
 
 def find_common_genes(disease_genes, herb_genes_list):
@@ -123,7 +170,12 @@ def upload_single_gene_list(gene_list, index):
     genes_str = "\n".join(list(gene_list))
     payload = {'list': (None, genes_str)}
     
-    response = requests.post(upload_url, files=payload, timeout=30)
+    response = requests.post(
+        upload_url,
+        files=payload,
+        timeout=30,
+        verify=Config.EXTERNAL_API_VERIFY_SSL
+    )
     if not response.ok:
         raise Exception(f'Error uploading gene list {index} to Enrichr')
     
@@ -160,7 +212,8 @@ def fetch_enrichment_single(user_list_id, library, index):
     enrich_url = f'{Config.ENRICHR_BASE_URL}/enrich'
     response = requests.get(
         f'{enrich_url}?userListId={user_list_id}&backgroundType={library}',
-        timeout=60
+        timeout=60,
+        verify=Config.EXTERNAL_API_VERIFY_SSL
     )
     
     if not response.ok:
@@ -195,12 +248,15 @@ def perform_enrichment_analysis_parallel(data_list, library=None):
 
 
 def process_enrichment_data(data, enrichment_data):
-    """Process raw enrichment data into structured format."""
-    df = pd.DataFrame(enrichment_data)
+    """Process raw enrichment data into structured format.
+
+    Enrichr's /enrich response is a dict keyed by library name whose values
+    are lists of result rows, e.g. {"DisGeNET": [[rank, term, p, ...], ...]}.
+    """
     data['enrichment_data'] = []
 
-    for _, row in df.iterrows():
-        for element in row:
+    for rows in enrichment_data.values():
+        for element in rows:
             rank = element[0]
             term_name = element[1]
             p_value = element[2]
@@ -229,30 +285,35 @@ def process_enrichment_data(data, enrichment_data):
     data['enrichment_data'] = data['enrichment_data'][:Config.MAX_ENRICHMENT_RESULTS]
 
 
-# Backwards compatibility aliases
-upload_gene_lists_to_enrichr = upload_gene_lists_to_enrichr_parallel
-perform_enrichment_analysis = perform_enrichment_analysis_parallel
-
-
 def analyze_prescriptions(disease_name, herb_lists):
     """
-    Main analysis function - OPTIMIZED VERSION.
+    Main analysis function - ONLINE REAL-TIME VERSION.
     """
+    disease_name = (disease_name or '').strip()
+    resolution = resolve_disease_to_open_targets(disease_name)
+    efo_id = resolution.get("efo_id") if resolution else None
+    real_name = resolution.get("name") if resolution and resolution.get("name") else disease_name
+
     results = {
-        'disease_name': disease_name,
+        'disease_name': real_name,
+        'disease_cui': efo_id or '',
+        'disease_resolution': resolution or {},
         'prescriptions': [],
         'enrichment_data': None,
         'errors': []
     }
     
-    # Get disease genes (now indexed - fast!)
-    disease_genes = search_disease_genes(disease_name)
+    # Get disease genes with scores dynamically from Open Targets
+    gene_scores = {}
+    if efo_id:
+        gene_scores = fetch_live_associated_genes(efo_id)
+    disease_genes = list(gene_scores.keys())
     results['disease_gene_count'] = len(disease_genes)
     
     if not disease_genes:
         results['errors'].append(f"No genes found for disease: {disease_name}")
         return results
-    
+        
     # Get herb genes for each prescription (batch queries - fast!)
     all_herb_genes = []
     for i, herb_names in enumerate(herb_lists):
@@ -275,6 +336,11 @@ def analyze_prescriptions(disease_name, herb_lists):
     
     for i, genes in enumerate(common_genes):
         results['prescriptions'][i]['common_gene_count'] = len(genes)
+        # Store common genes as a simple list with their Open Targets scores
+        results['prescriptions'][i]['common_genes'] = sorted(genes)
+        results['prescriptions'][i]['common_genes_scores'] = {
+            gene: round(gene_scores.get(gene, 0.0), 4) for gene in genes
+        }
     
     if not any(common_genes):
         results['errors'].append("No common genes found between disease and any prescription")

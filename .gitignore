@@ -32,6 +32,8 @@ Thumbs.db
 
 # Logs
 *.log
+server.out
+server.err
 
 # Instance folder
 instance/

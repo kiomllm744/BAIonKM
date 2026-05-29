@@ -2,22 +2,23 @@
 Flask routes for the Disease Portal application.
 """
 import json
+import re
 from datetime import datetime
 from functools import wraps
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
 from sqlalchemy import func, desc, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from models import Disease, Herb, AnalysisResult
+from models import Herb, AnalysisResult, ExternalLookupCache
 from services import analyze_prescriptions
 from config import Config
 from llm_service import generate_full_ai_analysis
+from umls_service import candidate_names_for_open_targets, translate_clinical_text
+
 from herb_mappings import (
-    search_herbs_bilingual, 
-    validate_herb_bilingual, 
+    search_herbs_bilingual,
+    validate_herb_bilingual,
     get_korean_name,
-    get_english_name,
-    KOREAN_TO_ENGLISH
 )
 
 # Create blueprint
@@ -26,6 +27,51 @@ main_bp = Blueprint('main', __name__)
 # Create engine and session
 engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
 Session = sessionmaker(bind=engine)
+
+
+DISEASE_MATCH_STOPWORDS = {
+    'a', 'an', 'and', 'are', 'blood', 'cell', 'cells', 'clinical', 'disease', 'disorder',
+    'for', 'from', 'in', 'left', 'lower', 'of', 'right', 'score', 'sign',
+    'spectrum', 'syndrome', 'serum', 'the', 'to', 'upper', 'with'
+}
+GENERIC_LOCATION_TOKENS = {
+    'abdomen', 'abdominal', 'chest', 'flank', 'groin', 'pelvis', 'pelvic',
+    'region', 'site'
+}
+
+
+def _meaningful_tokens(text_value):
+    """Return content tokens used to reject unrelated Open Targets guesses."""
+    tokens = re.findall(r'[a-z0-9]+', (text_value or '').lower())
+    normalized = []
+    for token in tokens:
+        if token == 'abdominal':
+            token = 'abdomen'
+        normalized.append(token)
+    return {
+        token for token in normalized
+        if len(token) > 2 and token not in DISEASE_MATCH_STOPWORDS
+    }
+
+
+def _is_relevant_open_targets_suggestion(suggestion, reference_terms):
+    suggestion_tokens = _meaningful_tokens(suggestion)
+    if not suggestion_tokens:
+        return False
+
+    for reference in reference_terms:
+        reference_tokens = _meaningful_tokens(reference)
+        if not reference_tokens:
+            continue
+        overlap = suggestion_tokens & reference_tokens
+        if not overlap:
+            continue
+        non_generic_overlap = overlap - GENERIC_LOCATION_TOKENS
+        if non_generic_overlap:
+            return True
+        if len(overlap) >= 2:
+            return True
+    return False
 
 
 # Login required decorator
@@ -70,6 +116,13 @@ def init_results_table():
         )
         metadata.create_all(engine)
         print("[DB] Created analysis_results table")
+
+    # Ensure the external API cache table exists. opentargets_service and
+    # umls_service read/write it, but nothing else creates it -- a freshly
+    # built herbs DB would otherwise make all caching silently fail (INSERTs
+    # raise "no such table", swallowed by their broad excepts). checkfirst
+    # makes this a no-op when the table is already present.
+    ExternalLookupCache.__table__.create(bind=engine, checkfirst=True)
 
 # Initialize table on import
 init_results_table()
@@ -128,37 +181,34 @@ def about():
 
 @main_bp.route('/api/database/diseases')
 def get_diseases_paginated():
-    """API endpoint to get paginated diseases data."""
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 50, type=int)
+    """API endpoint to get paginated diseases data from Open Targets online."""
     search = request.args.get('search', '').strip()
     
-    session = Session()
+    if not search:
+        search = "diabetes"
+        
     try:
-        query = session.query(
-            Disease.diseaseName,
-            func.count(Disease.geneName).label('gene_count')
-        ).group_by(Disease.diseaseName)
+        from opentargets_service import search_diseases_multi_online
+        ot_results = search_diseases_multi_online(search, limit=50)
         
-        if search:
-            query = query.filter(Disease.diseaseName.ilike(f'%{search}%'))
-        
-        total = query.count()
-        
-        diseases = query.order_by(Disease.diseaseName)\
-            .offset((page - 1) * per_page)\
-            .limit(per_page)\
-            .all()
+        data = [{'name': d['disease'], 'gene_count': 'Live online'} for d in ot_results]
         
         return jsonify({
-            'data': [{'name': d[0], 'gene_count': d[1]} for d in diseases],
-            'total': total,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': (total + per_page - 1) // per_page
+            'data': data,
+            'total': len(data),
+            'page': 1,
+            'per_page': 50,
+            'total_pages': 1
         })
-    finally:
-        session.close()
+    except Exception as e:
+        print(f"Error in paginated diseases: {e}")
+        return jsonify({
+            'data': [],
+            'total': 0,
+            'page': 1,
+            'per_page': 50,
+            'total_pages': 0
+        })
 
 
 @main_bp.route('/api/database/herbs')
@@ -199,33 +249,44 @@ def get_herbs_paginated():
 
 @main_bp.route('/api/database/disease/<disease_name>/genes')
 def get_disease_genes(disease_name):
-    """API endpoint to get genes for a specific disease."""
+    """API endpoint to get genes for a specific disease from Open Targets in real-time."""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     
-    session = Session()
     try:
-        query = session.query(Disease.geneName, Disease.geneId, Disease.score).filter(
-            func.lower(Disease.diseaseName) == disease_name.lower()
-        )
+        from services import search_disease_genes_with_scores
+        gene_scores = search_disease_genes_with_scores(disease_name)
         
-        total = query.count()
+        gene_list = [
+            {'gene': gene, 'gene_id': gene, 'score': round(score, 4)} 
+            for gene, score in gene_scores.items()
+        ]
         
-        genes = query.order_by(Disease.geneName)\
-            .offset((page - 1) * per_page)\
-            .limit(per_page)\
-            .all()
+        gene_list.sort(key=lambda x: x['score'], reverse=True)
+        
+        total = len(gene_list)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_data = gene_list[start_idx:end_idx]
         
         return jsonify({
             'disease': disease_name,
-            'data': [{'gene': g[0], 'gene_id': g[1], 'score': g[2]} for g in genes],
+            'data': paginated_data,
             'total': total,
             'page': page,
             'per_page': per_page,
             'total_pages': (total + per_page - 1) // per_page
         })
-    finally:
-        session.close()
+    except Exception as e:
+        print(f"Error getting disease genes: {e}")
+        return jsonify({
+            'disease': disease_name,
+            'data': [],
+            'total': 0,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': 0
+        })
 
 
 @main_bp.route('/api/database/herb/<herb_name>/genes')
@@ -270,47 +331,68 @@ def get_herb_genes(herb_name):
 
 @main_bp.route('/api/diseases')
 def get_disease_suggestions():
-    """API endpoint to get disease name suggestions, sorted by relevance."""
+    """API endpoint to get disease name suggestions dynamically from Open Targets."""
     query = request.args.get('q', '').strip()
     
     if len(query) < 1:
         return jsonify([])
-    
-    session = Session()
+        
     try:
-        # Get more results than needed for better sorting
-        matching_diseases = session.query(Disease.diseaseName).filter(
-            Disease.diseaseName.ilike(f'%{query}%')
-        ).distinct().limit(Config.MAX_SUGGESTIONS * 3).all()
-        
-        suggestions = [disease[0] for disease in matching_diseases]
-        
-        # Sort by relevance
-        query_lower = query.lower()
-        
-        def relevance_score(name):
-            name_lower = name.lower()
-            # Exact match (highest priority)
-            if name_lower == query_lower:
-                return (0, len(name), name_lower)
-            # Starts with query
-            elif name_lower.startswith(query_lower):
-                return (1, len(name), name_lower)
-            # Word starts with query (e.g., "Type 2 Diabetes" when searching "diabetes")
-            elif any(word.startswith(query_lower) for word in name_lower.split()):
-                return (2, len(name), name_lower)
-            # Contains query in middle
-            else:
-                # Earlier position = higher priority
-                pos = name_lower.find(query_lower)
-                return (3, pos, len(name), name_lower)
-        
-        suggestions.sort(key=relevance_score)
-        
-        # Return only the configured max
-        return jsonify(suggestions[:Config.MAX_SUGGESTIONS])
-    finally:
-        session.close()
+        from opentargets_service import get_disease_suggestions_online
+        suggestions = []
+        seen = set()
+        candidate_terms = [query]
+        candidates = candidate_names_for_open_targets(query, limit=5)
+        candidate_terms.extend(candidate["name"] for candidate in candidates)
+
+        for candidate in candidates:
+            candidate_suggestions = get_disease_suggestions_online(
+                candidate["name"],
+                limit=Config.MAX_SUGGESTIONS
+            )
+            for suggestion in candidate_suggestions:
+                key = suggestion.lower()
+                if key in seen:
+                    continue
+                if not _is_relevant_open_targets_suggestion(suggestion, candidate_terms):
+                    continue
+                seen.add(key)
+                suggestions.append(suggestion)
+                if len(suggestions) >= Config.MAX_SUGGESTIONS:
+                    break
+            if len(suggestions) >= Config.MAX_SUGGESTIONS:
+                break
+
+        return jsonify(suggestions)
+    except Exception as e:
+        print(f"Error in autocomplete: {e}")
+        return jsonify([])
+
+
+@main_bp.route('/api/translate-symptoms')
+def translate_symptoms():
+    """
+    Translate free clinical disease/symptom text through UMLS.
+
+    This endpoint is informational and keeps the analysis source of truth in
+    Open Targets. It lets the UI show what standardized UMLS concepts were
+    used to improve disease lookup.
+    """
+    query = request.args.get('q', '').strip()
+    if len(query) < 1:
+        return jsonify({
+            'success': False,
+            'source': 'empty_query',
+            'query': query,
+            'concepts': [],
+            'candidate_names': []
+        }), 400
+
+    payload = translate_clinical_text(query, limit=10)
+    payload['success'] = True
+    return jsonify(payload)
+
+
 
 
 @main_bp.route('/api/herbs')
@@ -418,7 +500,7 @@ def get_stats():
     """API endpoint to get database statistics."""
     session = Session()
     try:
-        disease_count = session.query(Disease.diseaseName).distinct().count()
+        disease_count = "24,000+ (Open Targets)"
         herb_count = session.query(Herb.herbName).distinct().count()
         
         return jsonify({

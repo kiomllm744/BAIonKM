@@ -7,23 +7,6 @@ from datetime import datetime
 db = SQLAlchemy()
 
 
-class Disease(db.Model):
-    """Model representing disease-gene associations from DisGeNET."""
-    __tablename__ = 'diseases'
-    
-    Serial_Number_D = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    geneNID = db.Column(db.Text)
-    diseaseNID = db.Column(db.Text)
-    diseaseId = db.Column(db.Text)
-    geneId = db.Column(db.Text)
-    diseaseName = db.Column(db.Text)
-    geneName = db.Column(db.Text)
-    score = db.Column(db.Text)
-    
-    def __repr__(self):
-        return f'<Disease {self.diseaseName} - Gene {self.geneName}>'
-
-
 class Herb(db.Model):
     """Model representing herb-gene associations from BATMAN-TCM."""
     __tablename__ = 'herbs'
@@ -53,3 +36,18 @@ class AnalysisResult(db.Model):
     
     def __repr__(self):
         return f'<AnalysisResult {self.disease_name} - {self.created_at}>'
+
+
+class ExternalLookupCache(db.Model):
+    """Cache for external API lookups (Open Targets autocomplete/gene results)."""
+    __tablename__ = 'external_lookup_cache'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    provider = db.Column(db.Text, nullable=False)
+    cache_key = db.Column(db.Text, nullable=False, unique=True)
+    query = db.Column(db.Text, nullable=False)
+    response_json = db.Column(db.Text, nullable=False)
+    source = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)

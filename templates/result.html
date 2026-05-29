@@ -1077,6 +1077,16 @@
                     <p class="disease-hero-subtitle">
                         <i class="fas fa-dna"></i> Gene-Disease Pathway Enrichment Analysis
                     </p>
+                    {% if results.disease_resolution %}
+                    <p class="disease-hero-subtitle" style="font-size: 0.85rem; margin-top: 8px;">
+                        <i class="fas fa-link"></i>
+                        Open Targets ID: {{ results.disease_cui or 'Not resolved' }}
+                        {% if results.disease_resolution.umls_cui %}
+                        · UMLS: {{ results.disease_resolution.umls_cui }}
+                        {% endif %}
+                        · Match source: {{ results.disease_resolution.match_source | replace('_', ' ') }}
+                    </p>
+                    {% endif %}
                 </div>
                 <div class="disease-hero-stats">
                     <div class="disease-hero-stat">
@@ -1134,7 +1144,7 @@
             <div class="card-body">
                 <div class="prescription-grid">
                     {% for prescription in results.prescriptions %}
-                    <div class="prescription-item">
+                    <div class="prescription-item" style="display: flex; flex-direction: column;">
                         <div class="prescription-item-header">
                             <span class="rx-badge">Rx {{ prescription.index }}</span>
                         </div>
@@ -1155,6 +1165,25 @@
                             <div class="prescription-stat">
                                 <span class="prescription-stat-value">{{ prescription.unique_gene_count | default(0) }}</span>
                                 <span class="prescription-stat-label">Unique</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Intersecting Targets Section -->
+                        <div style="margin-top: 18px; border-top: 1px solid #f3f4f6; padding-top: 14px;">
+                            <h4 style="font-size: 0.8rem; color: #374151; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-dna" style="color: #6366f1;"></i> Intersecting Gene Targets
+                            </h4>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                {% if prescription.common_genes %}
+                                    {% for gene in prescription.common_genes %}
+                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: #f0f4ff; border: 1px solid #c7d2fe; color: #4338ca; cursor: default;" title="{{ gene }}{% if prescription.common_genes_scores and prescription.common_genes_scores[gene] %} — OT Score: {{ prescription.common_genes_scores[gene] }}{% endif %}">
+                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: #6366f1;"></i>
+                                            <strong>{{ gene }}</strong>
+                                        </span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">No intersecting targets found</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

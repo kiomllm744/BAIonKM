@@ -19,7 +19,7 @@ def get_gemini_response(prompt: str) -> str:
         print("[LLM] Error: No Gemini API key configured")
         return None
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
     
     headers = {
         "Content-Type": "application/json"
@@ -39,7 +39,13 @@ def get_gemini_response(prompt: str) -> str:
     
     try:
         print(f"[LLM] Sending request to Gemini API (prompt length: {len(prompt)} chars)...")
-        response = requests.post(url, headers=headers, json=data, timeout=90)
+        response = requests.post(
+            url,
+            headers=headers,
+            json=data,
+            timeout=90,
+            verify=Config.EXTERNAL_API_VERIFY_SSL
+        )
         
         if not response.ok:
             print(f"[LLM] API Error: Status {response.status_code}")
@@ -161,7 +167,78 @@ def format_enrichment_data_for_llm(enrichment_results: list, top_n: int = 10) ->
     return "\n".join(lines)
 
 
-def generate_comparative_analysis(disease_name: str, prescription_data: dict) -> dict:
+def format_clingen_data_for_llm(prescriptions: list) -> str:
+    """
+    Format official ClinGen validity data and clearly labeled local fallback buckets.
+    """
+    if not prescriptions:
+        return "No official ClinGen validity data available."
+    
+    lines = []
+    official_count = 0
+    fallback_count = 0
+    for rx in prescriptions:
+        rx_idx = rx.get('index', '?')
+        herbs = ", ".join(rx.get('herbs', []))
+        lines.append(f"### Prescription {rx_idx} (Herbs: {herbs})")
+        
+        validity_map = rx.get('common_genes_validity', {})
+        if not validity_map:
+            lines.append("  No common genes or validity data found.")
+            continue
+        
+        official_by_level = {}
+        fallback_genes = []
+        
+        for gene, info in validity_map.items():
+            clingen = info.get('clingen', {})
+            level = clingen.get('level', 'Limited')
+            score = info.get('score', 0.0)
+            if clingen.get('source') == 'clingen':
+                official_by_level.setdefault(level, []).append((gene, score, clingen))
+                official_count += 1
+            else:
+                fallback_genes.append((gene, score, level))
+                fallback_count += 1
+        
+        has_official_genes = False
+        for level in ['Definitive', 'Strong', 'Moderate', 'Limited']:
+            genes = official_by_level.get(level, [])
+            if genes:
+                has_official_genes = True
+                genes.sort(key=lambda x: x[1], reverse=True)
+                genes_str = ", ".join([
+                    f"{gene} (ClinGen: {clingen.get('classification', level)}, DisGeNET score: {score})"
+                    for gene, score, clingen in genes
+                ])
+                lines.append(f"  * **Official ClinGen {level} targets**: {genes_str}")
+        
+        if fallback_genes:
+            fallback_genes.sort(key=lambda x: x[1], reverse=True)
+            fallback_str = ", ".join([
+                f"{gene} ({level} DisGeNET score bucket, score: {score})"
+                for gene, score, level in fallback_genes[:12]
+            ])
+            lines.append(f"  * **Not ClinGen - local fallback only**: {fallback_str}")
+        
+        if not has_official_genes and not fallback_genes:
+            lines.append("  No common genes or validity data found.")
+    
+    if official_count == 0:
+        lines.insert(
+            0,
+            "No official ClinGen validity matches were found. Any listed fallback buckets are local DisGeNET score buckets, not ClinGen evidence."
+        )
+    else:
+        lines.insert(
+            0,
+            f"Official ClinGen matches found: {official_count}. Local fallback-only genes: {fallback_count}."
+        )
+                
+    return "\n".join(lines)
+
+
+def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None) -> dict:
     """
     Generate comparative analysis with summary table and detailed analysis.
     Uses the exact prompt format specified.
@@ -179,11 +256,26 @@ def generate_comparative_analysis(disease_name: str, prescription_data: dict) ->
     # Build dynamic column names
     group_columns = ", ".join([f'"Group {i}"' for i in range(1, num_groups + 1)])
     
+    clingen_section = ""
+    if clingen_context and "Official ClinGen matches found" in clingen_context:
+        clingen_section = f"""
+### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
+The following official ClinGen Gene-Disease Validity data has been matched to common target genes. Items labeled "Not ClinGen" are local DisGeNET score buckets only and must be treated as low-confidence fallback context:
+
+{clingen_context}
+
+CRITICAL MOA REASONING RULES:
+1. **Prioritize Official ClinGen Targets**: Base primary therapeutic mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets only.
+2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Not ClinGen" DisGeNET score buckets as speculative or low-confidence associations only.
+3. **Clinical Integration**: Explain how the high-confidence targets interact with standard pathological pathways of {disease_name}.
+"""
+    
     prompt = f"""You are an expert Research Scientist in pathology and bioinformatics. Your task is to perform a comparative analysis of multiple disease clusters provided by the user.
 
 The user is studying **{disease_name}** with the following enrichment analysis results:
 
 {all_groups}
+{clingen_section}
 
 You must return your response in a strict JSON format with exactly two keys: "summary_table" and "detailed_analysis".
 
@@ -220,7 +312,7 @@ Do not include any text outside the JSON object."""
     }
 
 
-def generate_clinical_questions(disease_name: str, prescription_data: dict) -> list:
+def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None) -> list:
     """
     Generate clinical interview questions for diagnosis.
     Returns a structured JSON array with group cards.
@@ -235,11 +327,25 @@ def generate_clinical_questions(disease_name: str, prescription_data: dict) -> l
     
     all_groups = "\n\n".join(groups_text)
     
+    clingen_section = ""
+    if clingen_context and "Official ClinGen matches found" in clingen_context:
+        clingen_section = f"""
+### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
+To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items labeled "Not ClinGen" are local DisGeNET fallback buckets only:
+
+{clingen_context}
+
+CRITICAL DIAGNOSTIC QUESTION RULES:
+1. Focus questions on clinical features or comorbidities associated with official ClinGen **Definitive** and **Strong** gene targets.
+2. Avoid formulating primary screening questions around pathways driven solely by **Limited**, weak, or "Not ClinGen" fallback targets.
+"""
+    
     prompt = f"""You are a senior clinical diagnostician. Your task is to analyze the provided disease groups and generate a structured clinical interview guide.
 
 The patient is being evaluated for **{disease_name}**. Here are the enrichment analysis results showing associated conditions and pathways:
 
 {all_groups}
+{clingen_section}
 
 You must return your response in a strict JSON format. 
 The JSON must be a single list (array) of objects, where each object represents one disease group.
@@ -305,16 +411,31 @@ def extract_json_array_from_response(text: str) -> list:
         return None
 
 
-def generate_single_prescription_analysis(disease_name: str, enrichment_data: list) -> dict:
+def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, clingen_context: str = None) -> dict:
     """
     Generate analysis for a single prescription (when only one Rx is provided).
     """
     formatted_data = format_enrichment_data_for_llm(enrichment_data)
     
+    clingen_section = ""
+    if clingen_context and "Official ClinGen matches found" in clingen_context:
+        clingen_section = f"""
+### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
+The following official ClinGen Gene-Disease Validity data has been matched to target genes. Items labeled "Not ClinGen" are local DisGeNET score buckets only:
+
+{clingen_context}
+
+CRITICAL MOA REASONING RULES:
+1. **Prioritize Official ClinGen Targets**: Base mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets.
+2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Not ClinGen" fallback buckets as speculative or low-confidence.
+3. **Pathology Relevance**: Connect high-confidence targets explicitly to the standard pathological process of {disease_name}.
+"""
+    
     prompt = f"""You are an expert Research Scientist in pathology and bioinformatics. Analyze the gene enrichment results for a traditional Chinese medicine prescription targeting **{disease_name}**.
 
 Enrichment Results:
 {formatted_data}
+{clingen_section}
 
 You must return your response in a strict JSON format with exactly two keys: "summary_table" and "detailed_analysis".
 
@@ -348,18 +469,32 @@ Do not include any text outside the JSON object."""
     }
 
 
-def generate_single_clinical_questions(disease_name: str, enrichment_data: list) -> list:
+def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None) -> list:
     """
     Generate clinical questions for a single prescription.
     Returns a structured JSON array with one group card.
     """
     formatted_data = format_enrichment_data_for_llm(enrichment_data, top_n=8)
     
+    clingen_section = ""
+    if clingen_context and "Official ClinGen matches found" in clingen_context:
+        clingen_section = f"""
+### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
+To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items labeled "Not ClinGen" are local DisGeNET fallback buckets only:
+
+{clingen_context}
+
+CRITICAL DIAGNOSTIC QUESTION RULES:
+1. Focus questions on clinical symptoms associated with official ClinGen **Definitive** and **Strong** targets.
+2. Avoid clinical screening questions for pathways driven only by **Limited**, weak, or "Not ClinGen" fallback targets.
+"""
+    
     prompt = f"""You are a senior clinical diagnostician. Your task is to analyze the provided disease pathway data and generate a structured clinical interview guide.
 
 The patient is being evaluated for **{disease_name}**. Here are the enrichment analysis results:
 
 {formatted_data}
+{clingen_section}
 
 You must return your response in a strict JSON format. 
 The JSON must be a single list (array) containing exactly ONE object representing this analysis.
@@ -422,6 +557,11 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     prescription_enrichments = results.get('prescription_enrichments', {})
     print(f"[LLM] Found {len(prescription_enrichments)} prescription enrichments")
     
+    # Extract ClinGen validity context
+    prescriptions = results.get('prescriptions', [])
+    clingen_context = format_clingen_data_for_llm(prescriptions)
+    print(f"[LLM] Prepared ClinGen validity context: {len(clingen_context)} chars")
+    
     # Debug: Print structure of enrichment data
     for rx_key, rx_data in prescription_enrichments.items():
         disgenet_data = rx_data.get('DisGeNET', [])
@@ -439,7 +579,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
         if prescription_data:
             print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
             # Generate comparative analysis
-            analysis = generate_comparative_analysis(disease_name, prescription_data)
+            analysis = generate_comparative_analysis(disease_name, prescription_data, clingen_context)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -450,7 +590,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
                 print("[LLM] Comparative analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_clinical_questions(disease_name, prescription_data)
+            clinical = generate_clinical_questions(disease_name, prescription_data, clingen_context)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -465,7 +605,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
         
         if rx_data:
             # Generate single analysis
-            analysis = generate_single_prescription_analysis(disease_name, rx_data)
+            analysis = generate_single_prescription_analysis(disease_name, rx_data, clingen_context)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -475,7 +615,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
                 print("[LLM] Single prescription analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_single_clinical_questions(disease_name, rx_data)
+            clinical = generate_single_clinical_questions(disease_name, rx_data, clingen_context)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -492,13 +632,13 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
         
         if disgenet_results:
             print(f"[LLM] Using fallback enrichment data: {len(disgenet_results)} entries")
-            analysis = generate_single_prescription_analysis(disease_name, disgenet_results)
+            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, clingen_context)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
             
-            clinical = generate_single_clinical_questions(disease_name, disgenet_results)
+            clinical = generate_single_clinical_questions(disease_name, disgenet_results, clingen_context)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -507,18 +647,3 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     
     print(f"[LLM] Analysis complete. has_ai_analysis={ai_results['has_ai_analysis']}, error={ai_results.get('error')}")
     return ai_results
-
-
-# Legacy functions for backwards compatibility
-def generate_common_pathway_analysis(disease_name: str, all_enrichment_data: list) -> str:
-    result = generate_single_prescription_analysis(disease_name, all_enrichment_data)
-    if result:
-        return result.get('detailed_analysis', '')
-    return None
-
-
-def generate_prescription_comparison(disease_name: str, prescription_data: dict) -> str:
-    result = generate_comparative_analysis(disease_name, prescription_data)
-    if result:
-        return result.get('detailed_analysis', '')
-    return None

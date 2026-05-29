@@ -7,7 +7,14 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      # Generated once and kept stable so login sessions survive restarts and
+      # are valid across all gunicorn workers. Without this, config.py falls
+      # back to a per-process random key and logins break unpredictably.
+      - key: SECRET_KEY
+        generateValue: true
       - key: GEMINI_API_KEY
+        sync: false
+      - key: UMLS_API_KEY
         sync: false
       - key: FLASK_ENV
         value: production
