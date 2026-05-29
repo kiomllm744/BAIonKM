@@ -1281,7 +1281,7 @@
                     {% for data in results.enrichment_data %}
                     <div class="enrichment-item">
                         <div class="enrichment-item-header">
-                            <span class="rx-badge">Rx {{ loop.index }}</span>
+                            <span class="rx-badge" title="{{ data.herbs | join(', ') if data.herbs else '' }}">Rx {{ data.prescription_index or loop.index }}</span>
                             <span class="result-count">{{ data.enrichment_data | length }} results</span>
                         </div>
                         
@@ -1317,6 +1317,56 @@
                     </div>
                     {% endfor %}
                 </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if results.gene_overlap %}
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-layer-group"></i>
+                <h2>Gene Overlap Across Prescriptions</h2>
+            </div>
+            <div class="card-body">
+                <p style="opacity:0.75;margin-bottom:1rem;">
+                    Enrichment above is computed on each prescription's disease-relevant
+                    (&ldquo;common&rdquo;) genes. This panel shows how those targets overlap &mdash;
+                    the core hit by every formula vs. the targets distinctive to a single one.
+                </p>
+
+                <h3 style="margin-bottom:0.5rem;">
+                    Core targets &mdash; shared by every prescription
+                    <span class="result-count">{{ results.gene_overlap.shared_core | length }}</span>
+                </h3>
+                {% if results.gene_overlap.shared_core %}
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.25rem;">
+                    {% for g in results.gene_overlap.shared_core %}
+                    <span style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:4px;padding:2px 8px;font-size:0.8rem;font-family:monospace;">{{ g }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="no-results" style="margin-bottom:1.25rem;">No single target is shared by all prescriptions.</p>
+                {% endif %}
+
+                <h3 style="margin-bottom:0.5rem;">Distinctive targets &mdash; hit by only one prescription</h3>
+                {% for d in results.gene_overlap.distinctive %}
+                <div style="margin:8px 0;padding:8px 10px;border:1px solid rgba(125,125,125,0.25);border-radius:6px;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <span class="rx-badge" title="{{ d.herbs | join(', ') }}">Rx {{ d.index }}</span>
+                        <span class="result-count">{{ d.genes | length }} distinctive</span>
+                        <span style="opacity:0.6;font-size:0.8rem;">{{ d.herbs | join(', ') }}</span>
+                    </div>
+                    {% if d.genes %}
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                        {% for g in d.genes %}
+                        <span style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);border-radius:4px;padding:2px 8px;font-size:0.8rem;font-family:monospace;">{{ g }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <span style="opacity:0.6;font-size:0.85rem;">&mdash; none (fully overlaps the other prescriptions)</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
             </div>
         </div>
         {% endif %}
@@ -1421,7 +1471,8 @@
                 
                 if (resultsData.enrichment_data && resultsData.enrichment_data.length > 0) {
                     resultsData.enrichment_data.forEach((rxData, index) => {
-                        const rxKey = `Prescription ${index + 1}`;
+                        const rxNum = rxData.prescription_index || (index + 1);
+                        const rxKey = `Prescription ${rxNum}`;
                         const rxEnrichment = [];
                         
                         console.log(`[AI Debug] Processing ${rxKey}:`, rxData);

@@ -292,6 +292,11 @@ You must return your response in a strict JSON format with exactly two keys: "su
      - "2. Deep Dive into Pathways": A detailed breakdown of the mechanism for each group (Group 1, Group 2, Group 3).
      - Use bolding and bullet points for readability.
 
+EVIDENCE CALIBRATION (important):
+- These terms come from gene-set overlap; a group may rest on only a few genes or terms.
+- Do NOT infer a mechanism from a single gene or a single enriched term.
+- If groups largely overlap, or a group's evidence is sparse, say so explicitly and label those conclusions LOW-CONFIDENCE rather than asserting distinct mechanisms.
+
 Do not include any text outside the JSON object."""
 
     response_text = get_gemini_response(prompt)
@@ -449,6 +454,11 @@ You must return your response in a strict JSON format with exactly two keys: "su
      - "1. Key Findings": Main discoveries from the enrichment analysis.
      - "2. Mechanism of Action": How the prescription may work for {disease_name}.
      - Use bolding and bullet points for readability.
+
+EVIDENCE CALIBRATION (important):
+- These terms come from gene-set overlap and may rest on only a few genes or terms.
+- Do NOT infer a mechanism from a single gene or a single enriched term.
+- If the evidence is sparse, say so and label those conclusions LOW-CONFIDENCE.
 
 Do not include any text outside the JSON object."""
 

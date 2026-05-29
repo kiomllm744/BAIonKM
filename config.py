@@ -56,6 +56,10 @@ class Config:
     MAX_SUGGESTIONS = 50
     MAX_ENRICHMENT_RESULTS = 15
     ADJUSTED_PVALUE_THRESHOLD = 0.05
+    # Minimum number of genes required to run a meaningful enrichment. Lists
+    # smaller than this produce single-gene noise, so they are skipped (the
+    # genes still appear in the gene-overlap panel).
+    MIN_ENRICHMENT_GENES = 3
     
     # LLM Settings (Gemini API)
     # IMPORTANT: Set GEMINI_API_KEY as environment variable

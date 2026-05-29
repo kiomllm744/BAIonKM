@@ -346,22 +346,62 @@ def analyze_prescriptions(disease_name, herb_lists):
         results['errors'].append("No common genes found between disease and any prescription")
         return results
     
-    # Find unique genes
+    # Find genes distinctive to each prescription (for the gene-overlap panel)
     unique_genes = find_unique_genes(common_genes)
-    
     for i, genes in enumerate(unique_genes):
         results['prescriptions'][i]['unique_gene_count'] = len(genes)
-    
-    # Perform enrichment analysis (parallel API calls - faster!)
-    if any(len(genes) > 0 for genes in unique_genes):
+        results['prescriptions'][i]['distinctive_genes'] = sorted(genes)
+
+    # Gene-overlap summary (pure set logic, no API). This is how prescriptions are
+    # compared -- "core" targets shared across formulas vs targets distinctive to
+    # one -- instead of enriching the tiny unique sets, which collapse to noise
+    # when formulas share herbs.
+    common_sets = [set(c) for c in common_genes]
+    non_empty_common = [s for s in common_sets if s]
+    shared_core = sorted(set.intersection(*non_empty_common)) if non_empty_common else []
+    results['gene_overlap'] = {
+        'shared_core': shared_core,  # disease targets hit by every prescription that hits the disease
+        'distinctive': [
+            {
+                'index': i + 1,
+                'herbs': results['prescriptions'][i].get('herbs', []),
+                'genes': sorted(unique_genes[i]),
+            }
+            for i in range(len(common_genes))
+        ],
+    }
+
+    # Enrichment runs on each prescription's COMMON genes (the disease-relevant
+    # targets the formula actually hits) -- a statistically meaningful input --
+    # not the unique set. Prescriptions with fewer than MIN_ENRICHMENT_GENES
+    # common genes are skipped (too few for reliable enrichment); they still
+    # appear in the gene-overlap panel above.
+    enrich_indices = [
+        i for i, genes in enumerate(common_genes)
+        if len(genes) >= Config.MIN_ENRICHMENT_GENES
+    ]
+    if enrich_indices:
         try:
-            # Filter out empty gene lists
-            non_empty_indices = [i for i, genes in enumerate(unique_genes) if len(genes) > 0]
-            non_empty_genes = [unique_genes[i] for i in non_empty_indices]
-            
-            upload_data = upload_gene_lists_to_enrichr_parallel(non_empty_genes)
-            results['enrichment_data'] = perform_enrichment_analysis_parallel(upload_data)
+            enrich_gene_lists = [list(common_genes[i]) for i in enrich_indices]
+            upload_data = upload_gene_lists_to_enrichr_parallel(enrich_gene_lists)
+            enrichment_results = perform_enrichment_analysis_parallel(upload_data)
+
+            # Stamp each result with the ORIGINAL prescription number (1-based,
+            # matching prescriptions[].index), its herbs, and the gene count it
+            # was based on (so the UI/AI can judge confidence). Use each entry's
+            # own 'index' (its slot in enrich_gene_lists) rather than list
+            # position, so this holds even if an Enrichr upload was dropped.
+            for entry in enrichment_results:
+                slot = entry.get('index')
+                if slot is None or slot >= len(enrich_indices):
+                    continue
+                original_i = enrich_indices[slot]
+                entry['prescription_index'] = original_i + 1
+                entry['herbs'] = results['prescriptions'][original_i].get('herbs', [])
+                entry['gene_count'] = len(common_genes[original_i])
+
+            results['enrichment_data'] = enrichment_results
         except Exception as e:
             results['errors'].append(f"Enrichment analysis error: {str(e)}")
-    
+
     return results
