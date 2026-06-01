@@ -137,20 +137,27 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
         primaryName = typeof c0 === 'string' ? c0 : (c0.name || '');
     }
     if (elements.terminologySummary) {
+        const noOt = candidates.length === 0;
         elements.terminologySummary.innerHTML = primaryName
             ? `We understood <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong> as `
               + `<span class="terminology-understood">${escapeHtml(primaryName)}</span>`
               + (primaryMeta ? ` <small>${escapeHtml(primaryMeta)}</small>` : '')
+              + (noOt ? ` <small class="terminology-warn">not in Open Targets (no gene data)</small>` : '')
             : `Searching Open Targets for <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>&hellip;`;
     }
 
     if (hasUmls) {
+        // UMLS chips are read-only CONTEXT (how we interpreted the words). They
+        // are NOT selectable, because a UMLS concept may have no Open Targets
+        // disease -> no genes. Only Open Targets entries (which resolve to genes)
+        // are selectable. Anything analyzable also appears in the Open Targets
+        // column, so nothing useful is lost.
         elements.terminologyUmls.innerHTML = concepts.slice(0, 4).map(concept => {
             const name = concept.preferred_name || concept.name || '';
             const icd = concept.icd10 ? `<small>ICD-10 ${escapeHtml(concept.icd10)}</small>` : '';
-            const tip = `${name}${concept.cui ? ' (' + concept.cui + ')' : ''} — click to use`;
+            const tip = `Standardized term${concept.cui ? ' · ' + concept.cui : ''}`;
             return `
-                <span class="terminology-chip umls selectable" data-disease="${escapeHtml(name)}" title="${escapeHtml(tip)}">
+                <span class="terminology-chip umls" title="${escapeHtml(tip)}">
                     <strong>${escapeHtml(name)}</strong>${icd}
                 </span>
             `;
@@ -172,7 +179,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
             `;
         }).join('');
     } else {
-        elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">No reliable Open Targets disease candidate. Use a specific disease name.</span>';
+        elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Not in Open Targets &mdash; no disease-gene data for this term. Pick an Open Targets disease (try a more standard name).</span>';
     }
 }
 

@@ -509,6 +509,13 @@ body {
     font-weight: 600;
 }
 
+.terminology-summary small.terminology-warn {
+    color: #b45309;
+    background: #fef3c7;
+    padding: 1px 6px;
+    border-radius: 5px;
+}
+
 .terminology-empty {
     color: var(--text-muted);
     font-style: italic;
