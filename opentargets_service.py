@@ -246,19 +246,22 @@ def get_disease_suggestions_online(query_str, limit=15):
         return []
 
 
-def search_diseases_multi_online(query_str, limit=15):
+def search_diseases_multi_online(query_str, limit=15, page_index=0):
     """
-    Search Open Targets for diseases matching query_str, returning a list of dicts with:
-    'disease' (name) and 'cui' (EFO ID).
+    Search Open Targets for diseases matching query_str (paginated).
+
+    Returns {'diseases': [{'disease': name, 'cui': EFO_id}, ...], 'total': int}
+    so callers can build real pagination over the live search results.
     """
     query_str = (query_str or '').strip()
     if not query_str:
-        return []
+        return {"diseases": [], "total": 0}
 
     try:
         query = """
-        query searchDiseasesMulti($queryString: String!, $size: Int!) {
-          search(queryString: $queryString, entityNames: ["disease"], page: {index: 0, size: $size}) {
+        query searchDiseasesMulti($queryString: String!, $index: Int!, $size: Int!) {
+          search(queryString: $queryString, entityNames: ["disease"], page: {index: $index, size: $size}) {
+            total
             hits {
               id
               name
@@ -266,9 +269,9 @@ def search_diseases_multi_online(query_str, limit=15):
           }
         }
         """
-        variables = {"queryString": query_str, "size": limit}
+        variables = {"queryString": query_str, "index": max(page_index, 0), "size": limit}
         headers = {"Content-Type": "application/json"}
-        
+
         response = requests.post(
             Config.OPENTARGETS_API_URL,
             json={"query": query, "variables": variables},
@@ -277,15 +280,14 @@ def search_diseases_multi_online(query_str, limit=15):
             verify=Config.EXTERNAL_API_VERIFY_SSL
         )
         response.raise_for_status()
-        hits = response.json().get("data", {}).get("search", {}).get("hits", [])
-        return [
-            {
-                "disease": hit["name"],
-                "cui": hit["id"]
-            }
+        search = response.json().get("data", {}).get("search", {}) or {}
+        hits = search.get("hits", [])
+        diseases = [
+            {"disease": hit["name"], "cui": hit["id"]}
             for hit in hits
             if "id" in hit and "name" in hit
         ]
+        return {"diseases": diseases, "total": search.get("total", len(diseases))}
     except Exception as exc:
         print(f"[OpenTargets] Batch search failed for '{query_str}': {exc}")
-        return []
+        return {"diseases": [], "total": 0}

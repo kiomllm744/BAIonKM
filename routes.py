@@ -181,33 +181,46 @@ def about():
 
 @main_bp.route('/api/database/diseases')
 def get_diseases_paginated():
-    """API endpoint to get paginated diseases data from Open Targets online."""
+    """Paginated live disease search against Open Targets.
+
+    Diseases are not stored locally, so this paginates the live Open Targets
+    search results for the query (defaulting to 'diabetes' when the box is empty).
+    """
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
     search = request.args.get('search', '').strip()
-    
+
     if not search:
-        search = "diabetes"
-        
+        search = "diabetes"  # default so the tab isn't empty on first load
+    if page < 1:
+        page = 1
+
     try:
         from opentargets_service import search_diseases_multi_online
-        ot_results = search_diseases_multi_online(search, limit=50)
-        
+        result = search_diseases_multi_online(search, limit=per_page, page_index=page - 1)
+        ot_results = result.get('diseases', [])
+        total = result.get('total', len(ot_results))
+
         data = [{'name': d['disease'], 'gene_count': 'Live online'} for d in ot_results]
-        
+        total_pages = (total + per_page - 1) // per_page if per_page else 1
+
         return jsonify({
             'data': data,
-            'total': len(data),
-            'page': 1,
-            'per_page': 50,
-            'total_pages': 1
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+            'search': search
         })
     except Exception as e:
         print(f"Error in paginated diseases: {e}")
         return jsonify({
             'data': [],
             'total': 0,
-            'page': 1,
-            'per_page': 50,
-            'total_pages': 0
+            'page': page,
+            'per_page': per_page,
+            'total_pages': 0,
+            'search': search
         })
 
 

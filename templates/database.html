@@ -833,7 +833,8 @@
                 // Update pagination
                 const start = (data.page - 1) * PER_PAGE + 1;
                 const end = Math.min(data.page * PER_PAGE, data.total);
-                document.getElementById('diseases-info').textContent = `Showing ${start}-${end} of ${data.total}`;
+                const diseaseTerm = data.search ? ` matching "${data.search}"` : '';
+                document.getElementById('diseases-info').textContent = `Showing ${start}-${end} of ${data.total}${diseaseTerm}`;
                 document.getElementById('diseases-prev').disabled = data.page <= 1;
                 document.getElementById('diseases-next').disabled = data.page >= data.total_pages;
                 document.getElementById('diseases-page-input').max = data.total_pages;
