@@ -474,6 +474,16 @@ body {
     background: #f0fdf4;
 }
 
+.terminology-chip.selectable {
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.terminology-chip.selectable:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
 .terminology-empty {
     color: var(--text-muted);
     font-style: italic;
@@ -492,7 +502,10 @@ body {
 .input-icon {
     position: absolute;
     left: 16px;
-    top: 50%;
+    /* Anchor to the input's vertical center (~26px), not 50% of the wrapper:
+       the disease suggestions panel is in-flow and stretches the wrapper, which
+       would otherwise drop this icon into the middle of the dropdown. */
+    top: 26px;
     transform: translateY(-50%);
     color: var(--text-muted);
     pointer-events: none;

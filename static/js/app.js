@@ -120,12 +120,10 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     
     if (hasUmls) {
         elements.terminologyUmls.innerHTML = concepts.slice(0, 4).map(concept => {
-            const semanticType = Array.isArray(concept.semantic_types) && concept.semantic_types.length
-                ? concept.semantic_types[0]
-                : 'Concept';
+            const name = concept.preferred_name || concept.name || '';
             return `
-                <span class="terminology-chip umls" title="${escapeHtml(semanticType)}">
-                    <strong>${escapeHtml(concept.preferred_name || concept.name)}</strong>
+                <span class="terminology-chip umls selectable" data-disease="${escapeHtml(name)}" title="Click to use this as the disease">
+                    <strong>${escapeHtml(name)}</strong>
                     <small>${escapeHtml(concept.cui || '')}</small>
                 </span>
             `;
@@ -138,7 +136,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     
     if (candidates.length > 0) {
         elements.terminologyOpenTargets.innerHTML = candidates.slice(0, 5).map(name => `
-            <span class="terminology-chip open-targets">
+            <span class="terminology-chip open-targets selectable" data-disease="${escapeHtml(name)}" title="Click to select this disease">
                 <strong>${escapeHtml(name)}</strong>
             </span>
         `).join('');
@@ -236,6 +234,16 @@ function setupDiseaseAutocomplete() {
         }
     });
     
+    // Click a UMLS / Open Targets chip in the Terminology panel to use it as the disease
+    if (elements.terminologyPanel) {
+        elements.terminologyPanel.addEventListener('click', function(e) {
+            const chip = e.target.closest('.terminology-chip.selectable[data-disease]');
+            if (chip && chip.dataset.disease) {
+                selectDisease(chip.dataset.disease);
+            }
+        });
+    }
+
     // Close dropdown when clicking outside
     document.addEventListener('click', function(e) {
         if (!input.contains(e.target) && !dropdown.contains(e.target)) {
