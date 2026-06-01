@@ -89,14 +89,15 @@ function formatNumber(num) {
 
 let terminologyRequestId = 0;
 
-// True when a disease is typed, was NOT picked from Open Targets (no exact ID),
-// and the terminology lookup for that exact text found no Open Targets disease.
+// Block unless the current disease text is a CONFIRMED real disease: either
+// picked from suggestions (exact ID) or an exact name match. Stops free text
+// like "abc" from analyzing a surprise disease via fuzzy search.
 function diseaseSelectionBlocked() {
     if (!elements.diseaseInput) return false;
     const val = elements.diseaseInput.value.trim();
     if (!val) return false;                                              // empty handled separately
     if (elements.diseaseIdInput && elements.diseaseIdInput.value) return false; // exact pick -> ok
-    return state.diseaseOkFor === val && !state.diseaseOk;              // confirmed no Open Targets match
+    return !(state.diseaseOk && state.diseaseOkFor === val);            // ok only if confirmed for THIS text
 }
 
 function updateRunButton() {
@@ -139,12 +140,6 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     const concepts = Array.isArray(payload?.concepts) ? payload.concepts : [];
     const candidates = Array.isArray(openTargetsSuggestions) ? openTargetsSuggestions : [];
     const hasUmls = concepts.length > 0;
-
-    // Record whether this exact input resolves in Open Targets, and reflect it on
-    // the Run button (can't analyze a disease with no Open Targets gene data).
-    state.diseaseOk = candidates.length > 0;
-    state.diseaseOkFor = query;
-    updateRunButton();
 
     setTerminologyStatus(hasUmls ? 'Live' : 'Fallback', hasUmls ? 'ready' : 'fallback');
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
@@ -272,23 +267,45 @@ function setupDiseaseAutocomplete() {
     input.addEventListener('input', function() {
         clearTimeout(debounceTimer);
         justSelected = false; // Reset flag on new input
-        if (elements.diseaseIdInput) elements.diseaseIdInput.value = ''; // typing => no exact ID, fall back to name resolution
+        if (elements.diseaseIdInput) elements.diseaseIdInput.value = ''; // typing => no exact ID yet
         const query = this.value.trim();
         state.selectedIndex = -1;
-        updateRunButton(); // optimistic: text changed, re-enable until the lookup confirms
-        
+
         if (query.length < 1) {
             hideSuggestions(dropdown);
-            renderTerminologyEmpty();
+            renderTerminologyEmpty();   // resets diseaseOk + button
             return;
         }
-        
+
+        // Unconfirmed until the user picks a suggestion OR the text exactly
+        // matches one. Prevents free text like "abc" from analyzing a surprise
+        // disease via Open Targets' fuzzy search.
+        state.diseaseOk = false;
+        state.diseaseOkFor = query;
+        updateRunButton();
+
         debounceTimer = setTimeout(async () => {
             const suggestionsPromise = fetchSuggestions('/api/diseases', query);
             fetchTerminologyMapping(query, suggestionsPromise);
             const suggestions = await suggestionsPromise;
             state.activeDropdown = dropdown;
             showSuggestionsWithKeyboard(dropdown, suggestions, query, selectDisease);
+
+            // Auto-confirm if the typed text is an exact disease name.
+            if (input.value.trim() === query) {
+                const exact = suggestions.find(s => {
+                    const n = (s && typeof s === 'object') ? s.name : s;
+                    return (n || '').toLowerCase() === query.toLowerCase();
+                });
+                if (exact) {
+                    state.diseaseOk = true;
+                    state.diseaseOkFor = query;
+                    if (elements.diseaseIdInput) {
+                        elements.diseaseIdInput.value = (exact && typeof exact === 'object') ? (exact.id || '') : '';
+                    }
+                    updateRunButton();
+                }
+            }
         }, 150);
     });
     
@@ -832,7 +849,7 @@ function handleFormSubmit(e) {
     }
 
     if (diseaseSelectionBlocked()) {
-        showToast(`"${elements.diseaseInput.value.trim()}" isn't in Open Targets, so there are no disease genes to analyze. Pick a disease from the suggestions (or use a more standard name).`, 'error', 6000);
+        showToast(`Please pick a disease from the suggestions list so we analyze the exact one you mean. Free text like "${elements.diseaseInput.value.trim()}" isn't a confirmed disease.`, 'error', 6000);
         elements.diseaseInput.focus();
         return;
     }

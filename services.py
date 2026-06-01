@@ -5,9 +5,9 @@ Contains the main business logic for disease-herb gene analysis using Open Targe
 import json
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sqlalchemy import func, create_engine
+from sqlalchemy import func, create_engine, inspect as sa_inspect
 from sqlalchemy.orm import sessionmaker
-from models import Herb
+from models import Herb, Disease
 from config import Config
 from opentargets_service import search_disease_efo_id, fetch_live_associated_genes
 from umls_service import candidate_names_for_open_targets
@@ -24,12 +24,37 @@ engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **engine_args)
 Session = sessionmaker(bind=engine)
 
 
+def _exact_catalogue_disease(disease_name):
+    """Return (efo_id, name) for an exact (case-insensitive) match in the local
+    disease catalogue, or None. Used to avoid fuzzy Open Targets surprises
+    (e.g. "abc" resolving to aneurysmal bone cyst via its abbreviation)."""
+    disease_name = (disease_name or '').strip()
+    if not disease_name:
+        return None
+    try:
+        if 'diseases' not in sa_inspect(engine).get_table_names():
+            return None
+    except Exception:
+        return None
+    session = Session()
+    try:
+        return session.query(Disease.efo_id, Disease.name).filter(
+            func.lower(Disease.name) == disease_name.lower()
+        ).first()
+    except Exception:
+        return None
+    finally:
+        session.close()
+
+
 def resolve_disease_to_open_targets(disease_name):
     """
     Resolve a user disease/symptom string to an Open Targets disease ID.
 
-    UMLS is used to add standardized terminology candidates, but Open Targets
-    remains the final authority for EFO/MONDO IDs and gene associations.
+    Order: a raw EFO/MONDO/Orphanet ID is used as-is; then an EXACT local
+    catalogue name match (deterministic, no surprises); only then the UMLS +
+    Open Targets fuzzy search. UMLS adds standardized terminology candidates, but
+    Open Targets remains the final authority for EFO/MONDO IDs and associations.
     """
     disease_name = (disease_name or '').strip()
     if not disease_name:
@@ -42,6 +67,22 @@ def resolve_disease_to_open_targets(disease_name):
             "description": "",
             "matched_input": disease_name,
             "match_source": "user_identifier",
+            "umls_cui": None,
+            "umls_semantic_types": [],
+            "umls_root_source": None,
+            "candidates_checked": [disease_name],
+        }
+
+    # Exact local catalogue match takes precedence over fuzzy search, so an exact
+    # disease name always maps to that exact disease (not Open Targets' top fuzzy hit).
+    exact = _exact_catalogue_disease(disease_name)
+    if exact:
+        return {
+            "efo_id": exact[0],
+            "name": exact[1],
+            "description": "",
+            "matched_input": disease_name,
+            "match_source": "catalogue_exact",
             "umls_cui": None,
             "umls_semantic_types": [],
             "umls_root_source": None,
