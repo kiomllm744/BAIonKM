@@ -3,6 +3,7 @@ Flask routes for the Disease Portal application.
 """
 import json
 import re
+import difflib
 from datetime import datetime
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
@@ -359,14 +360,113 @@ def get_herb_genes(herb_name):
         session.close()
 
 
+# --- Local disease autocomplete (clinician-friendly) ---------------------------
+# Vocabulary of words appearing in disease names, used to fuzzy-correct typos.
+# Cached in memory; rebuilt on process restart (re-run build_disease_index.py +
+# restart to refresh after a new Open Targets release).
+_DISEASE_VOCAB = None
+
+
+def _disease_word_vocab():
+    global _DISEASE_VOCAB
+    if _DISEASE_VOCAB is None:
+        words = set()
+        session = Session()
+        try:
+            for (name,) in session.query(Disease.name).all():
+                for w in re.findall(r'[a-z0-9]+', name.lower()):
+                    if len(w) >= 4:
+                        words.add(w)
+        finally:
+            session.close()
+        _DISEASE_VOCAB = sorted(words)
+    return _DISEASE_VOCAB
+
+
+def _correct_token(token):
+    """Fuzzy-correct a (>=4 char) token to the nearest disease-vocabulary word."""
+    if len(token) < 4:
+        return token
+    match = difflib.get_close_matches(token, _disease_word_vocab(), n=1, cutoff=0.82)
+    return match[0] if match else token
+
+
+def _local_disease_match(session, term, limit, correct=False):
+    """Return disease names whose label contains every token of `term` (any order).
+    Shorter (more canonical) names first. Optionally typo-correct the tokens."""
+    tokens = re.findall(r'[a-z0-9]+', term.lower())
+    if not tokens:
+        return []
+    if correct:
+        tokens = [_correct_token(t) for t in tokens]
+    q = session.query(Disease.name)
+    for t in tokens:
+        q = q.filter(func.lower(Disease.name).like(f"%{t}%"))
+    q = q.order_by(func.length(Disease.name), Disease.name).limit(limit)
+    return [n for (n,) in q.all()]
+
+
 @main_bp.route('/api/diseases')
 def get_disease_suggestions():
-    """API endpoint to get disease name suggestions dynamically from Open Targets."""
+    """Disease autocomplete.
+
+    Local-first over the full Open Targets catalogue (instant, any-word-order),
+    augmented by UMLS so clinical synonyms/symptoms/abbreviations (e.g. "MI",
+    "heart attack", "high blood sugar") resolve to a real disease, with a typo
+    -correcting fallback. Falls back to live Open Targets search if the local
+    index isn't built.
+    """
+    from sqlalchemy import inspect as sa_inspect
     query = request.args.get('q', '').strip()
-    
     if len(query) < 1:
         return jsonify([])
-        
+
+    # --- Preferred: the local catalogue (built by build_disease_index.py) ---
+    if 'diseases' in sa_inspect(engine).get_table_names():
+        session = Session()
+        try:
+            if session.query(Disease.efo_id).first() is not None:
+                seen, out = set(), []
+
+                def _add(names):
+                    for n in names:
+                        k = n.lower()
+                        if k not in seen:
+                            seen.add(k)
+                            out.append(n)
+
+                direct = _local_disease_match(session, query, Config.MAX_SUGGESTIONS)
+
+                # Short inputs are usually abbreviations (MI, MS, RA, HTN, CKD)
+                # whose substring matches are noisy -- resolve via UMLS first.
+                abbrev_like = 2 <= len(query) <= 3
+                umls_names = []
+                if abbrev_like or len(direct) < 5:
+                    try:
+                        for cand in candidate_names_for_open_targets(query, limit=5):
+                            nm = cand.get('name')
+                            if nm and nm.lower() != query.lower():
+                                umls_names += _local_disease_match(session, nm, 8)
+                    except Exception as exc:
+                        print(f"[autocomplete] UMLS bridge failed: {exc}")
+
+                if abbrev_like:
+                    _add(umls_names)   # UMLS-resolved disease first
+                    _add(direct)
+                else:
+                    _add(direct)       # exact/any-order matches first
+                    _add(umls_names)
+
+                # typo-correcting fallback (only if still nothing)
+                if not out and len(query) >= 4:
+                    _add(_local_disease_match(session, query, Config.MAX_SUGGESTIONS, correct=True))
+
+                if out:
+                    return jsonify(out[:Config.MAX_SUGGESTIONS])
+        finally:
+            session.close()
+
+    # --- Fallback: live Open Targets search + UMLS (index not built) ---
     try:
         from opentargets_service import get_disease_suggestions_online
         suggestions = []
