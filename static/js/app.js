@@ -8,7 +8,9 @@ const state = {
     prescriptionCount: 1,
     maxPrescriptions: 3,
     activeDropdown: null,
-    selectedIndex: -1
+    selectedIndex: -1,
+    diseaseOk: true,      // does the current disease resolve in Open Targets?
+    diseaseOkFor: ''      // the exact input text the diseaseOk flag applies to
 };
 
 // DOM Elements
@@ -19,6 +21,7 @@ const elements = {
     prescriptionsContainer: document.getElementById('prescriptions-container'),
     addPrescriptionBtn: document.getElementById('add-prescription-btn'),
     clearBtn: document.getElementById('clear-btn'),
+    runAnalysisBtn: document.getElementById('run-analysis-btn'),
     form: document.getElementById('analysis-form'),
     herbsDataInput: document.getElementById('herbs-data-input'),
     diseaseCount: document.getElementById('disease-count'),
@@ -86,6 +89,21 @@ function formatNumber(num) {
 
 let terminologyRequestId = 0;
 
+// True when a disease is typed, was NOT picked from Open Targets (no exact ID),
+// and the terminology lookup for that exact text found no Open Targets disease.
+function diseaseSelectionBlocked() {
+    if (!elements.diseaseInput) return false;
+    const val = elements.diseaseInput.value.trim();
+    if (!val) return false;                                              // empty handled separately
+    if (elements.diseaseIdInput && elements.diseaseIdInput.value) return false; // exact pick -> ok
+    return state.diseaseOkFor === val && !state.diseaseOk;              // confirmed no Open Targets match
+}
+
+function updateRunButton() {
+    if (!elements.runAnalysisBtn) return;
+    elements.runAnalysisBtn.classList.toggle('is-disabled', diseaseSelectionBlocked());
+}
+
 function setTerminologyStatus(label, className = '') {
     if (!elements.terminologyStatus) return;
     elements.terminologyStatus.textContent = label;
@@ -94,6 +112,9 @@ function setTerminologyStatus(label, className = '') {
 
 function renderTerminologyEmpty(query = '') {
     if (!elements.terminologyPanel) return;
+    state.diseaseOk = true;          // no disease yet -> don't block the button
+    state.diseaseOkFor = '';
+    updateRunButton();
     setTerminologyStatus(query ? 'Waiting' : 'Idle');
     if (elements.terminologySummary) elements.terminologySummary.innerHTML = '';
     elements.terminologyInput.innerHTML = query
@@ -118,7 +139,13 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     const concepts = Array.isArray(payload?.concepts) ? payload.concepts : [];
     const candidates = Array.isArray(openTargetsSuggestions) ? openTargetsSuggestions : [];
     const hasUmls = concepts.length > 0;
-    
+
+    // Record whether this exact input resolves in Open Targets, and reflect it on
+    // the Run button (can't analyze a disease with no Open Targets gene data).
+    state.diseaseOk = candidates.length > 0;
+    state.diseaseOkFor = query;
+    updateRunButton();
+
     setTerminologyStatus(hasUmls ? 'Live' : 'Fallback', hasUmls ? 'ready' : 'fallback');
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
 
@@ -228,6 +255,9 @@ function setupDiseaseAutocomplete() {
         justSelected = true;
         input.value = value;
         if (elements.diseaseIdInput) elements.diseaseIdInput.value = id || '';
+        state.diseaseOk = true;          // picked from Open Targets -> analyzable
+        state.diseaseOkFor = value;
+        updateRunButton();
         fetchTerminologyMapping(value, fetchSuggestions('/api/diseases', value));
         hideSuggestions(dropdown);
         // Move focus to first herb input after disease selection
@@ -245,6 +275,7 @@ function setupDiseaseAutocomplete() {
         if (elements.diseaseIdInput) elements.diseaseIdInput.value = ''; // typing => no exact ID, fall back to name resolution
         const query = this.value.trim();
         state.selectedIndex = -1;
+        updateRunButton(); // optimistic: text changed, re-enable until the lookup confirms
         
         if (query.length < 1) {
             hideSuggestions(dropdown);
@@ -799,7 +830,13 @@ function handleFormSubmit(e) {
         elements.diseaseInput.focus();
         return;
     }
-    
+
+    if (diseaseSelectionBlocked()) {
+        showToast(`"${elements.diseaseInput.value.trim()}" isn't in Open Targets, so there are no disease genes to analyze. Pick a disease from the suggestions (or use a more standard name).`, 'error', 6000);
+        elements.diseaseInput.focus();
+        return;
+    }
+
     const herbsData = [];
     let hasHerbs = false;
     

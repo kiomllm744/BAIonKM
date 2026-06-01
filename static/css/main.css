@@ -828,6 +828,18 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
+/* Looks disabled but stays clickable, so clicking explains why (via a toast). */
+.btn.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
+}
+
+.btn.is-disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 .btn-secondary {
     background: var(--bg-color);
     color: var(--text-secondary);
