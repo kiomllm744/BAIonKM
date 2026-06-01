@@ -392,18 +392,19 @@ def _correct_token(token):
 
 
 def _local_disease_match(session, term, limit, correct=False):
-    """Return disease names whose label contains every token of `term` (any order).
-    Shorter (more canonical) names first. Optionally typo-correct the tokens."""
+    """Return (name, efo_id) for diseases whose label contains every token of
+    `term` (any order). Shorter (more canonical) names first. Optionally
+    typo-correct the tokens."""
     tokens = re.findall(r'[a-z0-9]+', term.lower())
     if not tokens:
         return []
     if correct:
         tokens = [_correct_token(t) for t in tokens]
-    q = session.query(Disease.name)
+    q = session.query(Disease.name, Disease.efo_id)
     for t in tokens:
         q = q.filter(func.lower(Disease.name).like(f"%{t}%"))
     q = q.order_by(func.length(Disease.name), Disease.name).limit(limit)
-    return [n for (n,) in q.all()]
+    return q.all()
 
 
 @main_bp.route('/api/diseases')
@@ -428,12 +429,12 @@ def get_disease_suggestions():
             if session.query(Disease.efo_id).first() is not None:
                 seen, out = set(), []
 
-                def _add(names):
-                    for n in names:
-                        k = n.lower()
+                def _add(rows):
+                    for name, efo in rows:
+                        k = name.lower()
                         if k not in seen:
                             seen.add(k)
-                            out.append(n)
+                            out.append({'name': name, 'id': efo})
 
                 direct = _local_disease_match(session, query, Config.MAX_SUGGESTIONS)
 
@@ -487,7 +488,7 @@ def get_disease_suggestions():
                 if not _is_relevant_open_targets_suggestion(suggestion, candidate_terms):
                     continue
                 seen.add(key)
-                suggestions.append(suggestion)
+                suggestions.append({'name': suggestion, 'id': None})
                 if len(suggestions) >= Config.MAX_SUGGESTIONS:
                     break
             if len(suggestions) >= Config.MAX_SUGGESTIONS:
@@ -654,6 +655,7 @@ def analyze():
     if request.method == 'POST':
         # Get form data
         disease_name = request.form.get('disease', '').strip()
+        disease_id = request.form.get('disease_id', '').strip()  # exact Open Targets ID if picked
         herbs_data_json = request.form.get('herbs_data', '[]')
         
         if not disease_name:
@@ -677,8 +679,8 @@ def analyze():
         if not herb_lists:
             return render_template('index.html', error="Please add at least one herb to a prescription")
         
-        # Perform analysis
-        results = analyze_prescriptions(disease_name, herb_lists)
+        # Perform analysis (use the exact picked ID when available -> skips re-resolution)
+        results = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None)
         
         # Save to history
         try:

@@ -285,12 +285,30 @@ def process_enrichment_data(data, enrichment_data):
     data['enrichment_data'] = data['enrichment_data'][:Config.MAX_ENRICHMENT_RESULTS]
 
 
-def analyze_prescriptions(disease_name, herb_lists):
+def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
     """
     Main analysis function - ONLINE REAL-TIME VERSION.
+
+    If efo_id is provided (the user picked an exact disease from the catalogue),
+    skip the name->ID re-resolution and use that Open Targets ID directly. This
+    is exact (no wrong-variant guess) and one network round-trip faster.
     """
     disease_name = (disease_name or '').strip()
-    resolution = resolve_disease_to_open_targets(disease_name)
+    efo_id = (efo_id or '').strip()
+    if efo_id:
+        resolution = {
+            "efo_id": efo_id,
+            "name": disease_name or efo_id,
+            "description": "",
+            "matched_input": disease_name,
+            "match_source": "catalogue_id",
+            "umls_cui": None,
+            "umls_semantic_types": [],
+            "umls_root_source": None,
+            "candidates_checked": [efo_id],
+        }
+    else:
+        resolution = resolve_disease_to_open_targets(disease_name)
     efo_id = resolution.get("efo_id") if resolution else None
     real_name = resolution.get("name") if resolution and resolution.get("name") else disease_name
 

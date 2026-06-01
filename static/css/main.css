@@ -484,6 +484,31 @@ body {
     box-shadow: 0 0 0 2px var(--primary-light);
 }
 
+.terminology-summary {
+    padding: 6px 2px 10px;
+    color: #27364a;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.terminology-summary:empty {
+    display: none;
+}
+
+.terminology-understood {
+    display: inline-block;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 6px;
+}
+
+.terminology-summary small {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
 .terminology-empty {
     color: var(--text-muted);
     font-style: italic;
@@ -583,6 +608,15 @@ body {
 
 .suggestion-item:last-child {
     border-bottom: none;
+}
+
+.suggestion-id {
+    float: right;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-family: monospace;
+    margin-left: 10px;
+    opacity: 0.85;
 }
 
 .suggestion-item:hover,

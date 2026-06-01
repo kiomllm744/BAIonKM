@@ -215,9 +215,57 @@ def candidate_names_for_open_targets(query_text, limit=5):
     return deduped
 
 
+def get_icd10_code(cui):
+    """Return an ICD-10-CM code for a UMLS concept (CUI), or None. Cached.
+
+    Doctors think in ICD-10, so we surface it for the primary interpreted concept.
+    """
+    cui = (cui or '').strip()
+    if not cui or not Config.UMLS_API_KEY:
+        return None
+
+    session = Session()
+    try:
+        cached = _get_cached_response(session, "umls_icd10", cui)
+        if cached is not None:
+            return cached or None  # cached "" means "looked up, none found"
+
+        url = f"{Config.UMLS_BASE_URL.rstrip('/')}/content/current/CUI/{cui}/atoms"
+        params = {"apiKey": Config.UMLS_API_KEY, "sabs": "ICD10CM", "pageSize": 25}
+        resp = requests.get(
+            url, params=params,
+            timeout=Config.UMLS_TIMEOUT_SECONDS,
+            verify=Config.EXTERNAL_API_VERIFY_SSL,
+        )
+
+        code = None
+        if resp.ok:
+            for atom in resp.json().get("result", []):
+                # atom["code"] is a URI ending in the source code, e.g. ".../ICD10CM/I21.9"
+                tail = (atom.get("code") or "").rstrip("/").split("/")[-1]
+                if tail and tail not in ("NONE", "ICD10CM"):
+                    code = tail
+                    break
+
+        _save_cached_response(session, "umls_icd10", cui, code or "")
+        return code
+    except Exception as exc:
+        print(f"[UMLS] ICD-10 lookup failed for {cui}: {exc}")
+        return None
+    finally:
+        session.close()
+
+
 def translate_clinical_text(query_text, limit=10):
     """Return a UI/API friendly UMLS translation payload."""
     concepts = search_umls_concepts(query_text, limit=limit)
+    if concepts:
+        # Enrich the top (primary) concept with an ICD-10 code, best-effort.
+        try:
+            concepts[0] = dict(concepts[0])
+            concepts[0]["icd10"] = get_icd10_code(concepts[0].get("cui"))
+        except Exception:
+            pass
     return {
         "query": query_text,
         "source": "umls" if concepts else "fallback_open_targets",

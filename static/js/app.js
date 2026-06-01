@@ -14,6 +14,7 @@ const state = {
 // DOM Elements
 const elements = {
     diseaseInput: document.getElementById('disease'),
+    diseaseIdInput: document.getElementById('disease-id-input'),
     diseaseSuggestions: document.getElementById('disease-suggestions'),
     prescriptionsContainer: document.getElementById('prescriptions-container'),
     addPrescriptionBtn: document.getElementById('add-prescription-btn'),
@@ -24,6 +25,7 @@ const elements = {
     herbCount: document.getElementById('herb-count'),
     terminologyPanel: document.getElementById('terminology-panel'),
     terminologyStatus: document.getElementById('terminology-status'),
+    terminologySummary: document.getElementById('terminology-summary'),
     terminologyInput: document.getElementById('terminology-input'),
     terminologyUmls: document.getElementById('terminology-umls'),
     terminologyOpenTargets: document.getElementById('terminology-opentargets')
@@ -93,6 +95,7 @@ function setTerminologyStatus(label, className = '') {
 function renderTerminologyEmpty(query = '') {
     if (!elements.terminologyPanel) return;
     setTerminologyStatus(query ? 'Waiting' : 'Idle');
+    if (elements.terminologySummary) elements.terminologySummary.innerHTML = '';
     elements.terminologyInput.innerHTML = query
         ? `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`
         : '<span class="terminology-empty">Type a disease, symptom, or clinical phrase</span>';
@@ -103,6 +106,7 @@ function renderTerminologyEmpty(query = '') {
 function renderTerminologyLoading(query) {
     if (!elements.terminologyPanel) return;
     setTerminologyStatus('Mapping', 'loading');
+    if (elements.terminologySummary) elements.terminologySummary.innerHTML = `Interpreting <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>&hellip;`;
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
     elements.terminologyUmls.innerHTML = '<span class="terminology-empty">Searching UMLS...</span>';
     elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Waiting for normalized terms</span>';
@@ -117,14 +121,37 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     
     setTerminologyStatus(hasUmls ? 'Live' : 'Fallback', hasUmls ? 'ready' : 'fallback');
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
-    
+
+    // Plain-language summary: "We understood "<input>" as <Disease> (ICD-10 ...)"
+    let primaryName = '';
+    let primaryMeta = '';
+    if (hasUmls) {
+        const top = concepts[0];
+        primaryName = top.preferred_name || top.name || '';
+        const bits = [];
+        if (top.icd10) bits.push('ICD-10 ' + top.icd10);
+        if (top.root_source) bits.push(top.root_source);
+        primaryMeta = bits.join(' · ');
+    } else if (candidates.length) {
+        const c0 = candidates[0];
+        primaryName = typeof c0 === 'string' ? c0 : (c0.name || '');
+    }
+    if (elements.terminologySummary) {
+        elements.terminologySummary.innerHTML = primaryName
+            ? `We understood <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong> as `
+              + `<span class="terminology-understood">${escapeHtml(primaryName)}</span>`
+              + (primaryMeta ? ` <small>${escapeHtml(primaryMeta)}</small>` : '')
+            : `Searching Open Targets for <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>&hellip;`;
+    }
+
     if (hasUmls) {
         elements.terminologyUmls.innerHTML = concepts.slice(0, 4).map(concept => {
             const name = concept.preferred_name || concept.name || '';
+            const icd = concept.icd10 ? `<small>ICD-10 ${escapeHtml(concept.icd10)}</small>` : '';
+            const tip = `${name}${concept.cui ? ' (' + concept.cui + ')' : ''} — click to use`;
             return `
-                <span class="terminology-chip umls selectable" data-disease="${escapeHtml(name)}" title="Click to use this as the disease">
-                    <strong>${escapeHtml(name)}</strong>
-                    <small>${escapeHtml(concept.cui || '')}</small>
+                <span class="terminology-chip umls selectable" data-disease="${escapeHtml(name)}" title="${escapeHtml(tip)}">
+                    <strong>${escapeHtml(name)}</strong>${icd}
                 </span>
             `;
         }).join('');
@@ -133,13 +160,17 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     } else {
         elements.terminologyUmls.innerHTML = '<span class="terminology-empty">No UMLS concept match</span>';
     }
-    
+
     if (candidates.length > 0) {
-        elements.terminologyOpenTargets.innerHTML = candidates.slice(0, 5).map(name => `
-            <span class="terminology-chip open-targets selectable" data-disease="${escapeHtml(name)}" title="Click to select this disease">
-                <strong>${escapeHtml(name)}</strong>
-            </span>
-        `).join('');
+        elements.terminologyOpenTargets.innerHTML = candidates.slice(0, 5).map(c => {
+            const nm = typeof c === 'string' ? c : (c.name || '');
+            const cid = typeof c === 'string' ? '' : (c.id || '');
+            return `
+                <span class="terminology-chip open-targets selectable" data-disease="${escapeHtml(nm)}" data-id="${escapeHtml(cid)}" title="Click to select this disease">
+                    <strong>${escapeHtml(nm)}</strong>
+                </span>
+            `;
+        }).join('');
     } else {
         elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">No reliable Open Targets disease candidate. Use a specific disease name.</span>';
     }
@@ -148,6 +179,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
 function renderTerminologyError(query) {
     if (!elements.terminologyPanel) return;
     setTerminologyStatus('Error', 'fallback');
+    if (elements.terminologySummary) elements.terminologySummary.innerHTML = '';
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
     elements.terminologyUmls.innerHTML = '<span class="terminology-empty">UMLS lookup failed</span>';
     elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Using direct Open Targets search</span>';
@@ -183,10 +215,12 @@ function setupDiseaseAutocomplete() {
     const dropdown = elements.diseaseSuggestions;
     renderTerminologyEmpty();
     
-    // Helper to handle selection
-    function selectDisease(value) {
+    // Helper to handle selection. `id` is the exact Open Targets ID when the
+    // pick came from the catalogue; stored so analysis skips name re-resolution.
+    function selectDisease(value, id) {
         justSelected = true;
         input.value = value;
+        if (elements.diseaseIdInput) elements.diseaseIdInput.value = id || '';
         fetchTerminologyMapping(value, fetchSuggestions('/api/diseases', value));
         hideSuggestions(dropdown);
         // Move focus to first herb input after disease selection
@@ -201,6 +235,7 @@ function setupDiseaseAutocomplete() {
     input.addEventListener('input', function() {
         clearTimeout(debounceTimer);
         justSelected = false; // Reset flag on new input
+        if (elements.diseaseIdInput) elements.diseaseIdInput.value = ''; // typing => no exact ID, fall back to name resolution
         const query = this.value.trim();
         state.selectedIndex = -1;
         
@@ -239,7 +274,7 @@ function setupDiseaseAutocomplete() {
         elements.terminologyPanel.addEventListener('click', function(e) {
             const chip = e.target.closest('.terminology-chip.selectable[data-disease]');
             if (chip && chip.dataset.disease) {
-                selectDisease(chip.dataset.disease);
+                selectDisease(chip.dataset.disease, chip.dataset.id || '');
             }
         });
     }
@@ -364,7 +399,8 @@ function handleKeyboardNavigation(e, dropdown, onSelect) {
     } else if (e.key === 'Enter') {
         e.preventDefault();
         if (state.selectedIndex >= 0 && items[state.selectedIndex]) {
-            onSelect(items[state.selectedIndex].dataset.value);
+            const chosen = items[state.selectedIndex];
+            onSelect(chosen.dataset.value, chosen.dataset.id || '');
             state.selectedIndex = -1;
         }
     } else if (e.key === 'Escape') {
@@ -406,36 +442,45 @@ function showSuggestionsWithKeyboard(container, suggestions, query, onSelect) {
     
     state.selectedIndex = 0; // Auto-select first item
     
-    // Check if this is herb suggestions (objects with english/korean) or disease suggestions (strings)
-    const isHerbSuggestion = suggestions.length > 0 && typeof suggestions[0] === 'object' && suggestions[0].english;
-    
+    // Detect suggestion shape: herb objects {english/korean}, disease objects
+    // {name,id}, or legacy plain strings.
+    const first = suggestions[0];
+    const isHerbSuggestion = typeof first === 'object' && first && first.english;
+    const isDiseaseObject = typeof first === 'object' && first && !first.english && 'name' in first;
+
     // Add count header for better UX
     const countHeader = `<div class="suggestions-count"><i class="fas fa-search"></i> Found ${suggestions.length} matching result${suggestions.length !== 1 ? 's' : ''}</div>`;
-    
+
     let itemsHtml;
     if (isHerbSuggestion) {
         // Bilingual herb display: Korean (English)
         itemsHtml = suggestions.map((s, i) => {
             const displayText = s.korean ? `${s.korean} (${s.english})` : s.english;
-            const highlightedText = s.korean ? 
+            const highlightedText = s.korean ?
                 `${highlightMatch(s.korean, query)} <span class="herb-english">(${highlightMatch(s.english, query)})</span>` :
                 highlightMatch(s.english, query);
             return `<div class="suggestion-item${i === 0 ? ' active' : ''}" data-value="${escapeHtml(s.english)}" data-korean="${escapeHtml(s.korean || '')}">${highlightedText}</div>`;
         }).join('');
+    } else if (isDiseaseObject) {
+        // Disease suggestions: name + Open Targets ID badge
+        itemsHtml = suggestions.map((s, i) => {
+            const idBadge = s.id ? `<span class="suggestion-id">${escapeHtml(s.id)}</span>` : '';
+            return `<div class="suggestion-item${i === 0 ? ' active' : ''}" data-value="${escapeHtml(s.name)}" data-id="${escapeHtml(s.id || '')}">${highlightMatch(s.name, query)}${idBadge}</div>`;
+        }).join('');
     } else {
-        // Regular string suggestions (diseases)
-        itemsHtml = suggestions.map((s, i) => 
+        // Legacy plain-string suggestions
+        itemsHtml = suggestions.map((s, i) =>
             `<div class="suggestion-item${i === 0 ? ' active' : ''}" data-value="${escapeHtml(s)}">${highlightMatch(s, query)}</div>`
         ).join('');
     }
-    
+
     container.innerHTML = countHeader + itemsHtml;
     container.style.display = 'block';
-    
+
     // Add click and hover handlers
     container.querySelectorAll('.suggestion-item').forEach((item, index) => {
         item.addEventListener('click', () => {
-            onSelect(item.dataset.value);
+            onSelect(item.dataset.value, item.dataset.id || '');
         });
         
         item.addEventListener('mouseenter', () => {

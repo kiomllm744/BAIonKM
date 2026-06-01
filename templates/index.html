@@ -102,12 +102,14 @@
                                 <i class="fas fa-search input-icon"></i>
                                 <div class="suggestions-dropdown" id="disease-suggestions"></div>
                             </div>
+                            <input type="hidden" name="disease_id" id="disease-id-input">
                             <span class="form-hint">Live UMLS terminology mapping with Open Targets disease resolution</span>
                             <div class="terminology-panel" id="terminology-panel" aria-live="polite">
                                 <div class="terminology-panel-header">
                                     <span><i class="fas fa-route"></i> Terminology Mapping</span>
                                     <span class="terminology-status" id="terminology-status">Waiting</span>
                                 </div>
+                                <div class="terminology-summary" id="terminology-summary"></div>
                                 <div class="terminology-chain">
                                     <div class="terminology-step">
                                         <span class="terminology-step-label">Input</span>
