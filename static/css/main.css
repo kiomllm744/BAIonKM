@@ -828,6 +828,36 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
+.provenance-bar {
+    margin-top: 18px;
+    padding: 8px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+.provenance-bar:empty { display: none; }
+.provenance-bar b { color: #4b5563; font-weight: 600; }
+.provenance-bar .provenance-title {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+}
+.provenance-bar .prov-sep { opacity: 0.5; }
+.provenance-bar .prov-warn {
+    color: #b45309;
+    background: #fef3c7;
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
 /* Looks disabled but stays clickable, so clicking explains why (via a toast). */
 .btn.is-disabled {
     opacity: 0.5;

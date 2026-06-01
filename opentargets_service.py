@@ -84,6 +84,36 @@ def _save_cached_response(session, provider, query_str, payload, source="opentar
     session.commit()
 
 
+def get_open_targets_version():
+    """Return the live Open Targets data release (e.g. '26.03'), cached.
+
+    The disease genes/scores are fetched live, so this is the actual release the
+    analysis used -- shown for provenance and to flag a stale local catalogue.
+    """
+    session = Session()
+    try:
+        cached = _get_cached_response(session, 'opentargets_meta', 'version')
+        if cached:
+            return cached
+        resp = requests.post(
+            Config.OPENTARGETS_API_URL,
+            json={"query": "{ meta { dataVersion { year month } } }"},
+            timeout=10,
+            verify=Config.EXTERNAL_API_VERIFY_SSL,
+        )
+        resp.raise_for_status()
+        dv = resp.json().get("data", {}).get("meta", {}).get("dataVersion", {}) or {}
+        ver = f"{dv['year']}.{dv['month']}" if dv.get("year") and dv.get("month") else None
+        if ver:
+            _save_cached_response(session, 'opentargets_meta', 'version', ver)
+        return ver
+    except Exception as exc:
+        print(f"[OpenTargets] meta version failed: {exc}")
+        return None
+    finally:
+        session.close()
+
+
 def search_disease_efo_id(disease_name):
     """
     Search Open Targets Platform to find matching disease EFO ID and metadata.

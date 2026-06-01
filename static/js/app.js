@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initializeApp() {
     loadStats();
+    loadProvenance();
     setupDiseaseAutocomplete();
     document.querySelectorAll('.herb-input').forEach(setupHerbAutocomplete);
     setupEventListeners();
@@ -59,6 +60,27 @@ function initializeApp() {
 // ==========================================
 // Stats Loading
 // ==========================================
+
+async function loadProvenance() {
+    const bar = document.getElementById('provenance-bar');
+    if (!bar) return;
+    try {
+        const p = await (await fetch('/api/provenance')).json();
+        const cat = p.disease_catalogue || {};
+        const herbs = (p.herb_db && p.herb_db.herbs) || '—';
+        const parts = [
+            `<span class="provenance-title">Data</span>`,
+            `Open Targets <b>${p.open_targets_live || '—'}</b>`,
+            `${cat.count || '—'} diseases`,
+            `${p.herb_db ? p.herb_db.name : 'BATMAN-TCM'} <b>${herbs}</b> herbs`,
+            `UMLS · Enrichr/${(p.enrichment || '').split('/').pop().trim() || 'DisGeNET'}`
+        ];
+        if (p.stale) parts.push(`<span class="prov-warn">disease catalogue outdated — rebuild the index</span>`);
+        bar.innerHTML = parts.join('<span class="prov-sep">·</span>');
+    } catch (e) {
+        bar.innerHTML = '';
+    }
+}
 
 async function loadStats() {
     try {

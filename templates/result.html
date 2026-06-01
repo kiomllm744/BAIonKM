@@ -960,7 +960,35 @@
             gap: 12px;
             margin-top: 24px;
         }
-        
+
+        .provenance {
+            margin-top: 18px;
+            padding: 10px 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 18px;
+            align-items: center;
+            font-size: 0.78rem;
+            color: #6b7280;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+        }
+        .provenance-title {
+            font-weight: 700;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .provenance b { color: #4b5563; font-weight: 600; }
+        .prov-warn {
+            color: #b45309;
+            background: #fef3c7;
+            padding: 1px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -1380,6 +1408,20 @@
                 <i class="fas fa-print"></i> Print Results
             </button>
         </div>
+
+        {% if results.provenance %}
+        {% set p = results.provenance %}
+        <div class="provenance">
+            <span class="provenance-title">Data sources</span>
+            <span><b>Disease&ndash;target genes:</b> Open Targets {{ p.open_targets_live or '&mdash;' }}</span>
+            <span><b>Disease catalogue:</b> {{ p.disease_catalogue.count or '&mdash;' }} (built {{ p.disease_catalogue.built or '&mdash;' }})</span>
+            <span><b>Herb&ndash;target:</b> {{ p.herb_db.name }} ({{ p.herb_db.herbs or '&mdash;' }} herbs)</span>
+            <span><b>Terminology:</b> {{ p.terminology }}</span>
+            <span><b>Enrichment:</b> {{ p.enrichment }}</span>
+            {% if results.created_at %}<span><b>Run:</b> {{ results.created_at }}</span>{% endif %}
+            {% if p.stale %}<span class="prov-warn">Disease catalogue is from an older Open Targets release &mdash; rebuild the index</span>{% endif %}
+        </div>
+        {% endif %}
     </div>
 
     <script>

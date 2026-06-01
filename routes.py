@@ -649,6 +649,51 @@ def get_stats():
         session.close()
 
 
+def _build_provenance():
+    """Data sources + versions behind an analysis (for the version footer,
+    a staleness check, and reproducibility). All best-effort."""
+    from sqlalchemy import inspect as sa_inspect
+    prov = {
+        'open_targets_live': None,                 # release the live genes came from
+        'disease_catalogue': {},                   # local browse index
+        'herb_db': {'name': 'BATMAN-TCM', 'herbs': None},
+        'terminology': 'UMLS (NLM)',
+        'enrichment': f"Enrichr / {Config.DEFAULT_GENE_LIBRARY}",
+        'stale': False,
+    }
+    try:
+        from opentargets_service import get_open_targets_version
+        prov['open_targets_live'] = get_open_targets_version()
+    except Exception:
+        pass
+
+    session = Session()
+    try:
+        try:
+            prov['herb_db']['herbs'] = session.query(Herb.herbName).distinct().count()
+        except Exception:
+            pass
+        if 'data_meta' in sa_inspect(engine).get_table_names():
+            rows = dict(session.execute(text("SELECT key, value FROM data_meta")).fetchall())
+            prov['disease_catalogue'] = {
+                'count': rows.get('disease_catalogue_count'),
+                'ot_version': rows.get('disease_catalogue_ot_version'),
+                'built': (rows.get('disease_catalogue_built') or '')[:10],
+            }
+            cat_ver = rows.get('disease_catalogue_ot_version')
+            if cat_ver and prov['open_targets_live'] and cat_ver != prov['open_targets_live']:
+                prov['stale'] = True
+    finally:
+        session.close()
+    return prov
+
+
+@main_bp.route('/api/provenance')
+def api_provenance():
+    """Data sources/versions + freshness, for the UI footer."""
+    return jsonify(_build_provenance())
+
+
 @main_bp.route('/analyze', methods=['POST'])
 def analyze():
     """Handle form submission and perform analysis."""
@@ -681,11 +726,21 @@ def analyze():
         
         # Perform analysis (use the exact picked ID when available -> skips re-resolution)
         results = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None)
+
+        # Record the data sources/versions used, so the result is auditable and reproducible
+        try:
+            results['provenance'] = _build_provenance()
+        except Exception as e:
+            print(f"Error building provenance: {e}")
         
         # Save to history
         try:
             session = Session()
-            common_genes_count = len(results.get('common_genes', []))
+            # common genes live per-prescription, not at the top level
+            _common = set()
+            for _rx in results.get('prescriptions', []):
+                _common.update(_rx.get('common_genes', []))
+            common_genes_count = len(_common)
             
             new_result = AnalysisResult(
                 disease_name=disease_name,

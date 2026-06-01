@@ -107,7 +107,31 @@ def build(force=False):
         conn.execute(text("CREATE INDEX IF NOT EXISTS idx_diseases_name ON diseases (name)"))
 
     count = _table_count()
-    print(f"[build] Done. diseases table now has {count} rows.")
+
+    # Record provenance (for the version footer + staleness check).
+    import datetime
+    try:
+        from opentargets_service import get_open_targets_version
+        ot_version = get_open_targets_version() or ""
+    except Exception:
+        ot_version = ""
+    now = datetime.datetime.utcnow().isoformat(timespec="seconds")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS data_meta (key TEXT PRIMARY KEY, value TEXT, updated_at TEXT)"
+        ))
+        for k, v in [
+            ("disease_catalogue_count", str(count)),
+            ("disease_catalogue_ot_version", ot_version),
+            ("disease_catalogue_built", now),
+        ]:
+            conn.execute(text("DELETE FROM data_meta WHERE key = :k"), {"k": k})
+            conn.execute(
+                text("INSERT INTO data_meta (key, value, updated_at) VALUES (:k, :v, :u)"),
+                {"k": k, "v": v, "u": now},
+            )
+
+    print(f"[build] Done. diseases table now has {count} rows (Open Targets {ot_version or '?'}).")
     try:
         os.remove(LOCAL_PARQUET)  # don't leave the 7 MB file lying around
     except OSError:
