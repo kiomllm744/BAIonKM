@@ -66,7 +66,16 @@ class Config:
     # - Local: Use .env file
     # - Production: Set in server environment variables
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-    
+    # Primary model + fallbacks. gemini-2.5-flash is a stable GA model; some
+    # others (e.g. gemini-3.5-flash) frequently return 503/429 "high demand".
+    # If the primary is overloaded, get_gemini_response tries the fallbacks.
+    GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+    GEMINI_FALLBACK_MODELS = [
+        m.strip() for m in os.environ.get(
+            'GEMINI_FALLBACK_MODELS', 'gemini-2.0-flash,gemini-flash-latest'
+        ).split(',') if m.strip()
+    ]
+
     # Demo Login Credentials (for professor access)
     # You can change these or set via environment variables
     DEMO_USERNAME = os.environ.get('DEMO_USERNAME', 'professor')

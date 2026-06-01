@@ -11,77 +11,58 @@ from config import Config
 
 def get_gemini_response(prompt: str) -> str:
     """
-    Send a prompt to Google Gemini API and get a response.
+    Send a prompt to Google Gemini and return the text response.
+
+    Tries the configured model, then falls back to alternates if a model is
+    overloaded/rate-limited (HTTP 503/429), so transient capacity issues on one
+    model don't break AI analysis.
     """
     api_key = Config.GEMINI_API_KEY
-    
     if not api_key:
         print("[LLM] Error: No Gemini API key configured")
         return None
-    
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
-    
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
+
+    models = [Config.GEMINI_MODEL] + [m for m in Config.GEMINI_FALLBACK_MODELS if m != Config.GEMINI_MODEL]
+    headers = {"Content-Type": "application/json"}
     data = {
-        "contents": [{
-            "parts": [{
-                "text": prompt
-            }]
-        }],
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 4096
-        }
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096},
     }
-    
-    try:
-        print(f"[LLM] Sending request to Gemini API (prompt length: {len(prompt)} chars)...")
-        response = requests.post(
-            url,
-            headers=headers,
-            json=data,
-            timeout=90,
-            verify=Config.EXTERNAL_API_VERIFY_SSL
-        )
-        
-        if not response.ok:
-            print(f"[LLM] API Error: Status {response.status_code}")
-            print(f"[LLM] Response: {response.text[:500]}")
-            return None
-        
-        result = response.json()
-        
-        if "candidates" in result and len(result["candidates"]) > 0:
-            candidate = result["candidates"][0]
-            if "content" in candidate and "parts" in candidate["content"]:
-                parts = candidate["content"]["parts"]
-                if len(parts) > 0 and "text" in parts[0]:
+
+    last_status = None
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            print(f"[LLM] Requesting {model} (prompt length: {len(prompt)} chars)...")
+            response = requests.post(url, headers=headers, json=data, timeout=90,
+                                     verify=Config.EXTERNAL_API_VERIFY_SSL)
+            if not response.ok:
+                last_status = response.status_code
+                print(f"[LLM] {model} -> HTTP {response.status_code}: {response.text[:200]}")
+                continue  # overloaded/rate-limited/etc. -> try the next model
+
+            result = response.json()
+            candidates = result.get("candidates") or []
+            if candidates:
+                parts = (candidates[0].get("content") or {}).get("parts") or []
+                if parts and "text" in parts[0]:
                     text = parts[0]["text"]
-                    print(f"[LLM] Received response (length: {len(text)} chars)")
+                    print(f"[LLM] {model} OK (response length: {len(text)} chars)")
                     return text
-        
-        # Check for blocked content or safety issues
-        if "candidates" in result and len(result["candidates"]) > 0:
-            candidate = result["candidates"][0]
-            if "finishReason" in candidate and candidate["finishReason"] != "STOP":
-                print(f"[LLM] Finish reason: {candidate['finishReason']}")
-        
-        print(f"[LLM] Unexpected response structure: {str(result)[:500]}")
-        return None
-        
-    except requests.exceptions.Timeout:
-        print("[LLM] API request timed out (90s)")
-        return None
-    except requests.exceptions.RequestException as e:
-        print(f"[LLM] API Request Error: {str(e)}")
-        return None
-    except Exception as e:
-        print(f"[LLM] Unexpected Error: {str(e)}")
-        traceback.print_exc()
-        return None
+                fr = candidates[0].get("finishReason")
+                if fr and fr != "STOP":
+                    print(f"[LLM] {model} finishReason: {fr}")
+            print(f"[LLM] {model} unexpected response: {str(result)[:200]}")
+        except requests.exceptions.Timeout:
+            print(f"[LLM] {model} timed out (90s)")
+        except requests.exceptions.RequestException as e:
+            print(f"[LLM] {model} request error: {e}")
+        except Exception as e:
+            print(f"[LLM] {model} unexpected error: {e}")
+            traceback.print_exc()
+
+    print(f"[LLM] All Gemini models failed (last HTTP status: {last_status})")
+    return None
 
 
 def extract_json_from_response(text: str) -> dict:
