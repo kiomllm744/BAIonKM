@@ -22,6 +22,19 @@ class Herb(db.Model):
         return f'<Herb {self.herbName} - Gene {self.Genes}>'
 
 
+class Disease(db.Model):
+    """Local index of Open Targets diseases/phenotypes for browsing the full
+    catalogue. Populated by build_disease_index.py. Genes are still fetched
+    live from Open Targets at analysis time -- this is only the name/ID list."""
+    __tablename__ = 'diseases'
+
+    efo_id = db.Column(db.Text, primary_key=True)  # EFO_/MONDO_/Orphanet_/HP_...
+    name = db.Column(db.Text, nullable=False, index=True)
+
+    def __repr__(self):
+        return f'<Disease {self.efo_id} {self.name}>'
+
+
 class AnalysisResult(db.Model):
     """Model for storing analysis results history."""
     __tablename__ = 'analysis_results'

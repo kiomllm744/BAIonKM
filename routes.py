@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, jsonif
 from sqlalchemy import func, desc, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from models import Herb, AnalysisResult, ExternalLookupCache
+from models import Herb, AnalysisResult, ExternalLookupCache, Disease
 from services import analyze_prescriptions
 from config import Config
 from llm_service import generate_full_ai_analysis
@@ -181,46 +181,60 @@ def about():
 
 @main_bp.route('/api/database/diseases')
 def get_diseases_paginated():
-    """Paginated live disease search against Open Targets.
+    """Browse diseases.
 
-    Diseases are not stored locally, so this paginates the live Open Targets
-    search results for the query (defaulting to 'diabetes' when the box is empty).
+    If the local disease index (built by build_disease_index.py) is present,
+    paginate/search the FULL Open Targets catalogue locally. Otherwise fall back
+    to a live Open Targets search. Disease genes are always fetched live.
     """
+    from sqlalchemy import inspect as sa_inspect
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     search = request.args.get('search', '').strip()
-
-    if not search:
-        search = "diabetes"  # default so the tab isn't empty on first load
     if page < 1:
         page = 1
 
+    # --- Preferred: browse the full local catalogue ---
+    if 'diseases' in sa_inspect(engine).get_table_names():
+        session = Session()
+        try:
+            if session.query(Disease.efo_id).first() is not None:
+                q = session.query(Disease.efo_id, Disease.name)
+                if search:
+                    q = q.filter(func.lower(Disease.name).like(f"%{search.lower()}%"))
+                total = q.count()
+                rows = (q.order_by(Disease.name)
+                        .offset((page - 1) * per_page)
+                        .limit(per_page)
+                        .all())
+                data = [{'name': n, 'efo_id': e, 'gene_count': 'Live online'} for e, n in rows]
+                total_pages = (total + per_page - 1) // per_page if per_page else 1
+                return jsonify({
+                    'data': data, 'total': total, 'page': page, 'per_page': per_page,
+                    'total_pages': total_pages, 'search': search, 'source': 'catalogue'
+                })
+        finally:
+            session.close()
+
+    # --- Fallback: live Open Targets search (index not built yet) ---
+    if not search:
+        search = "diabetes"  # search needs a query; default so the tab isn't empty
     try:
         from opentargets_service import search_diseases_multi_online
         result = search_diseases_multi_online(search, limit=per_page, page_index=page - 1)
         ot_results = result.get('diseases', [])
         total = result.get('total', len(ot_results))
-
         data = [{'name': d['disease'], 'gene_count': 'Live online'} for d in ot_results]
         total_pages = (total + per_page - 1) // per_page if per_page else 1
-
         return jsonify({
-            'data': data,
-            'total': total,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': total_pages,
-            'search': search
+            'data': data, 'total': total, 'page': page, 'per_page': per_page,
+            'total_pages': total_pages, 'search': search, 'source': 'live'
         })
     except Exception as e:
         print(f"Error in paginated diseases: {e}")
         return jsonify({
-            'data': [],
-            'total': 0,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': 0,
-            'search': search
+            'data': [], 'total': 0, 'page': page, 'per_page': per_page,
+            'total_pages': 0, 'search': search, 'source': 'live'
         })
 
 
@@ -511,11 +525,18 @@ def validate_herb():
 @main_bp.route('/api/stats')
 def get_stats():
     """API endpoint to get database statistics."""
+    from sqlalchemy import inspect as sa_inspect
     session = Session()
     try:
-        disease_count = "24,000+ (Open Targets)"
         herb_count = session.query(Herb.herbName).distinct().count()
-        
+
+        # Real count when the local index is built; otherwise the catalogue estimate.
+        disease_count = "24,000+ (Open Targets)"
+        if 'diseases' in sa_inspect(engine).get_table_names():
+            local_count = session.query(Disease).count()
+            if local_count > 0:
+                disease_count = local_count
+
         return jsonify({
             'diseases': disease_count,
             'herbs': herb_count
