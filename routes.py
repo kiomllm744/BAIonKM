@@ -201,7 +201,10 @@ def get_diseases_paginated():
             if session.query(Disease.efo_id).first() is not None:
                 q = session.query(Disease.efo_id, Disease.name)
                 if search:
-                    q = q.filter(func.lower(Disease.name).like(f"%{search.lower()}%"))
+                    # Match every whitespace-separated token in any order, e.g.
+                    # "diabetes 2" matches "type 2 diabetes mellitus".
+                    for token in search.lower().split():
+                        q = q.filter(func.lower(Disease.name).like(f"%{token}%"))
                 total = q.count()
                 rows = (q.order_by(Disease.name)
                         .offset((page - 1) * per_page)

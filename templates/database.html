@@ -239,6 +239,13 @@
             background: #dbeafe;
             color: #2563eb;
         }
+
+        mark.hl {
+            background: #fde68a;
+            color: inherit;
+            padding: 0 1px;
+            border-radius: 2px;
+        }
         
         .table-stats {
             display: flex;
@@ -823,7 +830,7 @@
                     tbody.innerHTML = data.data.map((d, i) => `
                         <tr onclick="showDiseaseGenes('${escapeHtml(d.name)}')">
                             <td>${(data.page - 1) * PER_PAGE + i + 1}</td>
-                            <td><strong>${escapeHtml(d.name)}</strong></td>
+                            <td><strong>${highlightTokens(d.name, state.diseases.search)}</strong></td>
                             <td><span class="badge badge-purple">${d.gene_count} genes</span></td>
                             <td><span class="badge badge-blue">Open Targets</span></td>
                         </tr>
@@ -1126,6 +1133,21 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Highlight every search token wherever it appears (order-independent).
+        function highlightTokens(text, query) {
+            const safe = escapeHtml(text);
+            if (!query) return safe;
+            const tokens = query.trim().split(/\s+/).filter(Boolean)
+                .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            if (!tokens.length) return safe;
+            try {
+                const re = new RegExp('(' + tokens.join('|') + ')', 'gi');
+                return safe.replace(re, '<mark class="hl">$1</mark>');
+            } catch (e) {
+                return safe;
+            }
         }
     </script>
 </body>
