@@ -554,7 +554,7 @@
                     <div class="table-stats">
                         <div class="table-stat">
                             <div class="table-stat-value" id="total-diseases">--</div>
-                            <div class="table-stat-label">Diseases (DisGeNET)</div>
+                            <div class="table-stat-label">Diseases</div>
                         </div>
                         <div class="table-stat herbs">
                             <div class="table-stat-value" id="total-herbs">--</div>
@@ -824,7 +824,7 @@
                             <td>${(data.page - 1) * PER_PAGE + i + 1}</td>
                             <td><strong>${escapeHtml(d.name)}</strong></td>
                             <td><span class="badge badge-purple">${d.gene_count} genes</span></td>
-                            <td><span class="badge badge-blue">DisGeNET</span></td>
+                            <td><span class="badge badge-blue">Open Targets</span></td>
                         </tr>
                     `).join('');
                 }
