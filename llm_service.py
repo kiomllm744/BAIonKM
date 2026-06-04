@@ -5,17 +5,26 @@ Returns structured JSON with summary_table, detailed_analysis, and clinical_ques
 import requests
 import json
 import re
+import time
 import traceback
 from config import Config
 
 
-def get_gemini_response(prompt: str) -> str:
+# HTTP statuses worth retrying on the same model (overload / transient server errors)
+_TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+
+
+def get_gemini_response(prompt, json_mode=False, temperature=0.3, max_tokens=8192, retries=2):
     """
     Send a prompt to Google Gemini and return the text response.
 
-    Tries the configured model, then falls back to alternates if a model is
-    overloaded/rate-limited (HTTP 503/429), so transient capacity issues on one
-    model don't break AI analysis.
+    Robustness:
+    - json_mode=True forces the model to return valid JSON (responseMimeType),
+      which removes almost all parse failures.
+    - Retries each model on transient errors (503/429/5xx/timeout) with backoff,
+      then falls back to the configured alternate models.
+    - Larger maxOutputTokens (avoids truncated JSON) and low temperature
+      (consistent structured output). Flags MAX_TOKENS truncation.
     """
     api_key = Config.GEMINI_API_KEY
     if not api_key:
@@ -24,44 +33,80 @@ def get_gemini_response(prompt: str) -> str:
 
     models = [Config.GEMINI_MODEL] + [m for m in Config.GEMINI_FALLBACK_MODELS if m != Config.GEMINI_MODEL]
     headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 4096},
-    }
+    gen_config = {"temperature": temperature, "maxOutputTokens": max_tokens}
+    if json_mode:
+        gen_config["responseMimeType"] = "application/json"
+    data = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": gen_config}
 
     last_status = None
     for model in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        try:
-            print(f"[LLM] Requesting {model} (prompt length: {len(prompt)} chars)...")
-            response = requests.post(url, headers=headers, json=data, timeout=90,
-                                     verify=Config.EXTERNAL_API_VERIFY_SSL)
-            if not response.ok:
+        for attempt in range(1, retries + 1):
+            try:
+                print(f"[LLM] {model} attempt {attempt}/{retries} (prompt {len(prompt)} chars, json={json_mode})")
+                response = requests.post(url, headers=headers, json=data, timeout=90,
+                                         verify=Config.EXTERNAL_API_VERIFY_SSL)
+                if response.ok:
+                    candidates = response.json().get("candidates") or []
+                    if candidates:
+                        cand = candidates[0]
+                        parts = (cand.get("content") or {}).get("parts") or []
+                        if parts and "text" in parts[0]:
+                            if cand.get("finishReason") == "MAX_TOKENS":
+                                print(f"[LLM] {model} hit MAX_TOKENS - response may be truncated")
+                            text = parts[0]["text"]
+                            print(f"[LLM] {model} OK ({len(text)} chars)")
+                            return text
+                        fr = cand.get("finishReason")
+                        if fr and fr != "STOP":
+                            print(f"[LLM] {model} finishReason={fr} (e.g. safety block) -> next model")
+                    print(f"[LLM] {model} 200 but unusable response -> next model")
+                    break  # usable-but-empty: don't retry, try next model
+
                 last_status = response.status_code
-                print(f"[LLM] {model} -> HTTP {response.status_code}: {response.text[:200]}")
-                continue  # overloaded/rate-limited/etc. -> try the next model
+                print(f"[LLM] {model} HTTP {response.status_code}: {response.text[:160]}")
+                if response.status_code in _TRANSIENT_STATUS and attempt < retries:
+                    time.sleep(1.2 * attempt)   # backoff, then retry the same model
+                    continue
+                break  # non-transient (e.g. 400/404) or out of retries -> next model
 
-            result = response.json()
-            candidates = result.get("candidates") or []
-            if candidates:
-                parts = (candidates[0].get("content") or {}).get("parts") or []
-                if parts and "text" in parts[0]:
-                    text = parts[0]["text"]
-                    print(f"[LLM] {model} OK (response length: {len(text)} chars)")
-                    return text
-                fr = candidates[0].get("finishReason")
-                if fr and fr != "STOP":
-                    print(f"[LLM] {model} finishReason: {fr}")
-            print(f"[LLM] {model} unexpected response: {str(result)[:200]}")
-        except requests.exceptions.Timeout:
-            print(f"[LLM] {model} timed out (90s)")
-        except requests.exceptions.RequestException as e:
-            print(f"[LLM] {model} request error: {e}")
-        except Exception as e:
-            print(f"[LLM] {model} unexpected error: {e}")
-            traceback.print_exc()
+            except requests.exceptions.Timeout:
+                print(f"[LLM] {model} timed out (attempt {attempt})")
+                if attempt < retries:
+                    time.sleep(1.0)
+                    continue
+                break
+            except requests.exceptions.RequestException as e:
+                print(f"[LLM] {model} request error: {e}")
+                break
+            except Exception as e:
+                print(f"[LLM] {model} unexpected error: {e}")
+                traceback.print_exc()
+                break
 
-    print(f"[LLM] All Gemini models failed (last HTTP status: {last_status})")
+    print(f"[LLM] All Gemini attempts failed (last HTTP status: {last_status})")
+    return None
+
+
+def get_gemini_json(prompt, expect="object", temperature=0.3):
+    """
+    Get parsed JSON (object or array) from Gemini using JSON mode, with one
+    automatic re-ask if the first response can't be parsed. Returns the parsed
+    value or None.
+    """
+    attempt_prompt = prompt
+    for attempt in range(2):
+        text = get_gemini_response(attempt_prompt, json_mode=True, temperature=temperature)
+        if text:
+            parsed = (extract_json_from_response(text) if expect == "object"
+                      else extract_json_array_from_response(text))
+            if expect == "object" and isinstance(parsed, dict):
+                return parsed
+            if expect == "array" and isinstance(parsed, list):
+                return parsed
+            print(f"[LLM] JSON parse failed (expect={expect}); {'re-asking' if attempt == 0 else 'giving up'}")
+        kind = "object" if expect == "object" else "array"
+        attempt_prompt = prompt + f"\n\nReturn ONLY a single valid JSON {kind}. No markdown, no code fences, no commentary."
     return None
 
 
@@ -97,6 +142,8 @@ def extract_json_from_response(text: str) -> dict:
         for i in range(32):
             if i not in (9, 10, 13):  # tab, newline, carriage return
                 cleaned = cleaned.replace(chr(i), '')
+        # Remove trailing commas before } or ] (a common LLM JSON error)
+        cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
         return cleaned
     
     json_str = clean_json_string(json_str)
@@ -280,22 +327,16 @@ EVIDENCE CALIBRATION (important):
 
 Do not include any text outside the JSON object."""
 
-    response_text = get_gemini_response(prompt)
-    
-    if not response_text:
-        return None
-    
-    parsed = extract_json_from_response(response_text)
-    
+    parsed = get_gemini_json(prompt, expect="object")
     if parsed and 'summary_table' in parsed and 'detailed_analysis' in parsed:
         return parsed
-    
-    # Fallback if parsing failed
-    return {
-        'summary_table': [],
-        'detailed_analysis': response_text if response_text else "Analysis could not be generated.",
-        'parse_error': True
-    }
+    if isinstance(parsed, dict):  # JSON came back but missing a key -> use what we got
+        return {
+            'summary_table': parsed.get('summary_table', []),
+            'detailed_analysis': parsed.get('detailed_analysis', ''),
+            'parse_error': not parsed.get('detailed_analysis'),
+        }
+    return None
 
 
 def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None) -> list:
@@ -356,17 +397,9 @@ Generate exactly {num_groups} group objects, one for each prescription group.
 
 Do not include any text outside the JSON array."""
 
-    response_text = get_gemini_response(prompt)
-    
-    if not response_text:
-        return None
-    
-    # Try to parse JSON array from response
-    parsed = extract_json_array_from_response(response_text)
-    
-    if parsed and isinstance(parsed, list):
+    parsed = get_gemini_json(prompt, expect="array")
+    if isinstance(parsed, list) and parsed:
         return parsed
-    
     return None
 
 
@@ -389,11 +422,12 @@ def extract_json_array_from_response(text: str) -> list:
             json_str = json_match.group(0)
         else:
             return None
-    
+
+    json_str = re.sub(r',\s*([}\]])', r'\1', json_str)  # remove trailing commas
     try:
         return json.loads(json_str)
     except json.JSONDecodeError as e:
-        print(f"JSON parse error: {e}")
+        print(f"JSON parse error (array): {e}")
         return None
 
 
@@ -443,21 +477,16 @@ EVIDENCE CALIBRATION (important):
 
 Do not include any text outside the JSON object."""
 
-    response_text = get_gemini_response(prompt)
-    
-    if not response_text:
-        return None
-    
-    parsed = extract_json_from_response(response_text)
-    
+    parsed = get_gemini_json(prompt, expect="object")
     if parsed and 'summary_table' in parsed and 'detailed_analysis' in parsed:
         return parsed
-    
-    return {
-        'summary_table': [],
-        'detailed_analysis': response_text if response_text else "Analysis could not be generated.",
-        'parse_error': True
-    }
+    if isinstance(parsed, dict):
+        return {
+            'summary_table': parsed.get('summary_table', []),
+            'detailed_analysis': parsed.get('detailed_analysis', ''),
+            'parse_error': not parsed.get('detailed_analysis'),
+        }
+    return None
 
 
 def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None) -> list:
@@ -508,16 +537,9 @@ Example Structure:
 
 Do not include any text outside the JSON array."""
 
-    response_text = get_gemini_response(prompt)
-    
-    if not response_text:
-        return None
-    
-    parsed = extract_json_array_from_response(response_text)
-    
-    if parsed and isinstance(parsed, list):
+    parsed = get_gemini_json(prompt, expect="array")
+    if isinstance(parsed, list) and parsed:
         return parsed
-    
     return None
 
 
