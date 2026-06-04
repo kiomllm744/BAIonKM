@@ -1583,7 +1583,28 @@
         
         document.addEventListener('DOMContentLoaded', () => {
             checkAndRunAiAnalysis();
+            alignPrescriptionRows();
         });
+
+        // Equalize the herb-tag block height across prescription cards so the
+        // Venn diagrams, KPI boxes and gene-target bars all line up on the same
+        // horizontal lines, regardless of how many herbs each prescription has.
+        function alignPrescriptionRows() {
+            const tagBlocks = Array.from(document.querySelectorAll('.prescription-grid .herb-tags'));
+            if (tagBlocks.length < 2) return;
+            const apply = () => {
+                tagBlocks.forEach(el => { el.style.minHeight = ''; });
+                // only equalize when cards sit side-by-side (not wrapped/stacked)
+                const tops = tagBlocks.map(el => el.getBoundingClientRect().top);
+                const sameRow = tops.every(t => Math.abs(t - tops[0]) < 4);
+                if (!sameRow) return;
+                const max = Math.max(...tagBlocks.map(el => el.offsetHeight));
+                tagBlocks.forEach(el => { el.style.minHeight = max + 'px'; });
+            };
+            requestAnimationFrame(apply);
+            let t;
+            window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(apply, 120); });
+        }
         
         async function checkAndRunAiAnalysis() {
             // Check if we have saved AI analysis from history
