@@ -1201,11 +1201,21 @@
                             <h4 style="font-size: 0.8rem; color: #374151; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
                                 <i class="fas fa-dna" style="color: #6366f1;"></i> Intersecting Gene Targets
                             </h4>
+                            <div style="font-size: 0.68rem; color: #9ca3af; margin-bottom: 8px;">
+                                <span style="color:#16a34a;">&#9679;</span> ClinGen-validated (this disease) &nbsp;
+                                <span style="color:#0d9488;">&#9679;</span> ClinGen (other disease) &nbsp;
+                                <span style="color:#6366f1;">&#9679;</span> other &nbsp;&middot; hover a gene for evidence
+                            </div>
                             <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                 {% if prescription.common_genes %}
                                     {% for gene in prescription.common_genes %}
-                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: #f0f4ff; border: 1px solid #c7d2fe; color: #4338ca; cursor: default;" title="{{ gene }}{% if prescription.common_genes_scores and prescription.common_genes_scores[gene] %} — OT Score: {{ prescription.common_genes_scores[gene] }}{% endif %}">
-                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: #6366f1;"></i>
+                                        {% set v = (prescription.common_genes_validity or {}).get(gene) %}
+                                        {% set sc = (prescription.common_genes_scores or {}).get(gene) %}
+                                        {% set cg = v.clingen if v else None %}
+                                        {% set is_clingen = cg and cg.get('source') == 'clingen' %}
+                                        {% set ds = cg and cg.get('disease_specific') %}
+                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: {% if ds %}#f0fdf4{% elif is_clingen %}#f0fdfa{% else %}#f0f4ff{% endif %}; border: 1px solid {% if ds %}#86efac{% elif is_clingen %}#99f6e4{% else %}#c7d2fe{% endif %}; color: #4338ca; cursor: default;" title="{{ gene }}{% if sc %} &mdash; OT score {{ sc }}{% endif %}{% if is_clingen %} &mdash; ClinGen: {{ cg.get('classification') }}{% endif %}{% if v and v.evidence %} &mdash; evidence: {{ v.evidence | join('/') }}{% endif %}">
+                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: {% if ds %}#16a34a{% elif is_clingen %}#0d9488{% else %}#6366f1{% endif %};"></i>
                                             <strong>{{ gene }}</strong>
                                         </span>
                                     {% endfor %}
