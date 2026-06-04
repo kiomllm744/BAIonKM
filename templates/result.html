@@ -265,6 +265,15 @@
         .rx-venn .venn-svg { max-width: 260px; }
         .rx-venn .venn-legend { font-size: 0.76rem; gap: 6px 12px; }
         .rx-venn .venn-legend-item { font-size: 0.76rem; }
+        /* KPI boxes inside a prescription card (2-up, tighter than disease KPIs) */
+        .rx-kpis {
+            grid-template-columns: repeat(2, 1fr);
+            margin-top: 14px;
+            padding-top: 0;
+            border-top: 0;
+        }
+        .rx-kpis .disease-kpi { padding: 12px; }
+        .rx-kpis .disease-kpi-value { font-size: 1.5rem; }
         .venn-count { fill: #111827; font-size: 15px; font-weight: 700; text-anchor: middle; }
         .venn-core { font-size: 18px; }
         .venn-letter { font-size: 18px; font-weight: 800; text-anchor: middle; }
@@ -1259,21 +1268,6 @@
             </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="summary-grid">
-            {% for prescription in results.prescriptions %}
-            <div class="summary-card">
-                <div class="summary-icon green">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div>
-                    <span class="summary-value">{{ prescription.common_gene_count | default(0) }}</span>
-                    <span class="summary-label">Rx {{ prescription.index }} Common Genes</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
         <!-- Errors/Warnings -->
         {% if results.errors %}
         <div class="alert alert-warning">
@@ -1307,20 +1301,6 @@
                             <span class="herb-tag">{{ herb }}</span>
                             {% endfor %}
                         </div>
-                        <div class="prescription-stats">
-                            <div class="prescription-stat">
-                                <span class="prescription-stat-value">{{ prescription.gene_count }}</span>
-                                <span class="prescription-stat-label">Herb Genes</span>
-                            </div>
-                            <div class="prescription-stat">
-                                <span class="prescription-stat-value">{{ prescription.common_gene_count | default(0) }}</span>
-                                <span class="prescription-stat-label">Common</span>
-                            </div>
-                            <div class="prescription-stat">
-                                <span class="prescription-stat-value">{{ prescription.unique_gene_count | default(0) }}</span>
-                                <span class="prescription-stat-label">Unique</span>
-                            </div>
-                        </div>
 
                         <!-- Disease-union vs this prescription Venn -->
                         {% if results.disease_gene_count %}
@@ -1338,10 +1318,20 @@
                                 <text x="318" y="50" class="venn-letter" style="fill: #8b5cf6;">B</text>
                             </svg>
                             <div class="venn-legend">
-                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #64748b;">A</span>Disease genes ({{ du }})</span>
-                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #8b5cf6;">B</span>Rx {{ prescription.index }} herb genes ({{ hg }})</span>
+                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #64748b;">A</span>Disease genes</span>
+                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #8b5cf6;">B</span>Rx {{ prescription.index }} herb genes</span>
                             </div>
-                            <div class="venn-note">Overlap = {{ cg }} disease-associated genes this prescription targets</div>
+                            <div class="venn-note">Overlap = disease-associated genes this prescription targets</div>
+                        </div>
+                        <div class="disease-kpis rx-kpis">
+                            <div class="disease-kpi">
+                                <span class="disease-kpi-value">{{ hg }}</span>
+                                <span class="disease-kpi-label">Herb genes (total)</span>
+                            </div>
+                            <div class="disease-kpi">
+                                <span class="disease-kpi-value">{{ cg }}</span>
+                                <span class="disease-kpi-label">Common genes</span>
+                            </div>
                         </div>
                         {% endif %}
 
