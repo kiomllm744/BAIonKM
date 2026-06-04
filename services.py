@@ -614,6 +614,29 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
         ],
     }
 
+    # Venn of the disease-associated (common) genes ACROSS prescriptions -- how the
+    # intersecting targets overlap between formulas. Center = hit by every formula.
+    results['common_union_count'] = len(set.union(*non_empty_common)) if non_empty_common else 0
+    results['prescription_venn'] = None
+    _ps = [(results['prescriptions'][i]['index'], common_sets[i])
+           for i in range(len(common_sets)) if common_sets[i]]
+    if len(_ps) == 2:
+        (ia, a), (ib, b) = _ps
+        results['prescription_venn'] = {
+            'n': 2, 'indices': [ia, ib],
+            'regions': {'A': len(a - b), 'B': len(b - a), 'AB': len(a & b)},
+        }
+    elif len(_ps) == 3:
+        (ia, a), (ib, b), (ic, c) = _ps
+        results['prescription_venn'] = {
+            'n': 3, 'indices': [ia, ib, ic],
+            'regions': {
+                'A': len(a - b - c), 'B': len(b - a - c), 'C': len(c - a - b),
+                'AB': len((a & b) - c), 'AC': len((a & c) - b), 'BC': len((b & c) - a),
+                'ABC': len(a & b & c),
+            },
+        }
+
     # Enrichment runs on each prescription's COMMON genes (the disease-relevant
     # targets the formula actually hits) -- a statistically meaningful input --
     # not the unique set. Prescriptions with fewer than MIN_ENRICHMENT_GENES
