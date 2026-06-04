@@ -623,13 +623,13 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
     if len(_ps) == 2:
         (ia, a), (ib, b) = _ps
         results['prescription_venn'] = {
-            'n': 2, 'indices': [ia, ib],
+            'n': 2, 'indices': [ia, ib], 'sizes': [len(a), len(b)],
             'regions': {'A': len(a - b), 'B': len(b - a), 'AB': len(a & b)},
         }
     elif len(_ps) == 3:
         (ia, a), (ib, b), (ic, c) = _ps
         results['prescription_venn'] = {
-            'n': 3, 'indices': [ia, ib, ic],
+            'n': 3, 'indices': [ia, ib, ic], 'sizes': [len(a), len(b), len(c)],
             'regions': {
                 'A': len(a - b - c), 'B': len(b - a - c), 'C': len(c - a - b),
                 'AB': len((a & b) - c), 'AC': len((a & c) - b), 'BC': len((b & c) - a),
