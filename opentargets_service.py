@@ -239,6 +239,78 @@ def fetch_live_associated_genes(efo_id, limit=300):
         session.close()
 
 
+# Open Targets evidence datatype id -> short, clinician-friendly label.
+EVIDENCE_LABELS = {
+    "genetic_association": "genetic",
+    "somatic_mutation": "somatic mutation",
+    "known_drug": "known drug",
+    "affected_pathway": "pathway",
+    "literature": "literature",
+    "animal_model": "animal model",
+    "rna_expression": "expression",
+}
+
+
+def fetch_disease_target_datatypes(efo_id, limit=300):
+    """
+    For a disease, return {gene_symbol: [evidence labels]} describing WHY each gene
+    is associated (genetic / known drug / literature / ...). Cached. This makes the
+    association clinically interpretable rather than just a number.
+    """
+    efo_id = (efo_id or '').strip()
+    if not efo_id:
+        return {}
+
+    session = Session()
+    try:
+        cached = _get_cached_response(session, 'opentargets_datatypes', efo_id)
+        if cached is not None:
+            return cached
+
+        query = """
+        query getTargetDatatypes($efoId: String!, $size: Int!) {
+          disease(efoId: $efoId) {
+            associatedTargets(page: {index: 0, size: $size}) {
+              rows {
+                target { approvedSymbol }
+                datatypeScores { id score }
+              }
+            }
+          }
+        }
+        """
+        response = requests.post(
+            Config.OPENTARGETS_API_URL,
+            json={"query": query, "variables": {"efoId": efo_id, "size": limit}},
+            headers={"Content-Type": "application/json"},
+            timeout=Config.OPENTARGETS_TIMEOUT_SECONDS,
+            verify=Config.EXTERNAL_API_VERIFY_SSL,
+        )
+        response.raise_for_status()
+        rows = response.json().get("data", {}).get("disease", {}).get("associatedTargets", {}).get("rows", [])
+
+        evidence = {}
+        for row in rows:
+            gene = row.get("target", {}).get("approvedSymbol")
+            if not gene:
+                continue
+            labels = [
+                EVIDENCE_LABELS.get(dt.get("id"), dt.get("id"))
+                for dt in (row.get("datatypeScores") or [])
+                if (dt.get("score") or 0) > 0
+            ]
+            if labels:
+                evidence[gene] = labels
+
+        _save_cached_response(session, 'opentargets_datatypes', efo_id, evidence)
+        return evidence
+    except Exception as exc:
+        print(f"[OpenTargets] Fetch target datatypes failed for {efo_id}: {exc}")
+        return {}
+    finally:
+        session.close()
+
+
 def get_disease_suggestions_online(query_str, limit=15):
     """
     Fetch autocomplete disease suggestions in real-time from Open Targets EFO/MONDO indexes.

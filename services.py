@@ -10,7 +10,7 @@ from sqlalchemy import func, create_engine, text, inspect as sa_inspect
 from sqlalchemy.orm import sessionmaker
 from models import Herb, Disease
 from config import Config
-from opentargets_service import search_disease_efo_id, fetch_live_associated_genes
+from opentargets_service import search_disease_efo_id, fetch_live_associated_genes, fetch_disease_target_datatypes
 from umls_service import candidate_names_for_open_targets
 
 # Create engine with optimized settings for local herbs caching
@@ -351,7 +351,7 @@ def _score_bucket(score):
     return 'Limited'
 
 
-def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_id):
+def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_id, gene_evidence=None):
     """Build the common_genes_validity map consumed by the LLM ClinGen formatter.
 
     Each common gene gets either an official ClinGen classification (clinical-grade
@@ -379,11 +379,13 @@ def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_i
     except Exception as exc:
         print(f"[ClinGen] lookup failed: {exc}")
 
+    gene_evidence = gene_evidence or {}
     dtokens = _disease_tokens(disease_name)
     efo = disease_efo_id or ''
     validity = {}
     for gene in common_genes:
         score = round(gene_scores.get(gene, 0.0), 4)
+        evidence = gene_evidence.get(gene, [])
         rows = clingen_rows.get(gene)
         if rows:
             def is_match(mondo, label):
@@ -399,6 +401,7 @@ def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_i
                 text_label += " [different disease]"
             validity[gene] = {
                 'score': score,
+                'evidence': evidence,
                 'clingen': {
                     'level': _CLINGEN_LEVEL.get(classification, 'Limited'),
                     'classification': text_label,
@@ -409,6 +412,7 @@ def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_i
         else:
             validity[gene] = {
                 'score': score,
+                'evidence': evidence,
                 'clingen': {'level': _score_bucket(score), 'source': 'disgenet'},
             }
     return validity
@@ -452,8 +456,10 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
     
     # Get disease genes with scores dynamically from Open Targets
     gene_scores = {}
+    gene_evidence = {}
     if efo_id:
         gene_scores = fetch_live_associated_genes(efo_id)
+        gene_evidence = fetch_disease_target_datatypes(efo_id)  # why each gene is linked
     disease_genes = list(gene_scores.keys())
     results['disease_gene_count'] = len(disease_genes)
     
@@ -488,10 +494,14 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
         results['prescriptions'][i]['common_genes_scores'] = {
             gene: round(gene_scores.get(gene, 0.0), 4) for gene in genes
         }
-        # ClinGen clinical-validity overlay for the common (disease-relevant) genes
+        # ClinGen clinical-validity overlay + Open Targets evidence types for the
+        # common (disease-relevant) genes
         results['prescriptions'][i]['common_genes_validity'] = _clingen_validity_for(
-            genes, gene_scores, real_name, efo_id
+            genes, gene_scores, real_name, efo_id, gene_evidence
         )
+        results['prescriptions'][i]['common_genes_evidence'] = {
+            g: gene_evidence[g] for g in genes if gene_evidence.get(g)
+        }
     
     if not any(common_genes):
         results['errors'].append("No common genes found between disease and any prescription")

@@ -222,13 +222,17 @@ def format_clingen_data_for_llm(prescriptions: list) -> str:
             clingen = info.get('clingen', {})
             level = clingen.get('level', 'Limited')
             score = info.get('score', 0.0)
+            evidence = info.get('evidence', [])
             if clingen.get('source') == 'clingen':
-                official_by_level.setdefault(level, []).append((gene, score, clingen))
+                official_by_level.setdefault(level, []).append((gene, score, clingen, evidence))
                 official_count += 1
             else:
-                fallback_genes.append((gene, score, level))
+                fallback_genes.append((gene, score, level, evidence))
                 fallback_count += 1
-        
+
+        def _ev(evidence):
+            return f", evidence: {'/'.join(evidence)}" if evidence else ""
+
         has_official_genes = False
         for level in ['Definitive', 'Strong', 'Moderate', 'Limited']:
             genes = official_by_level.get(level, [])
@@ -236,16 +240,16 @@ def format_clingen_data_for_llm(prescriptions: list) -> str:
                 has_official_genes = True
                 genes.sort(key=lambda x: x[1], reverse=True)
                 genes_str = ", ".join([
-                    f"{gene} (ClinGen: {clingen.get('classification', level)}, DisGeNET score: {score})"
-                    for gene, score, clingen in genes
+                    f"{gene} (ClinGen: {clingen.get('classification', level)}, score: {score}{_ev(evidence)})"
+                    for gene, score, clingen, evidence in genes
                 ])
                 lines.append(f"  * **Official ClinGen {level} targets**: {genes_str}")
-        
+
         if fallback_genes:
             fallback_genes.sort(key=lambda x: x[1], reverse=True)
             fallback_str = ", ".join([
-                f"{gene} ({level} DisGeNET score bucket, score: {score})"
-                for gene, score, level in fallback_genes[:12]
+                f"{gene} ({level} bucket, score: {score}{_ev(evidence)})"
+                for gene, score, level, evidence in fallback_genes[:12]
             ])
             lines.append(f"  * **Not ClinGen - local fallback only**: {fallback_str}")
         
