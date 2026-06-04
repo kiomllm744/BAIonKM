@@ -279,10 +279,11 @@
 
         /* Expandable disease boxes in the hero */
         .hero-boxes {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+            align-items: start;
         }
         .hero-box {
             background: rgba(255,255,255,0.14);
@@ -324,25 +325,21 @@
             color: rgba(255,255,255,0.92);
         }
 
-        /* Expandable prescription rows */
-        .prescription-item > summary.prescription-summary-row {
+        /* Expandable "Intersecting Gene Targets" section inside each prescription card */
+        .gene-targets > summary.gene-targets-summary {
             list-style: none;
             cursor: pointer;
+            font-size: 0.8rem;
+            color: #374151;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 6px;
         }
-        .prescription-item > summary::-webkit-details-marker { display: none; }
-        .prescription-summary-row::before {
-            content: '\25B8';
-            color: #6366f1;
-            opacity: 0.85;
-        }
-        .prescription-item[open] > summary.prescription-summary-row::before { content: '\25BE'; }
-        .prescription-summary-herbs { color: #4b5563; font-size: 0.85rem; flex: 1 1 220px; }
-        .prescription-summary-counts { color: #6366f1; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
-        .prescription-item-body { margin-top: 14px; }
+        .gene-targets > summary::-webkit-details-marker { display: none; }
+        .gene-targets-summary::after { content: '\25B8'; color: #6366f1; margin-left: 4px; }
+        .gene-targets[open] .gene-targets-summary::after { content: '\25BE'; }
+        .gene-targets > div { margin-top: 10px; }
 
         .page-header h1 {
             font-size: 1.75rem;
@@ -1168,34 +1165,11 @@
                     <span class="disease-hero-label">
                         <i class="fas fa-microscope"></i> Disease Analysis
                     </span>
-                    <h1 class="disease-hero-name">{{ results.disease_name }}</h1>
-                    {% if results.diseases %}
-                    <div class="hero-boxes">
-                        {% for d in results.diseases %}
-                        <details class="hero-box"{% if results.diseases | length == 1 %} open{% endif %}>
-                            <summary>
-                                <span class="hero-box-title">{{ d.name }}</span>
-                                <span class="hero-box-count">{{ d.total_gene_count or d.gene_count }} genes</span>
-                            </summary>
-                            <div class="hero-box-body">
-                                <div>Total associated genes: <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} used in analysis{% endif %}</div>
-                                <div>Open Targets ID:
-                                    {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
-                                </div>
-                                <div>Match source: {{ (d.match_source or 'n/a') | replace('_', ' ') }}</div>
-                            </div>
-                        </details>
-                        {% endfor %}
-                    </div>
-                    {% if results.diseases | length > 1 %}
-                    <div class="hero-union-note">Combined: union of <strong>{{ results.disease_gene_count }}</strong> genes &middot; <strong>{{ results.shared_core_genes | length }}</strong> shared by all diseases</div>
-                    {% endif %}
-                    {% endif %}
                 </div>
                 <div class="disease-hero-stats">
                     <div class="disease-hero-stat">
                         <span class="disease-hero-stat-value">{{ results.disease_gene_count }}</span>
-                        <span class="disease-hero-stat-label">Disease Genes</span>
+                        <span class="disease-hero-stat-label">{% if results.diseases and results.diseases | length > 1 %}Union Genes{% else %}Disease Genes{% endif %}</span>
                     </div>
                     <div class="disease-hero-stat">
                         <span class="disease-hero-stat-value">{{ results.prescriptions | length }}</span>
@@ -1207,6 +1181,28 @@
                     </div>
                 </div>
             </div>
+            {% if results.diseases %}
+            <div class="hero-boxes">
+                {% for d in results.diseases %}
+                <details class="hero-box"{% if results.diseases | length == 1 %} open{% endif %}>
+                    <summary>
+                        <span class="hero-box-title">{{ d.name }}</span>
+                        <span class="hero-box-count">{{ d.total_gene_count or d.gene_count }} genes</span>
+                    </summary>
+                    <div class="hero-box-body">
+                        <div>Total associated genes: <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} used in analysis{% endif %}</div>
+                        <div>Open Targets ID:
+                            {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
+                        </div>
+                        <div>Match source: {{ (d.match_source or 'n/a') | replace('_', ' ') }}</div>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+            {% if results.diseases | length > 1 %}
+            <div class="hero-union-note">Combined: union of <strong>{{ results.disease_gene_count }}</strong> genes &middot; <strong>{{ results.shared_core_genes | length }}</strong> shared by all diseases</div>
+            {% endif %}
+            {% endif %}
         </div>
 
         <!-- Summary Cards -->
@@ -1246,15 +1242,12 @@
                 <h2>Prescription Summary</h2>
             </div>
             <div class="card-body">
-                <div class="prescription-grid" style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="prescription-grid">
                     {% for prescription in results.prescriptions %}
-                    <details class="prescription-item"{% if loop.first %} open{% endif %}>
-                        <summary class="prescription-summary-row">
+                    <div class="prescription-item" style="display: flex; flex-direction: column;">
+                        <div class="prescription-item-header">
                             <span class="rx-badge">Rx {{ prescription.index }}</span>
-                            <span class="prescription-summary-herbs">{{ prescription.herbs | join(', ') }}</span>
-                            <span class="prescription-summary-counts">{{ prescription.gene_count }} herb genes &middot; {{ prescription.common_gene_count | default(0) }} common &middot; {{ prescription.unique_gene_count | default(0) }} unique</span>
-                        </summary>
-                        <div class="prescription-item-body">
+                        </div>
                         <div class="herb-tags">
                             {% for herb in prescription.herbs %}
                             <span class="herb-tag">{{ herb }}</span>
@@ -1275,11 +1268,11 @@
                             </div>
                         </div>
                         
-                        <!-- Intersecting Targets Section -->
-                        <div style="margin-top: 18px; border-top: 1px solid #f3f4f6; padding-top: 14px;">
-                            <h4 style="font-size: 0.8rem; color: #374151; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-                                <i class="fas fa-dna" style="color: #6366f1;"></i> Intersecting Gene Targets
-                            </h4>
+                        <!-- Intersecting Targets Section (expandable) -->
+                        <details class="gene-targets"{% if loop.first %} open{% endif %} style="margin-top: 18px; border-top: 1px solid #f3f4f6; padding-top: 14px;">
+                            <summary class="gene-targets-summary">
+                                <i class="fas fa-dna" style="color: #6366f1;"></i> Intersecting Gene Targets ({{ prescription.common_gene_count | default(0) }})
+                            </summary>
                             <div style="font-size: 0.68rem; color: #9ca3af; margin-bottom: 8px;">
                                 <span style="color:#16a34a;">&#9679;</span> ClinGen-validated (this disease) &nbsp;
                                 <span style="color:#0d9488;">&#9679;</span> ClinGen (other disease) &nbsp;
@@ -1308,9 +1301,8 @@
                                     <span style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">No intersecting targets found</span>
                                 {% endif %}
                             </div>
-                        </div>
-                        </div>
-                    </details>
+                        </details>
+                    </div>
                     {% endfor %}
                 </div>
             </div>
