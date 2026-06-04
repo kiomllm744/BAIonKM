@@ -701,9 +701,18 @@ def analyze():
         # Get form data
         disease_name = request.form.get('disease', '').strip()
         disease_id = request.form.get('disease_id', '').strip()  # exact Open Targets ID if picked
+        diseases_json = request.form.get('diseases_data', '').strip()  # list of {name,id} (1-3)
         herbs_data_json = request.form.get('herbs_data', '[]')
-        
-        if not disease_name:
+
+        # Multi-disease: a list of {name, id}. Falls back to the single disease box.
+        diseases = None
+        if diseases_json:
+            try:
+                parsed = json.loads(diseases_json)
+                diseases = [d for d in parsed if (d.get('name') or '').strip()]
+            except json.JSONDecodeError:
+                diseases = None
+        if not diseases and not disease_name:
             return render_template('index.html', error="Please enter a disease name")
         
         try:
@@ -724,8 +733,8 @@ def analyze():
         if not herb_lists:
             return render_template('index.html', error="Please add at least one herb to a prescription")
         
-        # Perform analysis (use the exact picked ID when available -> skips re-resolution)
-        results = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None)
+        # Perform analysis (exact picked ID skips re-resolution; diseases list = multi-disease union)
+        results = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None, diseases=diseases)
 
         # Record the data sources/versions used, so the result is auditable and reproducible
         try:
@@ -743,7 +752,7 @@ def analyze():
             common_genes_count = len(_common)
             
             new_result = AnalysisResult(
-                disease_name=disease_name,
+                disease_name=results.get('disease_name') or disease_name,
                 prescriptions=json.dumps(herb_lists),
                 results_json=json.dumps(results, default=str),
                 common_genes_count=common_genes_count,

@@ -351,8 +351,11 @@ def _score_bucket(score):
     return 'Limited'
 
 
-def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_id, gene_evidence=None):
+def _clingen_validity_for(common_genes, gene_scores, diseases, gene_evidence=None):
     """Build the common_genes_validity map consumed by the LLM ClinGen formatter.
+
+    `diseases` is a list of {'name', 'efo_id'} (one or several). A ClinGen entry
+    is "disease_specific" if it matches ANY of the analysed diseases.
 
     Each common gene gets either an official ClinGen classification (clinical-grade
     gene-disease validity, with the ClinGen disease named for transparency, and a
@@ -380,8 +383,10 @@ def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_i
         print(f"[ClinGen] lookup failed: {exc}")
 
     gene_evidence = gene_evidence or {}
-    dtokens = _disease_tokens(disease_name)
-    efo = disease_efo_id or ''
+    match_efos = {(d.get('efo_id') or '') for d in (diseases or []) if d.get('efo_id')}
+    match_tokens = set()
+    for d in (diseases or []):
+        match_tokens |= _disease_tokens(d.get('name'))
     validity = {}
     for gene in common_genes:
         score = round(gene_scores.get(gene, 0.0), 4)
@@ -389,9 +394,9 @@ def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_i
         rows = clingen_rows.get(gene)
         if rows:
             def is_match(mondo, label):
-                if efo and mondo and efo == mondo:
+                if mondo and mondo in match_efos:
                     return True
-                return bool(dtokens & _disease_tokens(label))
+                return bool(match_tokens & _disease_tokens(label))
             matched = [(d, m, c) for (d, m, c) in rows if is_match(m, d)]
             pool = matched or rows
             disease, mondo, classification = max(pool, key=lambda r: _CLINGEN_RANK.get(r[2], 0))
@@ -418,53 +423,96 @@ def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_i
     return validity
 
 
-def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
+def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
     """
     Main analysis function - ONLINE REAL-TIME VERSION.
 
-    If efo_id is provided (the user picked an exact disease from the catalogue),
-    skip the name->ID re-resolution and use that Open Targets ID directly. This
-    is exact (no wrong-variant guess) and one network round-trip faster.
+    Supports ONE or SEVERAL diseases. With multiple diseases the disease gene
+    sets are UNIONed (a gene linked to ANY selected disease is included), keeping
+    the best Open Targets score and tracking which diseases each gene came from;
+    genes shared by ALL diseases are recorded as the "shared core". `diseases` is
+    a list of {'name', 'efo_id'/'id'}; if omitted it falls back to the single
+    disease_name/efo_id. An exact efo_id skips name re-resolution.
     """
-    disease_name = (disease_name or '').strip()
-    efo_id = (efo_id or '').strip()
-    if efo_id:
-        resolution = {
-            "efo_id": efo_id,
-            "name": disease_name or efo_id,
-            "description": "",
-            "matched_input": disease_name,
-            "match_source": "catalogue_id",
-            "umls_cui": None,
-            "umls_semantic_types": [],
-            "umls_root_source": None,
-            "candidates_checked": [efo_id],
-        }
+    # Normalise inputs into a list of diseases
+    if diseases:
+        disease_inputs = []
+        for d in diseases:
+            nm = (d.get('name') or '').strip()
+            eid = (d.get('efo_id') or d.get('id') or '').strip()
+            if nm or eid:
+                disease_inputs.append({'name': nm, 'efo_id': eid})
     else:
-        resolution = resolve_disease_to_open_targets(disease_name)
-    efo_id = resolution.get("efo_id") if resolution else None
-    real_name = resolution.get("name") if resolution and resolution.get("name") else disease_name
+        disease_inputs = [{'name': (disease_name or '').strip(), 'efo_id': (efo_id or '').strip()}]
+    disease_inputs = [d for d in disease_inputs if d['name'] or d['efo_id']]
 
     results = {
-        'disease_name': real_name,
-        'disease_cui': efo_id or '',
-        'disease_resolution': resolution or {},
+        'disease_name': '',
+        'disease_cui': '',
+        'disease_resolution': {},
+        'diseases': [],
+        'shared_core_genes': [],
         'prescriptions': [],
         'enrichment_data': None,
-        'errors': []
+        'errors': [],
     }
-    
-    # Get disease genes with scores dynamically from Open Targets
+    if not disease_inputs:
+        results['errors'].append("No disease provided")
+        return results
+
+    # Resolve each disease and fetch its genes + evidence
+    resolved = []
+    for d in disease_inputs:
+        if d['efo_id']:
+            resn = {
+                "efo_id": d['efo_id'], "name": d['name'] or d['efo_id'], "description": "",
+                "matched_input": d['name'], "match_source": "catalogue_id",
+                "umls_cui": None, "umls_semantic_types": [], "umls_root_source": None,
+                "candidates_checked": [d['efo_id']],
+            }
+        else:
+            resn = resolve_disease_to_open_targets(d['name']) or {}
+        eid = resn.get('efo_id')
+        nm = resn.get('name') or d['name'] or eid or ''
+        scores = fetch_live_associated_genes(eid) if eid else {}
+        evid = fetch_disease_target_datatypes(eid) if eid else {}
+        resolved.append({'name': nm, 'efo_id': eid, 'resolution': resn, 'scores': scores, 'evidence': evid})
+        results['diseases'].append({'name': nm, 'efo_id': eid, 'gene_count': len(scores)})
+        if not scores:
+            results['errors'].append(f"No genes found for disease: {nm}")
+
+    names = [r['name'] for r in resolved if r['name']]
+    results['disease_name'] = " + ".join(names) if names else (disease_name or '')
+    results['disease_cui'] = resolved[0]['efo_id'] if len(resolved) == 1 else ''
+    results['disease_resolution'] = resolved[0]['resolution'] if resolved else {}
+
+    # Union disease genes (best score per gene), track source diseases + evidence
     gene_scores = {}
+    gene_diseases = {}
     gene_evidence = {}
-    if efo_id:
-        gene_scores = fetch_live_associated_genes(efo_id)
-        gene_evidence = fetch_disease_target_datatypes(efo_id)  # why each gene is linked
+    per_disease_sets = []
+    for r in resolved:
+        s = set(r['scores'].keys())
+        if s:
+            per_disease_sets.append(s)
+        for g, sc in r['scores'].items():
+            if sc > gene_scores.get(g, -1.0):
+                gene_scores[g] = sc
+            gene_diseases.setdefault(g, set()).add(r['name'])
+        for g, labels in r['evidence'].items():
+            gene_evidence.setdefault(g, set()).update(labels)
+    gene_evidence = {g: sorted(v) for g, v in gene_evidence.items()}
+
     disease_genes = list(gene_scores.keys())
     results['disease_gene_count'] = len(disease_genes)
-    
+    # shared core = genes associated with ALL diseases that returned any genes
+    shared_core = set.intersection(*per_disease_sets) if per_disease_sets else set()
+    results['shared_core_genes'] = sorted(shared_core)
+    multi = len(resolved) > 1
+    match_diseases = [{'name': r['name'], 'efo_id': r['efo_id']} for r in resolved]
+
     if not disease_genes:
-        results['errors'].append(f"No genes found for disease: {disease_name}")
+        results['errors'].append("No genes found for the selected disease(s)")
         return results
         
     # Get herb genes for each prescription (batch queries - fast!)
@@ -497,11 +545,15 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
         # ClinGen clinical-validity overlay + Open Targets evidence types for the
         # common (disease-relevant) genes
         results['prescriptions'][i]['common_genes_validity'] = _clingen_validity_for(
-            genes, gene_scores, real_name, efo_id, gene_evidence
+            genes, gene_scores, match_diseases, gene_evidence
         )
         results['prescriptions'][i]['common_genes_evidence'] = {
             g: gene_evidence[g] for g in genes if gene_evidence.get(g)
         }
+        # Which selected disease(s) each common gene is linked to (multi-disease only)
+        results['prescriptions'][i]['common_genes_diseases'] = (
+            {g: sorted(gene_diseases.get(g, [])) for g in genes} if multi else {}
+        )
     
     if not any(common_genes):
         results['errors'].append("No common genes found between disease and any prescription")

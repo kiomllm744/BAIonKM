@@ -9,14 +9,18 @@ const state = {
     maxPrescriptions: 3,
     activeDropdown: null,
     selectedIndex: -1,
-    diseaseOk: true,      // does the current disease resolve in Open Targets?
-    diseaseOkFor: ''      // the exact input text the diseaseOk flag applies to
+    selectedDiseases: [], // chosen diseases [{name, id}], up to maxDiseases
+    maxDiseases: 3,
+    diseaseOk: true,      // (legacy) per-input confirmation flag
+    diseaseOkFor: ''
 };
 
 // DOM Elements
 const elements = {
     diseaseInput: document.getElementById('disease'),
     diseaseIdInput: document.getElementById('disease-id-input'),
+    diseasesDataInput: document.getElementById('diseases-data-input'),
+    diseaseChips: document.getElementById('disease-chips'),
     diseaseSuggestions: document.getElementById('disease-suggestions'),
     prescriptionsContainer: document.getElementById('prescriptions-container'),
     addPrescriptionBtn: document.getElementById('add-prescription-btn'),
@@ -111,20 +115,57 @@ function formatNumber(num) {
 
 let terminologyRequestId = 0;
 
-// Block unless the current disease text is a CONFIRMED real disease: either
-// picked from suggestions (exact ID) or an exact name match. Stops free text
-// like "abc" from analyzing a surprise disease via fuzzy search.
+// Run is blocked until at least one real disease has been added (picked from
+// suggestions). This also stops free text like "abc" from being analysed.
 function diseaseSelectionBlocked() {
-    if (!elements.diseaseInput) return false;
-    const val = elements.diseaseInput.value.trim();
-    if (!val) return false;                                              // empty handled separately
-    if (elements.diseaseIdInput && elements.diseaseIdInput.value) return false; // exact pick -> ok
-    return !(state.diseaseOk && state.diseaseOkFor === val);            // ok only if confirmed for THIS text
+    return state.selectedDiseases.length === 0;
 }
 
 function updateRunButton() {
     if (!elements.runAnalysisBtn) return;
     elements.runAnalysisBtn.classList.toggle('is-disabled', diseaseSelectionBlocked());
+}
+
+// --- Selected-disease chips (1..maxDiseases) ---
+function syncDiseasesField() {
+    if (elements.diseasesDataInput) {
+        elements.diseasesDataInput.value = JSON.stringify(state.selectedDiseases);
+    }
+}
+
+function renderDiseaseChips() {
+    const c = elements.diseaseChips;
+    if (!c) return;
+    c.innerHTML = state.selectedDiseases.map((d, i) => `
+        <span class="disease-chip">
+            <strong>${escapeHtml(d.name)}</strong>${d.id ? `<small>${escapeHtml(d.id)}</small>` : ''}
+            <button type="button" class="disease-chip-remove" data-index="${i}" title="Remove" aria-label="Remove">&times;</button>
+        </span>
+    `).join('');
+    c.querySelectorAll('.disease-chip-remove').forEach(btn => {
+        btn.addEventListener('click', () => removeDisease(parseInt(btn.dataset.index, 10)));
+    });
+}
+
+function addDisease(name, id) {
+    name = (name || '').trim();
+    if (!name) return;
+    if (state.selectedDiseases.some(d => d.name.toLowerCase() === name.toLowerCase())) return; // de-dupe
+    if (state.selectedDiseases.length >= state.maxDiseases) {
+        showToast(`You can add up to ${state.maxDiseases} diseases/symptoms`, 'error');
+        return;
+    }
+    state.selectedDiseases.push({ name: name, id: id || '' });
+    renderDiseaseChips();
+    syncDiseasesField();
+    updateRunButton();
+}
+
+function removeDisease(index) {
+    state.selectedDiseases.splice(index, 1);
+    renderDiseaseChips();
+    syncDiseasesField();
+    updateRunButton();
 }
 
 function setTerminologyStatus(label, className = '') {
@@ -266,24 +307,16 @@ function setupDiseaseAutocomplete() {
     const dropdown = elements.diseaseSuggestions;
     renderTerminologyEmpty();
     
-    // Helper to handle selection. `id` is the exact Open Targets ID when the
-    // pick came from the catalogue; stored so analysis skips name re-resolution.
+    // Picking a suggestion ADDS it as a disease chip (up to maxDiseases), so the
+    // user can combine several. `id` is the exact Open Targets ID when available.
     function selectDisease(value, id) {
         justSelected = true;
-        input.value = value;
-        if (elements.diseaseIdInput) elements.diseaseIdInput.value = id || '';
-        state.diseaseOk = true;          // picked from Open Targets -> analyzable
-        state.diseaseOkFor = value;
-        updateRunButton();
-        fetchTerminologyMapping(value, fetchSuggestions('/api/diseases', value));
+        addDisease(value, id || '');
+        input.value = '';
+        if (elements.diseaseIdInput) elements.diseaseIdInput.value = '';
         hideSuggestions(dropdown);
-        // Move focus to first herb input after disease selection
-        setTimeout(() => {
-            const firstHerbInput = document.querySelector('.herb-input');
-            if (firstHerbInput) {
-                firstHerbInput.focus();
-            }
-        }, 50);
+        renderTerminologyEmpty();
+        setTimeout(() => input.focus(), 30);   // ready to add another
     }
     
     input.addEventListener('input', function() {
@@ -833,7 +866,11 @@ function updateRemoveButtonsVisibility() {
 
 function clearForm() {
     elements.diseaseInput.value = '';
-    
+    state.selectedDiseases = [];
+    renderDiseaseChips();
+    syncDiseasesField();
+    updateRunButton();
+
     // Clear all herbs
     Object.keys(state.prescriptions).forEach(index => {
         const tagsContainer = document.getElementById(`tags-container-${index}`);
@@ -864,17 +901,12 @@ function clearForm() {
 function handleFormSubmit(e) {
     e.preventDefault();
     
-    if (!elements.diseaseInput.value.trim()) {
-        showToast('Please enter a disease name', 'error');
+    if (state.selectedDiseases.length === 0) {
+        showToast('Please add at least one disease/symptom (pick it from the suggestions)', 'error');
         elements.diseaseInput.focus();
         return;
     }
-
-    if (diseaseSelectionBlocked()) {
-        showToast(`Please pick a disease from the suggestions list so we analyze the exact one you mean. Free text like "${elements.diseaseInput.value.trim()}" isn't a confirmed disease.`, 'error', 6000);
-        elements.diseaseInput.focus();
-        return;
-    }
+    syncDiseasesField();
 
     const herbsData = [];
     let hasHerbs = false;

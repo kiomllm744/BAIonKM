@@ -88,22 +88,23 @@
                     </div>
                     <div class="card-body">
                         <div class="form-group">
-                            <label for="disease">Disease Name</label>
+                            <label for="disease">Disease(s) / Symptom(s)</label>
                             <div class="autocomplete-wrapper">
-                                <input 
-                                    type="text" 
-                                    id="disease" 
-                                    name="disease" 
-                                    class="form-input" 
-                                    placeholder="Start typing to search diseases..." 
+                                <input
+                                    type="text"
+                                    id="disease"
+                                    name="disease"
+                                    class="form-input"
+                                    placeholder="Type a disease or symptom, then pick to add (up to 3)..."
                                     autocomplete="off"
-                                    required
                                 >
                                 <i class="fas fa-search input-icon"></i>
                                 <div class="suggestions-dropdown" id="disease-suggestions"></div>
                             </div>
                             <input type="hidden" name="disease_id" id="disease-id-input">
-                            <span class="form-hint">Live UMLS terminology mapping with Open Targets disease resolution</span>
+                            <input type="hidden" name="diseases_data" id="diseases-data-input">
+                            <div class="disease-chips" id="disease-chips"></div>
+                            <span class="form-hint">Add up to 3 diseases/symptoms &mdash; they're combined (union of genes; shared genes highlighted). Pick from the suggestions to add each one.</span>
                             <div class="terminology-panel" id="terminology-panel" aria-live="polite">
                                 <div class="terminology-panel-header">
                                     <span><i class="fas fa-route"></i> Terminology Mapping</span>

@@ -870,6 +870,48 @@ body {
     box-shadow: none;
 }
 
+/* Selected disease chips (multi-disease) */
+.disease-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+.disease-chips:empty { display: none; }
+.disease-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    border-radius: 16px;
+    padding: 4px 6px 4px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.disease-chip small {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-family: monospace;
+    font-size: 0.7rem;
+}
+.disease-chip-remove {
+    border: none;
+    background: rgba(0, 0, 0, 0.08);
+    color: inherit;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.disease-chip-remove:hover { background: rgba(0, 0, 0, 0.18); }
+
 .btn-secondary {
     background: var(--bg-color);
     color: var(--text-secondary);
