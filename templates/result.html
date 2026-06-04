@@ -187,8 +187,9 @@
             height: 400px;
             background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
             border-radius: 50%;
+            pointer-events: none;   /* decorative only - must not intercept clicks */
         }
-        
+
         .disease-hero-card::after {
             content: '';
             position: absolute;
@@ -198,6 +199,7 @@
             height: 300px;
             background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
             border-radius: 50%;
+            pointer-events: none;   /* decorative only - must not intercept clicks */
         }
         
         .disease-hero-content {
@@ -282,8 +284,34 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 12px;
-            margin-top: 16px;
             align-items: start;
+            position: relative;   /* above the decorative pseudo-elements */
+            z-index: 1;
+        }
+
+        /* Venn diagram of disease gene overlaps */
+        .venn-wrap {
+            position: relative;
+            z-index: 1;
+            margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .venn-svg { width: 100%; max-width: 320px; height: auto; }
+        .venn-circle {
+            fill: rgba(255, 255, 255, 0.16);
+            stroke: rgba(255, 255, 255, 0.75);
+            stroke-width: 1.5;
+        }
+        .venn-count { fill: #fff; font-size: 15px; font-weight: 700; text-anchor: middle; }
+        .venn-core { font-size: 18px; }
+        .venn-name { fill: rgba(255, 255, 255, 0.95); font-size: 13px; font-weight: 600; }
+        .venn-legend {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.85);
+            text-align: center;
         }
         .hero-box {
             background: rgba(255,255,255,0.14);
@@ -1160,27 +1188,6 @@
 
         <!-- Disease Hero Card -->
         <div class="disease-hero-card">
-            <div class="disease-hero-content">
-                <div class="disease-hero-main">
-                    <span class="disease-hero-label">
-                        <i class="fas fa-microscope"></i> Disease Analysis
-                    </span>
-                </div>
-                <div class="disease-hero-stats">
-                    <div class="disease-hero-stat">
-                        <span class="disease-hero-stat-value">{{ results.disease_gene_count }}</span>
-                        <span class="disease-hero-stat-label">{% if results.diseases and results.diseases | length > 1 %}Union Genes{% else %}Disease Genes{% endif %}</span>
-                    </div>
-                    <div class="disease-hero-stat">
-                        <span class="disease-hero-stat-value">{{ results.prescriptions | length }}</span>
-                        <span class="disease-hero-stat-label">Prescriptions</span>
-                    </div>
-                    <div class="disease-hero-stat">
-                        <span class="disease-hero-stat-value">{{ results.prescriptions | sum(attribute='common_gene_count') | default(0) }}</span>
-                        <span class="disease-hero-stat-label">Total Matches</span>
-                    </div>
-                </div>
-            </div>
             {% if results.diseases %}
             <div class="hero-boxes">
                 {% for d in results.diseases %}
@@ -1199,9 +1206,41 @@
                 </details>
                 {% endfor %}
             </div>
-            {% if results.diseases | length > 1 %}
-            <div class="hero-union-note">Combined: union of <strong>{{ results.disease_gene_count }}</strong> genes &middot; <strong>{{ results.shared_core_genes | length }}</strong> shared by all diseases</div>
             {% endif %}
+
+            {% if results.venn %}
+            {% set v = results.venn %}
+            {% set r = v.regions %}
+            <div class="venn-wrap">
+                {% if v.n == 2 %}
+                <svg viewBox="0 0 440 230" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                    <circle cx="170" cy="125" r="100" class="venn-circle"/>
+                    <circle cx="270" cy="125" r="100" class="venn-circle"/>
+                    <text x="113" y="132" class="venn-count">{{ r.A }}</text>
+                    <text x="220" y="132" class="venn-count">{{ r.AB }}</text>
+                    <text x="327" y="132" class="venn-count">{{ r.B }}</text>
+                    <text x="120" y="26" class="venn-name" text-anchor="middle">{{ v.names[0] }}</text>
+                    <text x="320" y="26" class="venn-name" text-anchor="middle">{{ v.names[1] }}</text>
+                </svg>
+                {% elif v.n == 3 %}
+                <svg viewBox="0 0 420 360" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                    <circle cx="160" cy="155" r="108" class="venn-circle"/>
+                    <circle cx="260" cy="155" r="108" class="venn-circle"/>
+                    <circle cx="210" cy="245" r="108" class="venn-circle"/>
+                    <text x="115" y="120" class="venn-count">{{ r.A }}</text>
+                    <text x="305" y="120" class="venn-count">{{ r.B }}</text>
+                    <text x="210" y="300" class="venn-count">{{ r.C }}</text>
+                    <text x="210" y="110" class="venn-count">{{ r.AB }}</text>
+                    <text x="150" y="220" class="venn-count">{{ r.AC }}</text>
+                    <text x="270" y="220" class="venn-count">{{ r.BC }}</text>
+                    <text x="210" y="180" class="venn-count venn-core">{{ r.ABC }}</text>
+                    <text x="110" y="34" class="venn-name" text-anchor="middle">{{ v.names[0] }}</text>
+                    <text x="310" y="34" class="venn-name" text-anchor="middle">{{ v.names[1] }}</text>
+                    <text x="210" y="352" class="venn-name" text-anchor="middle">{{ v.names[2] }}</text>
+                </svg>
+                {% endif %}
+                <div class="venn-legend">Each number = genes in that region &middot; center = shared by all &middot; union {{ results.disease_gene_count }} genes</div>
+            </div>
             {% endif %}
         </div>
 

@@ -521,6 +521,26 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
     multi = len(resolved) > 1
     match_diseases = [{'name': r['name'], 'efo_id': r['efo_id']} for r in resolved]
 
+    # Venn region counts for the gene sets used (2 or 3 diseases) -> overlap diagram
+    results['venn'] = None
+    _ds = [(r['name'], set(r['scores'].keys())) for r in resolved if r['scores']]
+    if len(_ds) == 2:
+        (na, a), (nb, b) = _ds
+        results['venn'] = {
+            'n': 2, 'names': [na, nb], 'sizes': [len(a), len(b)],
+            'regions': {'A': len(a - b), 'B': len(b - a), 'AB': len(a & b)},
+        }
+    elif len(_ds) == 3:
+        (na, a), (nb, b), (nc, c) = _ds
+        results['venn'] = {
+            'n': 3, 'names': [na, nb, nc], 'sizes': [len(a), len(b), len(c)],
+            'regions': {
+                'A': len(a - b - c), 'B': len(b - a - c), 'C': len(c - a - b),
+                'AB': len((a & b) - c), 'AC': len((a & c) - b), 'BC': len((b & c) - a),
+                'ABC': len(a & b & c),
+            },
+        }
+
     if not disease_genes:
         results['errors'].append("No genes found for the selected disease(s)")
         return results
