@@ -254,6 +254,17 @@
         .venn-circle[style*="6366f1"] { stroke: #6366f1; }
         .venn-circle[style*="0d9488"] { stroke: #0d9488; }
         .venn-circle[style*="d97706"] { stroke: #d97706; }
+        .venn-circle[style*="64748b"] { stroke: #64748b; }
+        .venn-circle[style*="8b5cf6"] { stroke: #8b5cf6; }
+        /* Compact Venn inside each prescription card */
+        .rx-venn {
+            margin-top: 16px;
+            padding-top: 14px;
+            border-top: 1px solid #f3f4f6;
+        }
+        .rx-venn .venn-svg { max-width: 260px; }
+        .rx-venn .venn-legend { font-size: 0.76rem; gap: 6px 12px; }
+        .rx-venn .venn-legend-item { font-size: 0.76rem; }
         .venn-count { fill: #111827; font-size: 15px; font-weight: 700; text-anchor: middle; }
         .venn-core { font-size: 18px; }
         .venn-letter { font-size: 18px; font-weight: 800; text-anchor: middle; }
@@ -1181,7 +1192,6 @@
                             <div>Open Targets ID:
                                 {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
                             </div>
-                            <div>Match source: {{ (d.match_source or 'n/a') | replace('_', ' ') }}</div>
                         </div>
                     </details>
                     {% endfor %}
@@ -1311,7 +1321,30 @@
                                 <span class="prescription-stat-label">Unique</span>
                             </div>
                         </div>
-                        
+
+                        <!-- Disease-union vs this prescription Venn -->
+                        {% if results.disease_gene_count %}
+                        {% set du = results.disease_gene_count %}
+                        {% set cg = prescription.common_gene_count | default(0) %}
+                        {% set hg = prescription.gene_count | default(0) %}
+                        <div class="venn-wrap rx-venn">
+                            <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease genes vs prescription genes overlap">
+                                <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: #64748b;"/>
+                                <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: #8b5cf6;"/>
+                                <text x="92" y="117" class="venn-count">{{ du - cg }}</text>
+                                <text x="180" y="117" class="venn-count venn-core">{{ cg }}</text>
+                                <text x="268" y="117" class="venn-count">{{ hg - cg }}</text>
+                                <text x="42" y="50" class="venn-letter" style="fill: #64748b;">A</text>
+                                <text x="318" y="50" class="venn-letter" style="fill: #8b5cf6;">B</text>
+                            </svg>
+                            <div class="venn-legend">
+                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #64748b;">A</span>Disease genes ({{ du }})</span>
+                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #8b5cf6;">B</span>Rx {{ prescription.index }} herb genes ({{ hg }})</span>
+                            </div>
+                            <div class="venn-note">Overlap = {{ cg }} disease-associated genes this prescription targets</div>
+                        </div>
+                        {% endif %}
+
                         <!-- Intersecting Targets Section (expandable) -->
                         <details class="gene-targets"{% if loop.first %} open{% endif %} style="margin-top: 18px; border-top: 1px solid #f3f4f6; padding-top: 14px;">
                             <summary class="gene-targets-summary">
