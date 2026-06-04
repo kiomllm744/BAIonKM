@@ -3,9 +3,10 @@ Core services for gene analysis - ONLINE REAL-TIME VERSION.
 Contains the main business logic for disease-herb gene analysis using Open Targets API.
 """
 import json
+import re
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from sqlalchemy import func, create_engine, inspect as sa_inspect
+from sqlalchemy import func, create_engine, text, inspect as sa_inspect
 from sqlalchemy.orm import sessionmaker
 from models import Herb, Disease
 from config import Config
@@ -326,6 +327,93 @@ def process_enrichment_data(data, enrichment_data):
     data['enrichment_data'] = data['enrichment_data'][:Config.MAX_ENRICHMENT_RESULTS]
 
 
+# ClinGen classification ranking + mapping to the levels the LLM formatter uses.
+_CLINGEN_RANK = {
+    'Definitive': 6, 'Strong': 5, 'Moderate': 4, 'Limited': 3,
+    'Disputed': 2, 'Refuted': 1, 'No Known Disease Relationship': 0,
+}
+_CLINGEN_LEVEL = {
+    'Definitive': 'Definitive', 'Strong': 'Strong', 'Moderate': 'Moderate',
+    'Limited': 'Limited', 'Disputed': 'Limited', 'Refuted': 'Limited',
+    'No Known Disease Relationship': 'Limited',
+}
+
+
+def _disease_tokens(name):
+    return {t for t in re.findall(r'[a-z0-9]+', (name or '').lower()) if len(t) > 3}
+
+
+def _score_bucket(score):
+    if score >= 0.4:
+        return 'Strong'
+    if score >= 0.2:
+        return 'Moderate'
+    return 'Limited'
+
+
+def _clingen_validity_for(common_genes, gene_scores, disease_name, disease_efo_id):
+    """Build the common_genes_validity map consumed by the LLM ClinGen formatter.
+
+    Each common gene gets either an official ClinGen classification (clinical-grade
+    gene-disease validity, with the ClinGen disease named for transparency, and a
+    disease_specific flag when it matches the analysed disease) or a local
+    DisGeNET/Open-Targets score bucket as fallback.
+    """
+    clingen_rows = {}
+    try:
+        if common_genes and 'clingen_validity' in sa_inspect(engine).get_table_names():
+            session = Session()
+            try:
+                genes = list(common_genes)
+                placeholders = ','.join(f':g{i}' for i in range(len(genes)))
+                params = {f'g{i}': g for i, g in enumerate(genes)}
+                res = session.execute(
+                    text(f"SELECT gene, disease, mondo_id, classification "
+                         f"FROM clingen_validity WHERE gene IN ({placeholders})"),
+                    params,
+                )
+                for gene, disease, mondo, classification in res:
+                    clingen_rows.setdefault(gene, []).append((disease, mondo, classification))
+            finally:
+                session.close()
+    except Exception as exc:
+        print(f"[ClinGen] lookup failed: {exc}")
+
+    dtokens = _disease_tokens(disease_name)
+    efo = disease_efo_id or ''
+    validity = {}
+    for gene in common_genes:
+        score = round(gene_scores.get(gene, 0.0), 4)
+        rows = clingen_rows.get(gene)
+        if rows:
+            def is_match(mondo, label):
+                if efo and mondo and efo == mondo:
+                    return True
+                return bool(dtokens & _disease_tokens(label))
+            matched = [(d, m, c) for (d, m, c) in rows if is_match(m, d)]
+            pool = matched or rows
+            disease, mondo, classification = max(pool, key=lambda r: _CLINGEN_RANK.get(r[2], 0))
+            ds = bool(matched)
+            text_label = f"{classification} for {disease}" if disease else classification
+            if not ds:
+                text_label += " [different disease]"
+            validity[gene] = {
+                'score': score,
+                'clingen': {
+                    'level': _CLINGEN_LEVEL.get(classification, 'Limited'),
+                    'classification': text_label,
+                    'source': 'clingen',
+                    'disease_specific': ds,
+                },
+            }
+        else:
+            validity[gene] = {
+                'score': score,
+                'clingen': {'level': _score_bucket(score), 'source': 'disgenet'},
+            }
+    return validity
+
+
 def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
     """
     Main analysis function - ONLINE REAL-TIME VERSION.
@@ -400,6 +488,10 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None):
         results['prescriptions'][i]['common_genes_scores'] = {
             gene: round(gene_scores.get(gene, 0.0), 4) for gene in genes
         }
+        # ClinGen clinical-validity overlay for the common (disease-relevant) genes
+        results['prescriptions'][i]['common_genes_validity'] = _clingen_validity_for(
+            genes, gene_scores, real_name, efo_id
+        )
     
     if not any(common_genes):
         results['errors'].append("No common genes found between disease and any prescription")

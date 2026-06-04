@@ -914,7 +914,21 @@ def ai_analysis():
         analysis_results = {
             'prescription_enrichments': prescription_enrichments
         }
-        
+
+        # Pull the saved prescriptions (with ClinGen common_genes_validity) so the
+        # AI gets the clinical-validity overlay. The frontend only sends enrichment
+        # tables, so load the rest from the saved analysis row.
+        if result_id:
+            try:
+                _sess = Session()
+                _row = _sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+                if _row:
+                    _saved = json.loads(_row.results_json)
+                    analysis_results['prescriptions'] = _saved.get('prescriptions', [])
+                _sess.close()
+            except Exception as e:
+                print(f"[ai-analysis] could not load saved prescriptions: {e}")
+
         # Generate full AI analysis (summary_table, detailed_analysis, clinical_questions)
         ai_results = generate_full_ai_analysis(disease_name, analysis_results)
         

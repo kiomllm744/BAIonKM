@@ -43,6 +43,9 @@ if not exist "diseaseportal.db" (
 REM --- 3b) Build the full disease index if missing (lets you browse all diseases) ---
 ".venv\Scripts\python.exe" build_disease_index.py
 
+REM --- 3c) Build the ClinGen clinical-validity overlay if missing ---
+".venv\Scripts\python.exe" build_clingen_index.py
+
 REM --- 4) Open the browser a few seconds after the server starts ---
 start "" /b powershell -NoProfile -Command "Start-Sleep 3; Start-Process 'http://localhost:5000'"
 

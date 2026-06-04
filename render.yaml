@@ -4,7 +4,7 @@ services:
     runtime: python
     # build_disease_index.py builds the full local disease catalogue; "|| true"
     # keeps a build hiccup from failing the deploy (it falls back to live search).
-    buildCommand: pip install -r requirements.txt && python download_db.py && (python build_disease_index.py || true)
+    buildCommand: pip install -r requirements.txt && python download_db.py && (python build_disease_index.py || true) && (python build_clingen_index.py || true)
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
