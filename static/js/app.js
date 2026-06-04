@@ -761,6 +761,39 @@ async function validateHerb(herbName) {
 // Prescription Management
 // ==========================================
 
+// Preset herb formulas for quick testing. Each maps to its prescription slot.
+const PRESCRIPTION_PRESETS = {
+    1: ['Shu di huang', 'Shan yao', 'Shan zhu yu', 'Ze xie', 'Mu dan pi', 'Fu ling'],
+    2: ['Ban xia', 'Mai ya', 'Bai zhu', 'Cang zhu', 'Fu ling', 'Tian ma', 'Chen pi',
+        'Shen qu', 'Ren shen', 'Gan jiang', 'Sheng jiang', 'Huang qi', 'Ze xie', 'Huang bai'],
+    3: ['Huang lian', 'Huang bai', 'Huang qin', 'Zhi zi']
+};
+
+// Fill a single prescription slot with its preset (creates the slot if needed).
+async function fillPresetSlot(slot) {
+    while (state.prescriptionCount < slot) {
+        addPrescription();
+    }
+    const tagsContainer = document.getElementById(`tags-container-${slot}`);
+    if (!tagsContainer) return;
+    const input = tagsContainer.querySelector('.herb-input');
+    // clear anything already in this slot so re-clicking is idempotent
+    tagsContainer.querySelectorAll('.herb-tag').forEach(tag => tag.remove());
+    state.prescriptions[slot] = [];
+    await addBulkHerbs(slot, PRESCRIPTION_PRESETS[slot], tagsContainer, input);
+}
+
+// Handle a preset button click ("1" | "2" | "3" | "all").
+async function loadPreset(which) {
+    if (which === 'all') {
+        for (const slot of [1, 2, 3]) {
+            await fillPresetSlot(slot);
+        }
+        return;
+    }
+    await fillPresetSlot(parseInt(which, 10));
+}
+
 function addPrescription() {
     if (state.prescriptionCount >= state.maxPrescriptions) {
         showToast('Maximum 3 prescriptions allowed', 'warning');
@@ -946,6 +979,10 @@ function setupEventListeners() {
     if (elements.clearBtn) {
         elements.clearBtn.addEventListener('click', clearForm);
     }
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => loadPreset(btn.dataset.preset));
+    });
     
     if (elements.form) {
         elements.form.addEventListener('submit', handleFormSubmit);
