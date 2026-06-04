@@ -66,13 +66,13 @@ class Config:
     # - Local: Use .env file
     # - Production: Set in server environment variables
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-    # Primary model + fallbacks. gemini-2.5-flash is a stable GA model; some
-    # others (e.g. gemini-3.5-flash) frequently return 503/429 "high demand".
-    # If the primary is overloaded, get_gemini_response tries the fallbacks.
-    GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+    # Primary model is tried first (gemini-3.5-flash, preferred). If it is ever
+    # overloaded/limited (503/429), get_gemini_response automatically falls back
+    # to the alternates. Override either via env vars.
+    GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash')
     GEMINI_FALLBACK_MODELS = [
         m.strip() for m in os.environ.get(
-            'GEMINI_FALLBACK_MODELS', 'gemini-2.0-flash,gemini-flash-latest'
+            'GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash,gemini-2.0-flash'
         ).split(',') if m.strip()
     ]
 
