@@ -167,190 +167,158 @@
             text-decoration: underline;
         }
         
-        /* Disease Hero Card */
-        .disease-hero-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px;
-            padding: 32px 40px;
-            margin-bottom: 28px;
-            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-            position: relative;
-            overflow: hidden;
+        /* Disease Summary - expandable disease boxes (mirrors prescription items) */
+        .disease-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            align-items: start;
         }
-        
-        .disease-hero-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -20%;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;   /* decorative only - must not intercept clicks */
+        .disease-item {
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid var(--dc, #6366f1);
+            border-radius: 12px;
+            padding: 4px 0;
+            background: #fff;
         }
-
-        .disease-hero-card::after {
-            content: '';
-            position: absolute;
-            bottom: -30%;
-            left: -10%;
-            width: 300px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;   /* decorative only - must not intercept clicks */
-        }
-        
-        .disease-hero-content {
-            position: relative;
-            z-index: 1;
+        .disease-item-summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 24px;
+            gap: 12px;
         }
-        
-        .disease-hero-main {
-            flex: 1;
-            min-width: 300px;
+        .disease-item-summary::-webkit-details-marker { display: none; }
+        .disease-item-name {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            font-weight: 700;
+            color: #1f2937;
+            font-size: 0.95rem;
         }
-        
-        .disease-hero-label {
+        .disease-item-name::after {
+            content: '\25B8';
+            margin-left: 4px;
+            color: #9ca3af;
+            font-size: 0.7rem;
+            transition: transform 0.15s ease;
+        }
+        .disease-item[open] .disease-item-name::after { content: '\25BE'; }
+        .disease-dot {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            margin-bottom: 12px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .disease-hero-label i {
-            font-size: 0.75rem;
-        }
-        
-        .disease-hero-name {
-            font-size: 2.25rem;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--dc, #6366f1);
+            color: #fff;
+            font-size: 0.72rem;
             font-weight: 700;
-            color: white;
-            margin: 0 0 8px 0;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            flex-shrink: 0;
         }
-        
-        .disease-hero-subtitle {
-            color: rgba(255,255,255,0.85);
-            font-size: 1rem;
-            margin: 0;
+        .disease-item-count {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #4338ca;
+            background: #eef2ff;
+            padding: 3px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
         }
-        
-        .disease-hero-stats {
-            display: flex;
-            gap: 16px;
-            flex-wrap: wrap;
+        .disease-item-body {
+            padding: 0 16px 14px 16px;
+            font-size: 0.82rem;
+            line-height: 1.9;
+            color: #4b5563;
+            border-top: 1px solid #f3f4f6;
+            margin-top: 2px;
+            padding-top: 10px;
         }
-        
-        .disease-hero-stat {
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 16px 24px;
-            text-align: center;
-            min-width: 120px;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        .disease-hero-stat-value {
-            display: block;
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: white;
-        }
-        
-        .disease-hero-stat-label {
-            font-size: 0.75rem;
-            color: rgba(255,255,255,0.8);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Expandable disease boxes in the hero */
-        .hero-boxes {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
-            align-items: start;
-            position: relative;   /* above the decorative pseudo-elements */
-            z-index: 1;
-        }
+        .disease-item-body a { color: #6366f1; text-decoration: underline; }
 
         /* Venn diagram of disease gene overlaps */
         .venn-wrap {
-            position: relative;
-            z-index: 1;
-            margin-top: 18px;
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid #f3f4f6;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        .venn-svg { width: 100%; max-width: 320px; height: auto; }
-        .venn-circle {
-            fill: rgba(255, 255, 255, 0.16);
-            stroke: rgba(255, 255, 255, 0.75);
-            stroke-width: 1.5;
-        }
-        .venn-count { fill: #fff; font-size: 15px; font-weight: 700; text-anchor: middle; }
+        .venn-svg { width: 100%; max-width: 340px; height: auto; }
+        .venn-circle { fill-opacity: 0.22; stroke-opacity: 0.9; stroke-width: 2; }
+        .venn-circle[style*="6366f1"] { stroke: #6366f1; }
+        .venn-circle[style*="0d9488"] { stroke: #0d9488; }
+        .venn-circle[style*="d97706"] { stroke: #d97706; }
+        .venn-count { fill: #111827; font-size: 15px; font-weight: 700; text-anchor: middle; }
         .venn-core { font-size: 18px; }
-        .venn-name { fill: rgba(255, 255, 255, 0.95); font-size: 13px; font-weight: 600; }
+        .venn-letter { font-size: 18px; font-weight: 800; text-anchor: middle; }
         .venn-legend {
-            margin-top: 8px;
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.85);
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px 16px;
+        }
+        .venn-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.82rem;
+            color: #374151;
+            font-weight: 500;
+        }
+        .venn-legend-letter {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .venn-note {
+            margin-top: 10px;
+            font-size: 0.72rem;
+            color: #9ca3af;
             text-align: center;
         }
-        .hero-box {
-            background: rgba(255,255,255,0.14);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 10px;
-            min-width: 210px;
+
+        /* KPI boxes below the Venn */
+        .disease-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid #f3f4f6;
         }
-        .hero-box > summary {
-            list-style: none;
-            cursor: pointer;
-            padding: 8px 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            font-size: 0.9rem;
+        .disease-kpi {
+            background: #f8fafc;
+            border: 1px solid #eef2f7;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
         }
-        .hero-box > summary::-webkit-details-marker { display: none; }
-        .hero-box-title { font-weight: 700; }
-        .hero-box-title::before { content: '\25B8'; margin-right: 7px; opacity: 0.85; }
-        .hero-box[open] .hero-box-title::before { content: '\25BE'; }
-        .hero-box-count {
+        .disease-kpi-value {
+            display: block;
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: #6366f1;
+            line-height: 1.1;
+        }
+        .disease-kpi-label {
             font-size: 0.74rem;
-            background: rgba(255,255,255,0.22);
-            padding: 2px 9px;
-            border-radius: 10px;
-            white-space: nowrap;
-        }
-        .hero-box-body {
-            padding: 2px 12px 10px 12px;
-            font-size: 0.8rem;
-            line-height: 1.8;
-            color: rgba(255,255,255,0.95);
-        }
-        .hero-box-body a { color: #fff; text-decoration: underline; }
-        .hero-union-note {
-            margin-top: 12px;
-            font-size: 0.82rem;
-            color: rgba(255,255,255,0.92);
+            color: #6b7280;
+            margin-top: 4px;
+            display: block;
         }
 
         /* Expandable "Intersecting Gene Targets" section inside each prescription card */
@@ -1186,62 +1154,99 @@
             </a>
         </div>
 
-        <!-- Disease Hero Card -->
-        <div class="disease-hero-card">
-            {% if results.diseases %}
-            <div class="hero-boxes">
-                {% for d in results.diseases %}
-                <details class="hero-box"{% if results.diseases | length == 1 %} open{% endif %}>
-                    <summary>
-                        <span class="hero-box-title">{{ d.name }}</span>
-                        <span class="hero-box-count">{{ d.total_gene_count or d.gene_count }} genes</span>
-                    </summary>
-                    <div class="hero-box-body">
-                        <div>Total associated genes: <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} used in analysis{% endif %}</div>
-                        <div>Open Targets ID:
-                            {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
+        <!-- Disease Summary Card -->
+        {% set dcolors = ['#6366f1', '#0d9488', '#d97706'] %}
+        {% set dletters = ['A', 'B', 'C'] %}
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-virus"></i>
+                <h2>Disease Summary</h2>
+                {% if results.diseases %}<span class="badge">{{ results.disease_gene_count }} genes analysed</span>{% endif %}
+            </div>
+            <div class="card-body">
+                {% if results.diseases %}
+                <div class="disease-grid">
+                    {% for d in results.diseases %}
+                    {% set dc = dcolors[loop.index0 % 3] %}
+                    <details class="disease-item"{% if results.diseases | length == 1 %} open{% endif %} style="--dc: {{ dc }};">
+                        <summary class="disease-item-summary">
+                            <span class="disease-item-name">
+                                <span class="disease-dot">{{ dletters[loop.index0 % 3] }}</span>
+                                {{ d.name }}
+                            </span>
+                            <span class="disease-item-count">{{ d.total_gene_count or d.gene_count }} genes</span>
+                        </summary>
+                        <div class="disease-item-body">
+                            <div>Total associated genes: <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} used in analysis{% endif %}</div>
+                            <div>Open Targets ID:
+                                {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
+                            </div>
+                            <div>Match source: {{ (d.match_source or 'n/a') | replace('_', ' ') }}</div>
                         </div>
-                        <div>Match source: {{ (d.match_source or 'n/a') | replace('_', ' ') }}</div>
-                    </div>
-                </details>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {% if results.venn %}
-            {% set v = results.venn %}
-            {% set r = v.regions %}
-            <div class="venn-wrap">
-                {% if v.n == 2 %}
-                <svg viewBox="0 0 440 230" class="venn-svg" role="img" aria-label="Disease gene overlap">
-                    <circle cx="170" cy="125" r="100" class="venn-circle"/>
-                    <circle cx="270" cy="125" r="100" class="venn-circle"/>
-                    <text x="113" y="132" class="venn-count">{{ r.A }}</text>
-                    <text x="220" y="132" class="venn-count">{{ r.AB }}</text>
-                    <text x="327" y="132" class="venn-count">{{ r.B }}</text>
-                    <text x="120" y="26" class="venn-name" text-anchor="middle">{{ v.names[0] }}</text>
-                    <text x="320" y="26" class="venn-name" text-anchor="middle">{{ v.names[1] }}</text>
-                </svg>
-                {% elif v.n == 3 %}
-                <svg viewBox="0 0 420 360" class="venn-svg" role="img" aria-label="Disease gene overlap">
-                    <circle cx="160" cy="155" r="108" class="venn-circle"/>
-                    <circle cx="260" cy="155" r="108" class="venn-circle"/>
-                    <circle cx="210" cy="245" r="108" class="venn-circle"/>
-                    <text x="115" y="120" class="venn-count">{{ r.A }}</text>
-                    <text x="305" y="120" class="venn-count">{{ r.B }}</text>
-                    <text x="210" y="300" class="venn-count">{{ r.C }}</text>
-                    <text x="210" y="110" class="venn-count">{{ r.AB }}</text>
-                    <text x="150" y="220" class="venn-count">{{ r.AC }}</text>
-                    <text x="270" y="220" class="venn-count">{{ r.BC }}</text>
-                    <text x="210" y="180" class="venn-count venn-core">{{ r.ABC }}</text>
-                    <text x="110" y="34" class="venn-name" text-anchor="middle">{{ v.names[0] }}</text>
-                    <text x="310" y="34" class="venn-name" text-anchor="middle">{{ v.names[1] }}</text>
-                    <text x="210" y="352" class="venn-name" text-anchor="middle">{{ v.names[2] }}</text>
-                </svg>
+                    </details>
+                    {% endfor %}
+                </div>
                 {% endif %}
-                <div class="venn-legend">Each number = genes in that region &middot; center = shared by all &middot; union {{ results.disease_gene_count }} genes</div>
+
+                {% if results.venn %}
+                {% set v = results.venn %}
+                {% set r = v.regions %}
+                <div class="venn-wrap">
+                    {% if v.n == 2 %}
+                    <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                        <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
+                        <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
+                        <text x="92" y="117" class="venn-count">{{ r.A }}</text>
+                        <text x="180" y="117" class="venn-count venn-core">{{ r.AB }}</text>
+                        <text x="268" y="117" class="venn-count">{{ r.B }}</text>
+                        <text x="42" y="50" class="venn-letter" style="fill: {{ dcolors[0] }};">A</text>
+                        <text x="318" y="50" class="venn-letter" style="fill: {{ dcolors[1] }};">B</text>
+                    </svg>
+                    {% elif v.n == 3 %}
+                    <svg viewBox="0 0 360 330" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                        <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
+                        <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
+                        <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ dcolors[2] }};"/>
+                        <text x="92" y="116" class="venn-count">{{ r.A }}</text>
+                        <text x="268" y="116" class="venn-count">{{ r.B }}</text>
+                        <text x="180" y="270" class="venn-count">{{ r.C }}</text>
+                        <text x="180" y="96" class="venn-count">{{ r.AB }}</text>
+                        <text x="122" y="194" class="venn-count">{{ r.AC }}</text>
+                        <text x="238" y="194" class="venn-count">{{ r.BC }}</text>
+                        <text x="180" y="160" class="venn-count venn-core">{{ r.ABC }}</text>
+                        <text x="48" y="58" class="venn-letter" style="fill: {{ dcolors[0] }};">A</text>
+                        <text x="312" y="58" class="venn-letter" style="fill: {{ dcolors[1] }};">B</text>
+                        <text x="180" y="320" class="venn-letter" style="fill: {{ dcolors[2] }};">C</text>
+                    </svg>
+                    {% endif %}
+                    <div class="venn-legend">
+                        {% for nm in v.names %}
+                        <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ dcolors[loop.index0 % 3] }};">{{ dletters[loop.index0 % 3] }}</span>{{ nm }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="venn-note">Each number = genes shared by exactly that region &middot; center = shared by all diseases</div>
+                </div>
+                {% endif %}
+
+                {% if results.diseases %}
+                <div class="disease-kpis">
+                    <div class="disease-kpi">
+                        <span class="disease-kpi-value">{{ results.diseases | length }}</span>
+                        <span class="disease-kpi-label">Diseases combined</span>
+                    </div>
+                    <div class="disease-kpi">
+                        <span class="disease-kpi-value">{{ results.disease_gene_count }}</span>
+                        <span class="disease-kpi-label">Total genes used (union)</span>
+                    </div>
+                    {% if results.diseases | length > 1 %}
+                    <div class="disease-kpi">
+                        <span class="disease-kpi-value">{{ results.shared_core_genes | length }}</span>
+                        <span class="disease-kpi-label">Shared by all diseases</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
 
         <!-- Summary Cards -->
