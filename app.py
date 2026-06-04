@@ -12,6 +12,16 @@ from models import db
 from routes import main_bp
 from config import Config
 
+# On restricted/institutional networks an SSL-inspection proxy can break cert
+# verification for some hosts (e.g. Open Targets, UMLS), so the app runs with
+# EXTERNAL_API_VERIFY_SSL=false. Silence the noisy per-request urllib3 warning
+# and note it once at startup instead. (In production/cloud, set it back to true.)
+if not Config.EXTERNAL_API_VERIFY_SSL:
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    print("[startup] SSL verification is OFF (EXTERNAL_API_VERIFY_SSL=false). "
+          "Required on this network; set it to true in production.")
+
 
 def create_app(config_class=Config):
     """
