@@ -1238,7 +1238,7 @@
                         <text x="318" y="50" class="venn-letter" style="fill: {{ dcolors[1] }};">B</text>
                     </svg>
                     {% elif v.n == 3 %}
-                    <svg viewBox="0 0 360 330" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                    <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Disease gene overlap">
                         <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
                         <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
                         <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ dcolors[2] }};"/>
@@ -1251,7 +1251,7 @@
                         <text x="180" y="160" class="venn-count venn-core">{{ r.ABC }}</text>
                         <text x="48" y="58" class="venn-letter" style="fill: {{ dcolors[0] }};">A</text>
                         <text x="312" y="58" class="venn-letter" style="fill: {{ dcolors[1] }};">B</text>
-                        <text x="180" y="320" class="venn-letter" style="fill: {{ dcolors[2] }};">C</text>
+                        <text x="180" y="336" class="venn-letter" style="fill: {{ dcolors[2] }};">C</text>
                     </svg>
                     {% endif %}
                     <div class="venn-legend">
@@ -1416,7 +1416,7 @@
                         <text x="318" y="50" class="venn-letter" style="fill: {{ pcolors[1] }};">B</text>
                     </svg>
                     {% elif pv.n == 3 %}
-                    <svg viewBox="0 0 360 330" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
+                    <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
                         <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
                         <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ pcolors[1] }};"/>
                         <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ pcolors[2] }};"/>
@@ -1429,7 +1429,7 @@
                         <text x="180" y="160" class="venn-count venn-core">{{ pr.ABC }}</text>
                         <text x="48" y="58" class="venn-letter" style="fill: {{ pcolors[0] }};">A</text>
                         <text x="312" y="58" class="venn-letter" style="fill: {{ pcolors[1] }};">B</text>
-                        <text x="180" y="320" class="venn-letter" style="fill: {{ pcolors[2] }};">C</text>
+                        <text x="180" y="336" class="venn-letter" style="fill: {{ pcolors[2] }};">C</text>
                     </svg>
                     {% endif %}
                     <div class="venn-legend">
