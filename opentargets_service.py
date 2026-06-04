@@ -219,8 +219,9 @@ def fetch_live_associated_genes(efo_id, limit=300):
         )
         response.raise_for_status()
         
-        rows = response.json().get("data", {}).get("disease", {}).get("associatedTargets", {}).get("rows", [])
-        
+        disease = (response.json().get("data") or {}).get("disease") or {}
+        rows = (disease.get("associatedTargets") or {}).get("rows", [])
+
         gene_scores = {}
         for row in rows:
             gene_symbol = row.get("target", {}).get("approvedSymbol")
@@ -249,6 +250,37 @@ EVIDENCE_LABELS = {
     "animal_model": "animal model",
     "rna_expression": "expression",
 }
+
+
+def fetch_disease_target_count(efo_id):
+    """Total number of targets Open Targets associates with a disease (UNCAPPED).
+    Cheap (asks only for the count, not the rows). Cached."""
+    efo_id = (efo_id or '').strip()
+    if not efo_id:
+        return 0
+    session = Session()
+    try:
+        cached = _get_cached_response(session, 'opentargets_count', efo_id)
+        if cached is not None:
+            return cached
+        query = "query($e:String!){ disease(efoId:$e){ associatedTargets(page:{index:0,size:1}){ count } } }"
+        response = requests.post(
+            Config.OPENTARGETS_API_URL,
+            json={"query": query, "variables": {"e": efo_id}},
+            headers={"Content-Type": "application/json"},
+            timeout=Config.OPENTARGETS_TIMEOUT_SECONDS,
+            verify=Config.EXTERNAL_API_VERIFY_SSL,
+        )
+        response.raise_for_status()
+        disease = (response.json().get("data") or {}).get("disease") or {}
+        count = (disease.get("associatedTargets") or {}).get("count", 0) or 0
+        _save_cached_response(session, 'opentargets_count', efo_id, count)
+        return count
+    except Exception as exc:
+        print(f"[OpenTargets] target count failed for {efo_id}: {exc}")
+        return 0
+    finally:
+        session.close()
 
 
 def fetch_disease_target_datatypes(efo_id, limit=300):
@@ -287,7 +319,8 @@ def fetch_disease_target_datatypes(efo_id, limit=300):
             verify=Config.EXTERNAL_API_VERIFY_SSL,
         )
         response.raise_for_status()
-        rows = response.json().get("data", {}).get("disease", {}).get("associatedTargets", {}).get("rows", [])
+        disease = (response.json().get("data") or {}).get("disease") or {}
+        rows = (disease.get("associatedTargets") or {}).get("rows", [])
 
         evidence = {}
         for row in rows:

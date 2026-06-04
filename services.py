@@ -10,7 +10,10 @@ from sqlalchemy import func, create_engine, text, inspect as sa_inspect
 from sqlalchemy.orm import sessionmaker
 from models import Herb, Disease
 from config import Config
-from opentargets_service import search_disease_efo_id, fetch_live_associated_genes, fetch_disease_target_datatypes
+from opentargets_service import (
+    search_disease_efo_id, fetch_live_associated_genes,
+    fetch_disease_target_datatypes, fetch_disease_target_count,
+)
 from umls_service import candidate_names_for_open_targets
 
 # Create engine with optimized settings for local herbs caching
@@ -476,8 +479,15 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
         nm = resn.get('name') or d['name'] or eid or ''
         scores = fetch_live_associated_genes(eid) if eid else {}
         evid = fetch_disease_target_datatypes(eid) if eid else {}
+        total = fetch_disease_target_count(eid) if eid else 0
         resolved.append({'name': nm, 'efo_id': eid, 'resolution': resn, 'scores': scores, 'evidence': evid})
-        results['diseases'].append({'name': nm, 'efo_id': eid, 'gene_count': len(scores)})
+        results['diseases'].append({
+            'name': nm,
+            'efo_id': eid,
+            'gene_count': len(scores),                       # used in analysis (capped at 300)
+            'total_gene_count': max(total, len(scores)),     # true Open Targets total (uncapped)
+            'match_source': (resn.get('match_source') or ''),
+        })
         if not scores:
             results['errors'].append(f"No genes found for disease: {nm}")
 

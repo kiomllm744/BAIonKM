@@ -276,7 +276,74 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        
+
+        /* Expandable disease boxes in the hero */
+        .hero-boxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .hero-box {
+            background: rgba(255,255,255,0.14);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            min-width: 210px;
+        }
+        .hero-box > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 0.9rem;
+        }
+        .hero-box > summary::-webkit-details-marker { display: none; }
+        .hero-box-title { font-weight: 700; }
+        .hero-box-title::before { content: '\25B8'; margin-right: 7px; opacity: 0.85; }
+        .hero-box[open] .hero-box-title::before { content: '\25BE'; }
+        .hero-box-count {
+            font-size: 0.74rem;
+            background: rgba(255,255,255,0.22);
+            padding: 2px 9px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+        .hero-box-body {
+            padding: 2px 12px 10px 12px;
+            font-size: 0.8rem;
+            line-height: 1.8;
+            color: rgba(255,255,255,0.95);
+        }
+        .hero-box-body a { color: #fff; text-decoration: underline; }
+        .hero-union-note {
+            margin-top: 12px;
+            font-size: 0.82rem;
+            color: rgba(255,255,255,0.92);
+        }
+
+        /* Expandable prescription rows */
+        .prescription-item > summary.prescription-summary-row {
+            list-style: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .prescription-item > summary::-webkit-details-marker { display: none; }
+        .prescription-summary-row::before {
+            content: '\25B8';
+            color: #6366f1;
+            opacity: 0.85;
+        }
+        .prescription-item[open] > summary.prescription-summary-row::before { content: '\25BE'; }
+        .prescription-summary-herbs { color: #4b5563; font-size: 0.85rem; flex: 1 1 220px; }
+        .prescription-summary-counts { color: #6366f1; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+        .prescription-item-body { margin-top: 14px; }
+
         .page-header h1 {
             font-size: 1.75rem;
             color: #1f2937;
@@ -1102,28 +1169,27 @@
                         <i class="fas fa-microscope"></i> Disease Analysis
                     </span>
                     <h1 class="disease-hero-name">{{ results.disease_name }}</h1>
-                    <p class="disease-hero-subtitle">
-                        <i class="fas fa-dna"></i> Gene-Disease Pathway Enrichment Analysis
-                    </p>
-                    {% if results.disease_resolution %}
-                    <p class="disease-hero-subtitle" style="font-size: 0.85rem; margin-top: 8px;">
-                        <i class="fas fa-link"></i>
-                        Open Targets ID: {{ results.disease_cui or 'Not resolved' }}
-                        {% if results.disease_resolution.umls_cui %}
-                        · UMLS: {{ results.disease_resolution.umls_cui }}
-                        {% endif %}
-                        · Match source: {{ results.disease_resolution.match_source | replace('_', ' ') }}
-                    </p>
-                    {% endif %}
-                    {% if results.diseases and results.diseases | length > 1 %}
-                    <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                    {% if results.diseases %}
+                    <div class="hero-boxes">
                         {% for d in results.diseases %}
-                        <span style="background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); border-radius: 14px; padding: 3px 11px; font-size: 0.8rem;" title="{{ d.efo_id }}">
-                            {{ d.name }} <strong>({{ d.gene_count }} genes)</strong>
-                        </span>
+                        <details class="hero-box"{% if results.diseases | length == 1 %} open{% endif %}>
+                            <summary>
+                                <span class="hero-box-title">{{ d.name }}</span>
+                                <span class="hero-box-count">{{ d.total_gene_count or d.gene_count }} genes</span>
+                            </summary>
+                            <div class="hero-box-body">
+                                <div>Total associated genes: <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} used in analysis{% endif %}</div>
+                                <div>Open Targets ID:
+                                    {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
+                                </div>
+                                <div>Match source: {{ (d.match_source or 'n/a') | replace('_', ' ') }}</div>
+                            </div>
+                        </details>
                         {% endfor %}
-                        <span style="font-size: 0.8rem; opacity: 0.9;">&middot; union of {{ results.disease_gene_count }} genes &middot; {{ results.shared_core_genes | length }} shared by all</span>
                     </div>
+                    {% if results.diseases | length > 1 %}
+                    <div class="hero-union-note">Combined: union of <strong>{{ results.disease_gene_count }}</strong> genes &middot; <strong>{{ results.shared_core_genes | length }}</strong> shared by all diseases</div>
+                    {% endif %}
                     {% endif %}
                 </div>
                 <div class="disease-hero-stats">
@@ -1180,12 +1246,15 @@
                 <h2>Prescription Summary</h2>
             </div>
             <div class="card-body">
-                <div class="prescription-grid">
+                <div class="prescription-grid" style="display: flex; flex-direction: column; gap: 12px;">
                     {% for prescription in results.prescriptions %}
-                    <div class="prescription-item" style="display: flex; flex-direction: column;">
-                        <div class="prescription-item-header">
+                    <details class="prescription-item"{% if loop.first %} open{% endif %}>
+                        <summary class="prescription-summary-row">
                             <span class="rx-badge">Rx {{ prescription.index }}</span>
-                        </div>
+                            <span class="prescription-summary-herbs">{{ prescription.herbs | join(', ') }}</span>
+                            <span class="prescription-summary-counts">{{ prescription.gene_count }} herb genes &middot; {{ prescription.common_gene_count | default(0) }} common &middot; {{ prescription.unique_gene_count | default(0) }} unique</span>
+                        </summary>
+                        <div class="prescription-item-body">
                         <div class="herb-tags">
                             {% for herb in prescription.herbs %}
                             <span class="herb-tag">{{ herb }}</span>
@@ -1240,7 +1309,8 @@
                                 {% endif %}
                             </div>
                         </div>
-                    </div>
+                        </div>
+                    </details>
                     {% endfor %}
                 </div>
             </div>
