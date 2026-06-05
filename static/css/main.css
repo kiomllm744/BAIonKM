@@ -2,6 +2,29 @@
    BAIonKM - Modern CSS Stylesheet
    ======================================== */
 
+/* Enrichment-library pill toggles (input page) */
+.lib-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.lib-option { cursor: pointer; user-select: none; }
+.lib-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+.lib-option span {
+    display: inline-block;
+    padding: 7px 16px;
+    border-radius: 18px;
+    border: 1.5px solid #c7d2fe;
+    background: #fff;
+    color: #4338ca;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+.lib-option span:hover { border-color: #8b5cf6; }
+.lib-option input:checked + span {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    border-color: transparent;
+}
+.lib-option input:focus-visible + span { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35); }
+
 /* CSS Variables */
 :root {
     --primary-color: #6366f1;

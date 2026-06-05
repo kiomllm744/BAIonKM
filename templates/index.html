@@ -183,6 +183,28 @@
                     </div>
                 </section>
 
+                <!-- Enrichment library selection -->
+                <section class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <i class="fas fa-chart-bar"></i>
+                        <h2>Enrichment Libraries</h2>
+                    </div>
+                    <div class="card-body">
+                        <p class="form-hint" style="margin-bottom: 14px;">
+                            <i class="fas fa-info-circle"></i>
+                            Choose which gene-set libraries to enrich the common genes against. Pathway libraries (KEGG, Reactome, GO) reveal mechanism; DisGeNET maps the genes back to diseases.
+                        </p>
+                        <div class="lib-options">
+                            {% for opt in enrichment_options or [] %}
+                            <label class="lib-option">
+                                <input type="checkbox" name="enrichment_libraries" value="{{ opt.value }}"{% if opt.default %} checked{% endif %}>
+                                <span>{{ opt.label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Hidden input for herbs data -->
                 <input type="hidden" name="herbs_data" id="herbs-data-input">
 

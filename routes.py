@@ -192,6 +192,18 @@ def logout():
     return redirect(url_for('main.index'))
 
 
+@main_bp.context_processor
+def _inject_enrichment_options():
+    """Make the enrichment-library choices available to every template
+    (so all index.html renders, including error fallbacks, have them)."""
+    return {
+        'enrichment_options': [
+            {'value': name, 'label': label, 'default': name in Config.ENRICHMENT_LIBRARIES}
+            for name, label in Config.ENRICHMENT_LIBRARY_LABELS.items()
+        ]
+    }
+
+
 @main_bp.route('/')
 def index():
     """Render the main page."""
@@ -695,7 +707,9 @@ def _build_provenance():
         'disease_catalogue': {},                   # local browse index
         'herb_db': {'name': 'BATMAN-TCM', 'herbs': None},
         'terminology': 'UMLS (NLM)',
-        'enrichment': f"Enrichr / {Config.DEFAULT_GENE_LIBRARY}",
+        'enrichment': "Enrichr / " + ", ".join(
+            Config.ENRICHMENT_LIBRARY_LABELS.get(lib, lib) for lib in Config.ENRICHMENT_LIBRARIES
+        ),
         'stale': False,
     }
     try:
@@ -770,8 +784,14 @@ def analyze():
         if not herb_lists:
             return render_template('index.html', error="Please add at least one herb to a prescription")
         
+        # User-chosen enrichment libraries (falls back to the config default).
+        selected_libs = [lib for lib in request.form.getlist('enrichment_libraries') if lib]
+
         # Perform analysis (exact picked ID skips re-resolution; diseases list = multi-disease union)
-        results = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None, diseases=diseases)
+        results = analyze_prescriptions(
+            disease_name, herb_lists, efo_id=disease_id or None,
+            diseases=diseases, libraries=selected_libs or None
+        )
 
         # Record the data sources/versions used, so the result is auditable and reproducible
         try:

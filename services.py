@@ -447,9 +447,12 @@ def _clingen_validity_for(common_genes, gene_scores, diseases, gene_evidence=Non
     return validity
 
 
-def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
+def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, libraries=None):
     """
     Main analysis function - ONLINE REAL-TIME VERSION.
+
+    `libraries` is the list of Enrichr libraries to enrich against (user choice);
+    when None it falls back to Config.ENRICHMENT_LIBRARIES.
 
     Supports ONE or SEVERAL diseases. With multiple diseases the disease gene
     sets are UNIONed (a gene linked to ANY selected disease is included), keeping
@@ -667,15 +670,18 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
         i for i, genes in enumerate(common_genes)
         if len(genes) >= Config.MIN_ENRICHMENT_GENES
     ]
+    # libraries to enrich against: user choice, else the config default
+    active_libraries = [lib for lib in (libraries or Config.ENRICHMENT_LIBRARIES) if lib] \
+        or Config.ENRICHMENT_LIBRARIES
     # the human-friendly library labels used for enrichment (for the UI heading)
     results['enrichment_libraries'] = [
-        Config.ENRICHMENT_LIBRARY_LABELS.get(lib, lib) for lib in Config.ENRICHMENT_LIBRARIES
+        Config.ENRICHMENT_LIBRARY_LABELS.get(lib, lib) for lib in active_libraries
     ]
     if enrich_indices:
         try:
             enrich_gene_lists = [list(common_genes[i]) for i in enrich_indices]
             upload_data = upload_gene_lists_to_enrichr_parallel(enrich_gene_lists)
-            enrichment_results = perform_enrichment_analysis_parallel(upload_data)
+            enrichment_results = perform_enrichment_analysis_parallel(upload_data, libraries=active_libraries)
 
             # Stamp each result with the ORIGINAL prescription number (1-based,
             # matching prescriptions[].index), its herbs, and the gene count it
