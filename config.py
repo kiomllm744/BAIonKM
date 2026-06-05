@@ -12,6 +12,15 @@ class Config:
     
     # Flask settings
     SECRET_KEY = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
+    # Session-cookie hardening. HttpOnly stops page JS from reading the session
+    # cookie; SameSite=Lax stops the browser from sending it on cross-site POST
+    # requests, which blocks the basic CSRF vector against the cookie-authed
+    # mutating endpoints (e.g. the saved-result DELETE). Secure is enabled when
+    # the app is served over HTTPS (set SESSION_COOKIE_SECURE=true in prod).
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
     
     # Database configuration
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))

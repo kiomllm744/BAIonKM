@@ -3,9 +3,11 @@ Flask routes for the Disease Portal application.
 """
 import json
 import re
+import hmac
 import difflib
 from datetime import datetime
 from functools import wraps
+from urllib.parse import urlparse
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
 from sqlalchemy import func, desc, text
 from sqlalchemy.orm import sessionmaker
@@ -80,9 +82,25 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('logged_in'):
-            return redirect(url_for('main.login', next=request.url))
+            # Pass a RELATIVE next (path+query) so it can be safely validated on
+            # the way back in (avoids open-redirect via an absolute URL).
+            return redirect(url_for('main.login', next=request.full_path))
         return f(*args, **kwargs)
     return decorated_function
+
+
+def _is_safe_next(target):
+    """Only allow same-site relative redirects, to prevent open-redirect abuse."""
+    if not target:
+        return False
+    parsed = urlparse(target)
+    # Reject anything with a scheme/host (absolute URL) or protocol-relative //.
+    return (
+        not parsed.scheme
+        and not parsed.netloc
+        and target.startswith('/')
+        and not target.startswith('//')
+    )
 
 
 # Ensure the analysis_results table has the ai_analysis_json column
@@ -136,10 +154,14 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         
-        if username == Config.DEMO_USERNAME and password == Config.DEMO_PASSWORD:
+        # Constant-time comparison avoids leaking match length via timing.
+        user_ok = hmac.compare_digest(username, Config.DEMO_USERNAME or '')
+        pass_ok = hmac.compare_digest(password, Config.DEMO_PASSWORD or '')
+        if user_ok and pass_ok:
             session['logged_in'] = True
             session['username'] = username
-            next_url = request.args.get('next') or url_for('main.results')
+            requested = request.args.get('next')
+            next_url = requested if _is_safe_next(requested) else url_for('main.results')
             return redirect(next_url)
         else:
             return render_template('login.html', error='Invalid username or password')
@@ -774,8 +796,9 @@ def analyze():
 
 
 @main_bp.route('/api/results/history')
+@login_required
 def get_results_history():
-    """API endpoint to get analysis results history."""
+    """API endpoint to get analysis results history (login required)."""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     
@@ -817,8 +840,9 @@ def get_results_history():
 
 
 @main_bp.route('/api/results/<int:result_id>')
+@login_required
 def get_result_detail(result_id):
-    """API endpoint to get a specific analysis result."""
+    """API endpoint to get a specific analysis result (login required)."""
     session = Session()
     try:
         result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
@@ -872,8 +896,9 @@ def view_result(result_id):
 
 
 @main_bp.route('/api/results/<int:result_id>', methods=['DELETE'])
+@login_required
 def delete_result(result_id):
-    """Delete a specific analysis result."""
+    """Delete a specific analysis result (login required)."""
     session = Session()
     try:
         result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()

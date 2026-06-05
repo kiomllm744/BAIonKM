@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file (for local development)
 load_dotenv()
 
-from flask import Flask
+from flask import Flask, render_template
 from models import db
 from routes import main_bp
 from config import Config
@@ -41,7 +41,24 @@ def create_app(config_class=Config):
     
     # Register blueprints
     app.register_blueprint(main_bp)
-    
+
+    # Friendly error pages. In production (debug off) these replace the bare
+    # Werkzeug 404/500. In local debug mode Flask still shows the interactive
+    # debugger for 500s, which is the desired dev behaviour.
+    @app.errorhandler(404)
+    def _not_found(error):
+        return render_template(
+            'error.html', code=404, title='Page not found',
+            message="That page doesn't exist or has moved."
+        ), 404
+
+    @app.errorhandler(500)
+    def _server_error(error):
+        return render_template(
+            'error.html', code=500, title='Something went wrong',
+            message='An unexpected error occurred while processing your request. Please try again.'
+        ), 500
+
     return app
 
 

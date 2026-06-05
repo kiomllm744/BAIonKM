@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ code or 'Error' }} - BAIonKM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .error-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-height: 70vh;
+            gap: 14px;
+        }
+        .error-code {
+            font-size: 4.5rem;
+            font-weight: 700;
+            line-height: 1;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .error-title { font-size: 1.4rem; font-weight: 700; color: #1f2937; }
+        .error-message { color: #6b7280; max-width: 460px; }
+        .error-actions { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-dna"></i>
+                <span>BAIonKM</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <i class="fas fa-search"></i>
+                    <span>Analysis</span>
+                </a>
+                <a href="/database" class="nav-item">
+                    <i class="fas fa-database"></i>
+                    <span>Database</span>
+                </a>
+                <a href="/results" class="nav-item">
+                    <i class="fas fa-history"></i>
+                    <span>History</span>
+                </a>
+                <a href="/about" class="nav-item">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About</span>
+                </a>
+            </nav>
+            <div class="sidebar-user">
+                {% if session.get('logged_in') %}
+                <div class="user-info">
+                    <i class="fas fa-user-check"></i>
+                    <span>{{ session.get('username', 'User') }}</span>
+                </div>
+                <a href="{{ url_for('main.logout') }}" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('main.login') }}" class="btn-login">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Login</span>
+                </a>
+                {% endif %}
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="error-wrap">
+                <div class="error-code">{{ code or 'Error' }}</div>
+                <div class="error-title">{{ title or 'Something went wrong' }}</div>
+                <p class="error-message">{{ message or 'An unexpected error occurred.' }}</p>
+                <div class="error-actions">
+                    <a href="/" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Analysis
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
