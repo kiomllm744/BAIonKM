@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: disease-portal
+    name: baionkm
     runtime: python
     # build_disease_index.py builds the full local disease catalogue; "|| true"
     # keeps a build hiccup from failing the deploy (it falls back to live search).
