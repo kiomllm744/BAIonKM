@@ -960,11 +960,21 @@ function handleFormSubmit(e) {
     elements.herbsDataInput.value = JSON.stringify(herbsData);
     
     const submitBtn = elements.form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
     submitBtn.disabled = true;
-    
+
     elements.form.submit();
+}
+
+// Restore the Run Analysis button to its normal, clickable state. Needed after
+// a back/forward-cache restore (e.g. Chrome Back from a result page), where the
+// button would otherwise stay frozen in the "Analyzing..." disabled state.
+function resetRunButton() {
+    const btn = elements.runAnalysisBtn;
+    if (!btn) return;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-flask"></i> Run Analysis';
+    updateRunButton(); // re-apply is-disabled based on current disease selection
 }
 
 // ==========================================
@@ -987,7 +997,11 @@ function setupEventListeners() {
     if (elements.form) {
         elements.form.addEventListener('submit', handleFormSubmit);
     }
-    
+
+    // pageshow fires on first load AND on back/forward-cache restores (unlike
+    // DOMContentLoaded). Reset the submit button so it isn't stuck "Analyzing...".
+    window.addEventListener('pageshow', resetRunButton);
+
     // Hide suggestions on outside click
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.autocomplete-wrapper')) {
