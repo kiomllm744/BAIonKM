@@ -5,10 +5,12 @@ services:
     # build_disease_index.py builds the full local disease catalogue; "|| true"
     # keeps a build hiccup from failing the deploy (it falls back to live search).
     buildCommand: pip install -r requirements.txt && python download_db.py && (python build_disease_index.py || true) && (python build_clingen_index.py || true)
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    # 2 workers + threads so a long Gemini AI call doesn't block page loads;
+    # --timeout 120 because AI analysis can take 10-30s (the default 30s would 502).
+    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.11.9
       # Generated once and kept stable so login sessions survive restarts and
       # are valid across all gunicorn workers. Without this, config.py falls
       # back to a per-process random key and logins break unpredictably.
