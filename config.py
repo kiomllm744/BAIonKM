@@ -36,7 +36,29 @@ class Config:
     
     # Enrichr API settings
     ENRICHR_BASE_URL = 'https://maayanlab.cloud/Enrichr'
-    DEFAULT_GENE_LIBRARY = 'DisGeNET'
+    # DisGeNET is kept available for backtracking (it's a disease->gene library,
+    # which overlaps with the Open Targets disease genes). The ACTIVE enrichment
+    # now uses pathway/process libraries, which are more mechanistic and
+    # complementary to Open Targets. To revert: set ENRICHMENT_LIBRARIES=DisGeNET
+    # (env) or change the default list below back to ['DisGeNET'].
+    DEFAULT_GENE_LIBRARY = 'DisGeNET'  # legacy single-library (backtrack reference)
+    ENRICHMENT_LIBRARIES = [
+        lib.strip() for lib in os.environ.get(
+            'ENRICHMENT_LIBRARIES',
+            'KEGG_2021_Human,Reactome_2022,GO_Biological_Process_2023'
+        ).split(',') if lib.strip()
+    ]
+    # short, human-friendly labels for the UI (full Enrichr name -> short)
+    ENRICHMENT_LIBRARY_LABELS = {
+        'KEGG_2021_Human': 'KEGG',
+        'Reactome_2022': 'Reactome',
+        'GO_Biological_Process_2023': 'GO BP',
+        'GO_Molecular_Function_2023': 'GO MF',
+        'GO_Cellular_Component_2023': 'GO CC',
+        'WikiPathway_2023_Human': 'WikiPathways',
+        'DisGeNET': 'DisGeNET',
+    }
+    ENRICHR_MAX_RETRIES = int(os.environ.get('ENRICHR_MAX_RETRIES', '3'))
     EXTERNAL_API_VERIFY_SSL = os.environ.get('EXTERNAL_API_VERIFY_SSL', 'true').lower() not in ('0', 'false', 'no')
     
     # Open Targets API Settings

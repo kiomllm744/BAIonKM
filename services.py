@@ -4,6 +4,7 @@ Contains the main business logic for disease-herb gene analysis using Open Targe
 """
 import json
 import re
+import time
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sqlalchemy import func, create_engine, text, inspect as sa_inspect
@@ -202,21 +203,38 @@ def find_unique_genes(all_common_genes):
     return all_unique_genes
 
 
+def _enrichr_request(method, url, *, attempts=None, **kwargs):
+    """Call Enrichr with retry + exponential backoff.
+
+    Enrichr (a free academic service) rate-limits and intermittently times out,
+    especially under parallel load. Retrying transient failures (timeouts, 5xx,
+    connection resets) makes enrichment self-heal instead of dropping a
+    prescription. Raises the last error if every attempt fails.
+    """
+    attempts = attempts or Config.ENRICHR_MAX_RETRIES
+    kwargs.setdefault('timeout', 30)
+    kwargs.setdefault('verify', Config.EXTERNAL_API_VERIFY_SSL)
+    last_err = None
+    for i in range(attempts):
+        try:
+            resp = requests.request(method, url, **kwargs)
+            if resp.ok:
+                return resp
+            last_err = Exception(f'Enrichr HTTP {resp.status_code}')
+        except Exception as e:  # timeout, connection error, etc.
+            last_err = e
+        if i < attempts - 1:
+            time.sleep(0.6 * (2 ** i))  # 0.6s, 1.2s, 2.4s ...
+    raise last_err if last_err else Exception('Enrichr request failed')
+
+
 def upload_single_gene_list(gene_list, index):
     """Upload a single gene list to Enrichr (for parallel execution)."""
     upload_url = f'{Config.ENRICHR_BASE_URL}/addList'
     genes_str = "\n".join(list(gene_list))
     payload = {'list': (None, genes_str)}
-    
-    response = requests.post(
-        upload_url,
-        files=payload,
-        timeout=30,
-        verify=Config.EXTERNAL_API_VERIFY_SSL
-    )
-    if not response.ok:
-        raise Exception(f'Error uploading gene list {index} to Enrichr')
-    
+
+    response = _enrichr_request('POST', upload_url, files=payload, timeout=30)
     data = json.loads(response.text)
     data['index'] = index
     return data
@@ -246,81 +264,91 @@ def upload_gene_lists_to_enrichr_parallel(gene_lists):
 
 
 def fetch_enrichment_single(user_list_id, library, index):
-    """Fetch enrichment for a single gene list (for parallel execution)."""
+    """Fetch enrichment for a single gene list against one library."""
     enrich_url = f'{Config.ENRICHR_BASE_URL}/enrich'
-    response = requests.get(
+    response = _enrichr_request(
+        'GET',
         f'{enrich_url}?userListId={user_list_id}&backgroundType={library}',
         timeout=60,
-        verify=Config.EXTERNAL_API_VERIFY_SSL
     )
-    
-    if not response.ok:
-        raise Exception(f"Error fetching enrichment for userListId: {user_list_id}")
-    
-    return index, json.loads(response.text)
+    return index, library, json.loads(response.text)
 
 
-def perform_enrichment_analysis_parallel(data_list, library=None):
+def perform_enrichment_analysis_parallel(data_list, libraries=None):
     """
-    Perform enrichment analysis using Enrichr API.
-    OPTIMIZED: Parallel API calls.
-    """
-    if library is None:
-        library = Config.DEFAULT_GENE_LIBRARY
+    Perform enrichment analysis using Enrichr against one or more libraries.
 
-    # Parallel fetch enrichment results
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    Each uploaded gene list is scored against every library in `libraries`
+    (default Config.ENRICHMENT_LIBRARIES -- pathway/process libraries such as
+    KEGG, Reactome, GO). Results from all libraries are merged per prescription,
+    tagged with their source library, then ranked by significance.
+    """
+    if libraries is None:
+        libraries = Config.ENRICHMENT_LIBRARIES
+
+    for d in data_list:
+        d['enrichment_data'] = []
+
+    # one fetch per (gene list, library) pair, all in parallel
+    tasks = [
+        (i, d['userListId'], lib)
+        for i, d in enumerate(data_list)
+        for lib in libraries
+    ]
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
-            executor.submit(fetch_enrichment_single, data['userListId'], library, i): i
-            for i, data in enumerate(data_list)
+            executor.submit(fetch_enrichment_single, ulid, lib, i): (i, lib)
+            for (i, ulid, lib) in tasks
         }
-        
         for future in as_completed(futures):
             try:
-                index, enrichment_data = future.result()
-                process_enrichment_data(data_list[index], enrichment_data)
+                index, lib, enrichment_data = future.result()
+                process_enrichment_data(data_list[index], enrichment_data, lib)
             except Exception as e:
                 print(f"Error fetching enrichment: {e}")
+
+    # rank merged results by adjusted p-value and cap per prescription
+    for d in data_list:
+        d['enrichment_data'].sort(key=lambda r: r.get('Adjusted p-value', 1.0))
+        d['enrichment_data'] = d['enrichment_data'][:Config.MAX_ENRICHMENT_RESULTS]
 
     return data_list
 
 
-def process_enrichment_data(data, enrichment_data):
-    """Process raw enrichment data into structured format.
+def process_enrichment_data(data, enrichment_data, library=None):
+    """Append significant enrichment rows (tagged with their source library).
 
     Enrichr's /enrich response is a dict keyed by library name whose values
-    are lists of result rows, e.g. {"DisGeNET": [[rank, term, p, ...], ...]}.
+    are lists of result rows, e.g. {"KEGG_2021_Human": [[rank, term, p, ...]]}.
+    Rows are ACCUMULATED (so multiple libraries merge per prescription); the
+    caller sorts and caps the merged list. `library` is the Enrichr library the
+    rows came from; it is stored as a short human label for the UI/AI.
     """
-    data['enrichment_data'] = []
+    if not data.get('enrichment_data'):
+        data['enrichment_data'] = []
+
+    label = Config.ENRICHMENT_LIBRARY_LABELS.get(library, library) if library else None
 
     for rows in enrichment_data.values():
         for element in rows:
-            rank = element[0]
-            term_name = element[1]
-            p_value = element[2]
-            z_score = element[3]
-            combined_score = element[4]
-            overlapping_genes = ', '.join(element[5])
-            adjusted_p_value = element[6]
-            old_p_value = element[7]
-            old_adjusted_p_value = element[8]
+            try:
+                adjusted_p_value = element[6]
+            except (IndexError, TypeError):
+                continue  # malformed row -> skip rather than crash
 
             if adjusted_p_value < Config.ADJUSTED_PVALUE_THRESHOLD:
-                new_row = {
-                    'Rank': rank,
-                    'Term name': term_name,
-                    'P-value': p_value,
-                    'Z-score': z_score,
-                    'Combined score': combined_score,
-                    'Overlapping genes': overlapping_genes,
+                data['enrichment_data'].append({
+                    'Rank': element[0],
+                    'Term name': element[1],
+                    'P-value': element[2],
+                    'Z-score': element[3],
+                    'Combined score': element[4],
+                    'Overlapping genes': ', '.join(element[5]),
                     'Adjusted p-value': adjusted_p_value,
-                    'Old p-value': old_p_value,
-                    'Old adjusted p-value': old_adjusted_p_value
-                }
-                data['enrichment_data'].append(new_row)
-
-    # Keep only top results
-    data['enrichment_data'] = data['enrichment_data'][:Config.MAX_ENRICHMENT_RESULTS]
+                    'Old p-value': element[7],
+                    'Old adjusted p-value': element[8],
+                    'Library': label,
+                })
 
 
 # ClinGen classification ranking + mapping to the levels the LLM formatter uses.
@@ -638,6 +666,10 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
     enrich_indices = [
         i for i, genes in enumerate(common_genes)
         if len(genes) >= Config.MIN_ENRICHMENT_GENES
+    ]
+    # the human-friendly library labels used for enrichment (for the UI heading)
+    results['enrichment_libraries'] = [
+        Config.ENRICHMENT_LIBRARY_LABELS.get(lib, lib) for lib in Config.ENRICHMENT_LIBRARIES
     ]
     if enrich_indices:
         try:

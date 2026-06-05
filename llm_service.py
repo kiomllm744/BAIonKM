@@ -547,6 +547,24 @@ Do not include any text outside the JSON array."""
     return None
 
 
+def _flatten_rx_enrichment(rx_data):
+    """Merge all of a prescription's enrichment-library buckets into one term list.
+
+    rx_data is {libraryLabel: [term, ...], ...} (e.g. KEGG/Reactome/GO, or the
+    legacy single 'DisGeNET' bucket). Returns the combined list of term dicts,
+    so the LLM sees pathway terms regardless of which libraries were used.
+    """
+    if isinstance(rx_data, list):
+        return rx_data
+    if not isinstance(rx_data, dict):
+        return []
+    terms = []
+    for lib_terms in rx_data.values():
+        if isinstance(lib_terms, list):
+            terms.extend(lib_terms)
+    return terms
+
+
 def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     """
     Generate complete AI analysis with:
@@ -581,17 +599,17 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     
     # Debug: Print structure of enrichment data
     for rx_key, rx_data in prescription_enrichments.items():
-        disgenet_data = rx_data.get('DisGeNET', [])
-        print(f"[LLM] {rx_key}: {len(disgenet_data)} DisGeNET entries")
-    
+        terms = _flatten_rx_enrichment(rx_data)
+        print(f"[LLM] {rx_key}: {len(terms)} enrichment entries")
+
     if len(prescription_enrichments) > 1:
         # Multiple prescriptions - do comparative analysis
         print("[LLM] Running comparative analysis for multiple prescriptions")
         prescription_data = {}
         for rx_key, rx_data in prescription_enrichments.items():
-            rx_disgenet = rx_data.get('DisGeNET', [])
-            if rx_disgenet:
-                prescription_data[rx_key] = rx_disgenet
+            rx_terms = _flatten_rx_enrichment(rx_data)
+            if rx_terms:
+                prescription_data[rx_key] = rx_terms
         
         if prescription_data:
             print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
@@ -617,7 +635,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
     elif len(prescription_enrichments) == 1:
         # Single prescription analysis
         rx_key = list(prescription_enrichments.keys())[0]
-        rx_data = prescription_enrichments[rx_key].get('DisGeNET', [])
+        rx_data = _flatten_rx_enrichment(prescription_enrichments[rx_key])
         print(f"[LLM] Single prescription mode: {rx_key} with {len(rx_data)} enrichment entries")
         
         if rx_data:

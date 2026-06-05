@@ -880,6 +880,19 @@
             text-overflow: ellipsis;
             display: block;
         }
+        .lib-pill {
+            display: inline-block;
+            margin-top: 3px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            color: #6366f1;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 4px;
+            padding: 1px 6px;
+        }
         
         .pvalue {
             color: #059669;
@@ -1410,7 +1423,8 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-chart-bar"></i>
-                <h2>Enrichment Analysis (DisGeNET)</h2>
+                <h2>Pathway Enrichment Analysis</h2>
+                {% if results.enrichment_libraries %}<span class="badge">{{ results.enrichment_libraries | join(' &middot; ') }}</span>{% endif %}
             </div>
             <div class="card-body">
                 <div class="enrichment-grid">
@@ -1437,6 +1451,7 @@
                                     <td>{{ loop.index }}</td>
                                     <td>
                                         <span class="term-name" title="{{ item['Term name'] }}">{{ item['Term name'] }}</span>
+                                        {% if item['Library'] %}<span class="lib-pill">{{ item['Library'] }}</span>{% endif %}
                                     </td>
                                     <td><span class="pvalue">{{ "%.2e" | format(item['Adjusted p-value']) }}</span></td>
                                     <td><span class="score">{{ "%.1f" | format(item['Combined score']) }}</span></td>
@@ -1658,32 +1673,31 @@
                     resultsData.enrichment_data.forEach((rxData, index) => {
                         const rxNum = rxData.prescription_index || (index + 1);
                         const rxKey = `Prescription ${rxNum}`;
-                        const rxEnrichment = [];
-                        
-                        console.log(`[AI Debug] Processing ${rxKey}:`, rxData);
-                        
+                        // Group terms by their source library (KEGG / Reactome / GO ...)
+                        const byLib = {};
+
                         if (rxData.enrichment_data && rxData.enrichment_data.length > 0) {
                             rxData.enrichment_data.forEach(item => {
-                                rxEnrichment.push({
+                                const lib = item['Library'] || 'Enrichment';
+                                (byLib[lib] = byLib[lib] || []).push({
                                     term: item['Term name'],
                                     adjusted_p_value: item['Adjusted p-value'],
                                     combined_score: item['Combined score']
                                 });
                             });
                         }
-                        
-                        console.log(`[AI Debug] ${rxKey} enrichment entries:`, rxEnrichment.length);
-                        prescriptionEnrichments[rxKey] = { 'DisGeNET': rxEnrichment };
+
+                        prescriptionEnrichments[rxKey] = byLib;
                     });
                 } else {
                     console.warn('[AI Debug] No enrichment_data found in results');
                 }
-                
+
                 console.log('[AI Debug] Final prescriptionEnrichments:', prescriptionEnrichments);
-                
-                // Check if we have any valid enrichment data
+
+                // Valid if ANY prescription has terms in ANY library bucket
                 const hasEnrichmentData = Object.values(prescriptionEnrichments).some(
-                    rx => rx.DisGeNET && rx.DisGeNET.length > 0
+                    rx => Object.values(rx).some(terms => terms && terms.length > 0)
                 );
                 
                 if (!hasEnrichmentData) {
