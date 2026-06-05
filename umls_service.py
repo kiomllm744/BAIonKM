@@ -17,7 +17,7 @@ from config import Config
 from models import ExternalLookupCache
 
 
-engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **Config.engine_options())
 Session = sessionmaker(bind=engine)
 
 

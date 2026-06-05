@@ -89,3 +89,18 @@ class Config:
     # You can change these or set via environment variables
     DEMO_USERNAME = os.environ.get('DEMO_USERNAME', 'professor')
     DEMO_PASSWORD = os.environ.get('DEMO_PASSWORD', 'kiom2026')
+
+    @classmethod
+    def engine_options(cls):
+        """Shared SQLAlchemy create_engine kwargs for every module's engine.
+
+        Each module builds its own engine (routes/services/opentargets/umls),
+        so this keeps them identical: pool_pre_ping recycles dead connections
+        (important for Postgres in prod after an idle/restart), pool_recycle
+        caps connection age, and check_same_thread=False lets the threaded dev
+        server share a SQLite connection across threads.
+        """
+        opts = {'pool_pre_ping': True, 'pool_recycle': 300}
+        if cls.SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+            opts['connect_args'] = {'check_same_thread': False}
+        return opts

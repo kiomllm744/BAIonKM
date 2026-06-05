@@ -16,15 +16,8 @@ from opentargets_service import (
 )
 from umls_service import candidate_names_for_open_targets
 
-# Create engine with optimized settings for local herbs caching
-engine_args = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
-if Config.SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
-    engine_args['connect_args'] = {'check_same_thread': False}
-
-engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **engine_args)
+# Create engine with shared settings (see Config.engine_options)
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **Config.engine_options())
 Session = sessionmaker(bind=engine)
 
 
@@ -665,6 +658,17 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None):
                 entry['prescription_index'] = original_i + 1
                 entry['herbs'] = results['prescriptions'][original_i].get('herbs', [])
                 entry['gene_count'] = len(common_genes[original_i])
+
+            # Surface any prescription that was eligible for enrichment but came
+            # back empty (e.g. a transient Enrichr upload/fetch failure), so it is
+            # reported rather than silently missing from the results.
+            returned = {e.get('prescription_index') for e in enrichment_results}
+            for i in enrich_indices:
+                if (i + 1) not in returned:
+                    results['errors'].append(
+                        f"Prescription {i+1}: enrichment could not be retrieved from Enrichr "
+                        "(transient error) — try running again."
+                    )
 
             results['enrichment_data'] = enrichment_results
         except Exception as e:

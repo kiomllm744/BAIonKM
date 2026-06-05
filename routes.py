@@ -27,8 +27,8 @@ from herb_mappings import (
 # Create blueprint
 main_bp = Blueprint('main', __name__)
 
-# Create engine and session
-engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
+# Create engine and session (shared engine options across all modules)
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **Config.engine_options())
 Session = sessionmaker(bind=engine)
 
 

@@ -11,6 +11,11 @@ psycopg2-binary>=2.9.0  # PostgreSQL support for Render
 # HTTP requests for APIs
 requests>=2.31.0
 
+# Reading the Open Targets parquet exports when building the disease catalogue
+# (build_disease_index.py). Without it the catalogue build silently no-ops and
+# the app falls back to live search only.
+pyarrow>=14.0.0
+
 # Environment variables
 python-dotenv>=1.0.0
 

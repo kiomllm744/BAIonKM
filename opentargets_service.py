@@ -12,15 +12,8 @@ from sqlalchemy import text as sql_text
 from config import Config
 from models import ExternalLookupCache
 
-# Setup database session for caching
-engine_args = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
-if Config.SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
-    engine_args['connect_args'] = {'check_same_thread': False}
-
-engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **engine_args)
+# Setup database session for caching (shared engine options, see config.py)
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI, **Config.engine_options())
 Session = sessionmaker(bind=engine)
 
 
