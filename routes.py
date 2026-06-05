@@ -103,6 +103,21 @@ def _is_safe_next(target):
     )
 
 
+def _saved_result_data(result):
+    """Build the result.html context dict from a saved AnalysisResult row."""
+    try:
+        data = json.loads(result.results_json)
+        data['result_id'] = result.id
+    except Exception:
+        data = {}
+    if result.ai_analysis_json:
+        try:
+            data['saved_ai_analysis'] = json.loads(result.ai_analysis_json)
+        except Exception:
+            data['saved_ai_analysis'] = None
+    return data
+
+
 # Ensure the analysis_results table has the ai_analysis_json column
 def init_results_table():
     """Create/update the analysis_results table."""
@@ -764,35 +779,64 @@ def analyze():
         except Exception as e:
             print(f"Error building provenance: {e}")
         
-        # Save to history
+        # Save to history (try/finally so the DB session never leaks on error)
+        result_id = None
+        db_session = Session()
         try:
-            session = Session()
             # common genes live per-prescription, not at the top level
             _common = set()
             for _rx in results.get('prescriptions', []):
                 _common.update(_rx.get('common_genes', []))
-            common_genes_count = len(_common)
-            
+
             new_result = AnalysisResult(
                 disease_name=results.get('disease_name') or disease_name,
                 prescriptions=json.dumps(herb_lists),
                 results_json=json.dumps(results, default=str),
-                common_genes_count=common_genes_count,
+                common_genes_count=len(_common),
                 created_at=datetime.utcnow()
             )
-            session.add(new_result)
-            session.commit()
+            db_session.add(new_result)
+            db_session.commit()
             result_id = new_result.id
-            session.close()
-            
-            # Add ID to results for linking
-            results['result_id'] = result_id
         except Exception as e:
             print(f"Error saving result: {e}")
-        
+            db_session.rollback()
+        finally:
+            db_session.close()
+
+        # Post/Redirect/Get: stash the id in the server-side session and redirect
+        # to a GET view, so a browser refresh/back does NOT re-POST and re-run the
+        # whole analysis (which previously also inserted a duplicate history row).
+        # The id lives in the session, not the URL, so there's no enumerable public
+        # link to saved results (history viewing stays login-gated).
+        if result_id is not None:
+            session['last_result_id'] = result_id
+            return redirect(url_for('main.view_last_result'), code=303)
+
+        # Saving failed (rare) -> render directly so the user still sees results.
         return render_template('result.html', results=results)
-    
+
     return redirect(url_for('main.index'))
+
+
+@main_bp.route('/result')
+def view_last_result():
+    """Render the most recently computed analysis (the PRG target; public).
+
+    Reads the id from the session rather than the URL so refresh/back is
+    idempotent and there is no enumerable public link to stored results.
+    """
+    result_id = session.get('last_result_id')
+    if not result_id:
+        return redirect(url_for('main.index'))
+    db_session = Session()
+    try:
+        result = db_session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+        if not result:
+            return redirect(url_for('main.index'))
+        return render_template('result.html', results=_saved_result_data(result))
+    finally:
+        db_session.close()
 
 
 @main_bp.route('/api/results/history')
@@ -873,24 +917,9 @@ def view_result(result_id):
     db_session = Session()
     try:
         result = db_session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
-        
         if not result:
             return redirect(url_for('main.results'))
-        
-        try:
-            results_data = json.loads(result.results_json)
-            results_data['result_id'] = result.id
-        except:
-            results_data = {}
-        
-        # Include saved AI analysis if available
-        if result.ai_analysis_json:
-            try:
-                results_data['saved_ai_analysis'] = json.loads(result.ai_analysis_json)
-            except:
-                results_data['saved_ai_analysis'] = None
-        
-        return render_template('result.html', results=results_data)
+        return render_template('result.html', results=_saved_result_data(result))
     finally:
         db_session.close()
 
@@ -953,30 +982,30 @@ def ai_analysis():
         # AI gets the clinical-validity overlay. The frontend only sends enrichment
         # tables, so load the rest from the saved analysis row.
         if result_id:
+            _sess = Session()
             try:
-                _sess = Session()
                 _row = _sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
                 if _row:
                     _saved = json.loads(_row.results_json)
                     analysis_results['prescriptions'] = _saved.get('prescriptions', [])
-                _sess.close()
             except Exception as e:
                 print(f"[ai-analysis] could not load saved prescriptions: {e}")
+            finally:
+                _sess.close()
 
         # Generate full AI analysis (summary_table, detailed_analysis, clinical_questions)
         ai_results = generate_full_ai_analysis(disease_name, analysis_results)
         
         # Save AI analysis to database if result_id provided and analysis succeeded
         if result_id and ai_results.get('has_ai_analysis'):
+            _save_sess = Session()
             try:
-                session = Session()
-                result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+                result = _save_sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
                 if result:
                     # Ensure AI analysis can be serialized to JSON
                     try:
-                        ai_json_str = json.dumps(ai_results, default=str, ensure_ascii=False)
-                        result.ai_analysis_json = ai_json_str
-                        session.commit()
+                        result.ai_analysis_json = json.dumps(ai_results, default=str, ensure_ascii=False)
+                        _save_sess.commit()
                         print(f"[DB] Saved AI analysis for result {result_id}")
                     except (TypeError, ValueError) as json_err:
                         print(f"[DB] JSON serialization error: {json_err}")
@@ -991,13 +1020,14 @@ def ai_analysis():
                             elif isinstance(obj, list):
                                 return [clean_for_json(i) for i in obj]
                             return obj
-                        cleaned_results = clean_for_json(ai_results)
-                        result.ai_analysis_json = json.dumps(cleaned_results, default=str)
-                        session.commit()
+                        result.ai_analysis_json = json.dumps(clean_for_json(ai_results), default=str)
+                        _save_sess.commit()
                         print(f"[DB] Saved cleaned AI analysis for result {result_id}")
-                session.close()
             except Exception as e:
                 print(f"[DB] Error saving AI analysis: {e}")
+                _save_sess.rollback()
+            finally:
+                _save_sess.close()
         
         return jsonify(ai_results)
         
