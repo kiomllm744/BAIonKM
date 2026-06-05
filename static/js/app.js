@@ -1,5 +1,5 @@
 /**
- * GeneRx Portal - Main Application JavaScript
+ * BAIonKM - Main Application JavaScript
  */
 
 // State management
@@ -809,7 +809,7 @@ function addPrescription() {
     prescriptionCard.dataset.index = index;
     prescriptionCard.innerHTML = `
         <div class="prescription-header">
-            <span class="prescription-badge">Rx ${index}</span>
+            <span class="prescription-badge">Prescription ${index}</span>
             <button type="button" class="btn-icon remove-prescription" title="Remove prescription">
                 <i class="fas fa-times"></i>
             </button>
@@ -874,7 +874,7 @@ function renumberPrescriptions() {
         newPrescriptions[newIndex] = state.prescriptions[oldIndex] || [];
         
         card.dataset.index = newIndex;
-        card.querySelector('.prescription-badge').textContent = `Rx ${newIndex}`;
+        card.querySelector('.prescription-badge').textContent = `Prescription ${newIndex}`;
         card.querySelector('.herb-input').dataset.index = newIndex;
         card.querySelector('.tags-input-container').id = `tags-container-${newIndex}`;
     });

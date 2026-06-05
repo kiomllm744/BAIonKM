@@ -3,151 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analysis Results - EnrichR Portal</title>
+    <title>Analysis Results - BAIonKM</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #f1f5f9;
-            min-height: 100vh;
-        }
-        
-        /* Top Navigation */
-        .top-nav {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            padding: 0 32px;
-            display: flex;
-            align-items: center;
-            height: 64px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: white;
-            text-decoration: none;
-            margin-right: 40px;
-        }
-        
-        .nav-brand-icon {
-            width: 38px;
-            height: 38px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .nav-brand-icon i {
-            font-size: 1.1rem;
-            color: white;
-        }
-        
-        .nav-brand-text {
-            font-size: 1.2rem;
-            font-weight: 700;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 8px;
-            flex: 1;
-        }
-        
-        .nav-link {
-            color: #94a3b8;
-            text-decoration: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(99, 102, 241, 0.2);
-            color: #818cf8;
-        }
-        
-        .nav-user {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-left: auto;
-        }
-        
-        .user-badge {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 20px;
-            color: #94a3b8;
-            font-size: 0.85rem;
-        }
-        
-        .user-badge i {
-            color: #10b981;
-        }
-        
-        .btn-nav-auth {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        
-        .btn-nav-login {
-            background: #6366f1;
-            color: white;
-        }
-        
-        .btn-nav-login:hover {
-            background: #4f46e5;
-        }
-        
-        .btn-nav-logout {
-            color: #94a3b8;
-            background: transparent;
-        }
-        
-        .btn-nav-logout:hover {
-            background: rgba(239, 68, 68, 0.2);
-            color: #fca5a5;
-        }
-        
-        /* Main Content */
-        .main-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 28px;
-        }
-        
+        /* result-specific styles below; base layout/components come from main.css */
+
         /* Header */
         .page-header {
             margin-bottom: 24px;
@@ -465,7 +327,7 @@
         }
         
         .ai-card .card-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: white;
             border-bottom: none;
         }
@@ -1142,54 +1004,68 @@
     </style>
 </head>
 <body>
-    <!-- Top Navigation -->
-    <nav class="top-nav">
-        <a href="/" class="nav-brand">
-            <div class="nav-brand-icon">
+    <div class="app-container">
+        <!-- Sidebar (shared shell, matches every other page) -->
+        <aside class="sidebar">
+            <div class="logo">
                 <i class="fas fa-dna"></i>
+                <span>BAIonKM</span>
             </div>
-            <span class="nav-brand-text">EnrichR Portal</span>
-        </a>
-        <div class="nav-links">
-            <a href="/" class="nav-link">
-                <i class="fas fa-search"></i> New Analysis
-            </a>
-            <a href="/database" class="nav-link">
-                <i class="fas fa-database"></i> Database
-            </a>
-            <a href="/results" class="nav-link active">
-                <i class="fas fa-history"></i> History
-            </a>
-            <a href="/about" class="nav-link">
-                <i class="fas fa-info-circle"></i> About
-            </a>
-        </div>
-        <div class="nav-user">
-            {% if session.get('logged_in') %}
-            <div class="user-badge">
-                <i class="fas fa-user-check"></i>
-                <span>{{ session.get('username', 'User') }}</span>
+            <nav class="nav-menu">
+                <a href="/" class="nav-item active">
+                    <i class="fas fa-search"></i>
+                    <span>Analysis</span>
+                </a>
+                <a href="/database" class="nav-item">
+                    <i class="fas fa-database"></i>
+                    <span>Database</span>
+                </a>
+                <a href="/results" class="nav-item">
+                    <i class="fas fa-history"></i>
+                    <span>History</span>
+                </a>
+                <a href="/about" class="nav-item">
+                    <i class="fas fa-info-circle"></i>
+                    <span>About</span>
+                </a>
+            </nav>
+            <div class="sidebar-stats">
+                <div class="stat-item">
+                    <i class="fas fa-disease"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="disease-count">--</span>
+                        <span class="stat-label">Diseases</span>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-leaf"></i>
+                    <div class="stat-info">
+                        <span class="stat-value" id="herb-count">--</span>
+                        <span class="stat-label">Herbs</span>
+                    </div>
+                </div>
             </div>
-            <a href="{{ url_for('main.logout') }}" class="btn-nav-auth btn-nav-logout">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-            {% else %}
-            <a href="{{ url_for('main.login') }}" class="btn-nav-auth btn-nav-login">
-                <i class="fas fa-sign-in-alt"></i> Login
-            </a>
-            {% endif %}
-        </div>
-    </nav>
+            <div class="sidebar-user">
+                {% if session.get('logged_in') %}
+                <div class="user-info">
+                    <i class="fas fa-user-check"></i>
+                    <span>{{ session.get('username', 'User') }}</span>
+                </div>
+                <a href="{{ url_for('main.logout') }}" class="btn-logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('main.login') }}" class="btn-login">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Login</span>
+                </a>
+                {% endif %}
+            </div>
+        </aside>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <!-- Page Header -->
-        <div class="page-header">
-            <a href="/" class="back-link">
-                <i class="fas fa-arrow-left"></i> Back to Analysis
-            </a>
-        </div>
-
+        <!-- Main Content -->
+        <main class="main-content">
         <!-- Disease Summary Card -->
         {% set dcolors = ['#6366f1', '#0d9488', '#d97706'] %}
         {% set dletters = ['A', 'B', 'C'] %}
@@ -1654,6 +1530,7 @@
             {% if p.stale %}<span class="prov-warn">Disease catalogue is from an older Open Targets release &mdash; rebuild the index</span>{% endif %}
         </div>
         {% endif %}
+        </main>
     </div>
 
     <script>
@@ -1662,7 +1539,20 @@
         document.addEventListener('DOMContentLoaded', () => {
             checkAndRunAiAnalysis();
             alignPrescriptionRows();
+            loadSidebarStats();
         });
+
+        // Populate the sidebar Diseases/Herbs counts (same as the other pages).
+        async function loadSidebarStats() {
+            try {
+                const s = await (await fetch('/api/stats')).json();
+                const fmt = n => (n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(n));
+                const dc = document.getElementById('disease-count');
+                const hc = document.getElementById('herb-count');
+                if (dc && s.diseases != null) dc.textContent = fmt(s.diseases);
+                if (hc && s.herbs != null) hc.textContent = fmt(s.herbs);
+            } catch (e) { /* leave the placeholder dashes */ }
+        }
 
         // Equalize the herb-tag block height across prescription cards so the
         // Venn diagrams, KPI boxes and gene-target bars all line up on the same
