@@ -1,27 +1,33 @@
 #!/usr/bin/env python3
 """
-Download the database file from Google Drive if it doesn't exist.
-Run this script once after deployment to set up the database.
+Download the prebuilt database (herbs + disease catalogue + ClinGen) if it is
+not already present. Run once at deploy/build time.
+
+The DB is hosted as a GitHub Release asset on the project repo (public, served
+from GitHub's CDN -- reliable and auth-free). Override the source with the
+DB_DOWNLOAD_URL env var if you move it elsewhere.
 """
 import os
 import sys
 import requests
 
-# Google Drive file ID - UPDATE THIS with your actual file ID
-# Get from the sharing link: https://drive.google.com/file/d/FILE_ID_HERE/view
-GDRIVE_FILE_ID = "1VuGmIvan8cXLai2LvzF1WUwI5FqTKtrB"
+# Public GitHub Release asset (default). To publish/update it:
+#   gh release create db-v1 diseaseportal.db   # first time
+#   gh release upload db-v1 diseaseportal.db --clobber   # to replace later
+DB_DOWNLOAD_URL = os.environ.get(
+    "DB_DOWNLOAD_URL",
+    "https://github.com/kiomllm744/BAIonKM/releases/download/db-v1/diseaseportal.db",
+)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "diseaseportal.db")
 
 # A valid DB is ~37 MB. Anything well under this is an empty/partial/HTML-error
-# file (e.g. an empty SQLite created by the app, or a Google Drive error page),
-# which must not be allowed to shadow the real database.
+# file, which must not be allowed to shadow the real database.
 MIN_DB_BYTES = 5 * 1024 * 1024  # 5 MB floor
 SQLITE_MAGIC = b"SQLite format 3\x00"
 
-# Honour the same SSL toggle as the rest of the app (institutional proxies).
 VERIFY_SSL = os.environ.get("EXTERNAL_API_VERIFY_SSL", "true").lower() not in ("0", "false", "no")
-HTTP_TIMEOUT = (15, 120)  # (connect, read) seconds
+HTTP_TIMEOUT = (15, 180)  # (connect, read) seconds
 
 
 def _looks_like_sqlite(path: str) -> bool:
@@ -41,52 +47,37 @@ def is_valid_db(path: str) -> bool:
     )
 
 
-def download_from_gdrive(file_id: str, destination: str):
-    """Download a file from Google Drive into `destination` atomically."""
-    print(f"Downloading database to {destination}...")
-    url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
-
-    session = requests.Session()
-    response = session.get(url, stream=True, timeout=HTTP_TIMEOUT, verify=VERIFY_SSL)
+def download_db(url: str, destination: str):
+    """Download the database from `url` into `destination` atomically."""
+    print(f"Downloading database from {url} ...")
+    response = requests.get(url, stream=True, timeout=HTTP_TIMEOUT, verify=VERIFY_SSL)
     response.raise_for_status()
 
-    # Handle large-file confirmation token
-    for key, value in response.cookies.items():
-        if key.startswith("download_warning"):
-            url = f"https://drive.google.com/uc?export=download&confirm={value}&id={file_id}"
-            response = session.get(url, stream=True, timeout=HTTP_TIMEOUT, verify=VERIFY_SSL)
-            response.raise_for_status()
-            break
-
-    # If Drive returns an HTML page (quota exceeded, file removed, login wall),
-    # it is NOT the database -- fail instead of writing a corrupt file.
     content_type = (response.headers.get("content-type") or "").lower()
     if "text/html" in content_type:
         raise RuntimeError(
-            "Google Drive returned an HTML page, not the database file "
-            "(quota exceeded, file unshared, or wrong file ID)."
+            "Download URL returned an HTML page, not the database file "
+            "(asset missing, repo private, or wrong URL)."
         )
 
     tmp = destination + ".tmp"
-    total_size = int(response.headers.get("content-length", 0))
+    total = int(response.headers.get("content-length", 0))
     downloaded = 0
     try:
         with open(tmp, "wb") as f:
-            for chunk in response.iter_content(chunk_size=32768):
+            for chunk in response.iter_content(chunk_size=1 << 16):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
-                    if total_size:
-                        print(f"\rProgress: {downloaded / total_size * 100:.1f}%", end="")
+                    if total:
+                        print(f"\rProgress: {downloaded / total * 100:.1f}%", end="")
         print()
 
-        # Validate the downloaded file before letting it replace anything.
         if downloaded < MIN_DB_BYTES or not _looks_like_sqlite(tmp):
             raise RuntimeError(
                 f"Downloaded file is invalid ({downloaded / (1024*1024):.2f} MB, "
                 f"sqlite header={_looks_like_sqlite(tmp)}). Aborting."
             )
-
         os.replace(tmp, destination)
     finally:
         if os.path.exists(tmp):
@@ -98,15 +89,13 @@ def download_from_gdrive(file_id: str, destination: str):
 if __name__ == "__main__":
     if is_valid_db(DB_PATH):
         size_mb = os.path.getsize(DB_PATH) / (1024 * 1024)
-        print(f"Database already exists and looks valid at {DB_PATH} ({size_mb:.1f} MB)")
+        print(f"Database already present and valid at {DB_PATH} ({size_mb:.1f} MB)")
     else:
         if os.path.exists(DB_PATH):
-            # An existing-but-invalid file (empty/partial) would otherwise block the
-            # download forever -- remove it so we can fetch a clean copy.
             print(f"Existing DB at {DB_PATH} is invalid/too small; re-downloading.")
             os.remove(DB_PATH)
         try:
-            download_from_gdrive(GDRIVE_FILE_ID, DB_PATH)
+            download_db(DB_DOWNLOAD_URL, DB_PATH)
         except Exception as exc:
             print(f"ERROR: database download failed: {exc}", file=sys.stderr)
             sys.exit(1)
