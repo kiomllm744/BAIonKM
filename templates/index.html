@@ -31,14 +31,14 @@
                     </div>
                     <div class="card-body">
                         <div class="form-group">
-                            <label for="disease" data-i18n="index.diseaseLabel">Disease(s) / Symptom(s)</label>
+                            <label for="disease" data-i18n="index.diseaseLabel">Disease(s)</label>
                             <div class="autocomplete-wrapper">
                                 <input
                                     type="text"
                                     id="disease"
                                     name="disease"
                                     class="form-input"
-                                    placeholder="Type a disease or symptom, then pick to add (up to 3)..."
+                                    placeholder="Type a disease, then pick to add (up to 3)..."
                                     data-i18n-placeholder="index.diseasePlaceholder"
                                     autocomplete="off"
                                 >
@@ -48,7 +48,7 @@
                             <input type="hidden" name="disease_id" id="disease-id-input">
                             <input type="hidden" name="diseases_data" id="diseases-data-input">
                             <div class="disease-chips" id="disease-chips"></div>
-                            <span class="form-hint" data-i18n="index.diseaseHint">Add up to 3 diseases/symptoms &mdash; they're combined (union of genes; shared genes highlighted). Pick from the suggestions to add each one.</span>
+                            <span class="form-hint" data-i18n="index.diseaseHint">Add up to 3 diseases &mdash; they're combined (union of genes; shared genes highlighted). Pick from the suggestions to add each one.</span>
                             <div class="terminology-panel" id="terminology-panel" aria-live="polite">
                                 <div class="terminology-panel-header">
                                     <span><i class="fas fa-route"></i> <span data-i18n="term.title">Terminology Mapping</span></span>
@@ -58,7 +58,7 @@
                                 <div class="terminology-chain">
                                     <div class="terminology-step">
                                         <span class="terminology-step-label" data-i18n="term.input">Input</span>
-                                        <div class="terminology-step-body" id="terminology-input" data-i18n="term.inputHint">Type a disease, symptom, or clinical phrase</div>
+                                        <div class="terminology-step-body" id="terminology-input" data-i18n="term.inputHint">Type a disease or clinical phrase</div>
                                     </div>
                                     <div class="terminology-step">
                                         <span class="terminology-step-label">UMLS</span>
