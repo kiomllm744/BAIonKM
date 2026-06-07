@@ -1154,6 +1154,7 @@ def ai_analysis():
     disease_name = data.get('disease_name', '')
     prescription_enrichments = data.get('prescription_enrichments', {})
     result_id = data.get('result_id')  # Optional: save to this result
+    language = (data.get('language') or 'en')  # UI language for the AI analysis text
     
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
@@ -1186,7 +1187,7 @@ def ai_analysis():
                 _sess.close()
 
         # Generate full AI analysis (summary_table, detailed_analysis, clinical_questions)
-        ai_results = generate_full_ai_analysis(disease_name, analysis_results)
+        ai_results = generate_full_ai_analysis(disease_name, analysis_results, language=language)
         
         # Save AI analysis to database if result_id provided and analysis succeeded
         if result_id and ai_results.get('has_ai_analysis'):

@@ -270,7 +270,25 @@ def format_clingen_data_for_llm(prescriptions: list) -> str:
     return "\n".join(lines)
 
 
-def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None) -> dict:
+def _language_directive(language: str) -> str:
+    """Appended to LLM prompts so the analysis VALUES are written in the user's UI
+    language, WITHOUT changing the JSON keys/structure (which the frontend parses)."""
+    if (language or 'en').strip().lower().startswith('ko'):
+        return (
+            "\n\nLANGUAGE REQUIREMENT: Write EVERY human-readable VALUE -- all table cell "
+            "contents (including the \"Feature\" column), the entire detailed_analysis report "
+            "(INCLUDING every Markdown section heading and title inside it -- translate those too), "
+            "and all questions and rationales -- in KOREAN (한국어), in professional clinical and "
+            "scientific Korean. BUT keep ALL JSON keys and the overall structure EXACTLY as "
+            "specified above, in English (e.g. \"summary_table\", \"detailed_analysis\", "
+            "\"Feature\", \"Finding\", \"Group 1\", \"clinical_questions\", \"group_label\", "
+            "\"suspected_driver\", \"rationale_hidden\"). Do NOT translate the keys. Keep gene "
+            "symbols (e.g. TP53), pathway names, and EFO/MONDO IDs in their original form."
+        )
+    return ""
+
+
+def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en') -> dict:
     """
     Generate comparative analysis with summary table and detailed analysis.
     Uses the exact prompt format specified.
@@ -331,7 +349,7 @@ EVIDENCE CALIBRATION (important):
 
 Do not include any text outside the JSON object."""
 
-    parsed = get_gemini_json(prompt, expect="object")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="object")
     if parsed and 'summary_table' in parsed and 'detailed_analysis' in parsed:
         return parsed
     if isinstance(parsed, dict):  # JSON came back but missing a key -> use what we got
@@ -343,7 +361,7 @@ Do not include any text outside the JSON object."""
     return None
 
 
-def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None) -> list:
+def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en') -> list:
     """
     Generate clinical interview questions for diagnosis.
     Returns a structured JSON array with group cards.
@@ -401,7 +419,7 @@ Generate exactly {num_groups} group objects, one for each prescription group.
 
 Do not include any text outside the JSON array."""
 
-    parsed = get_gemini_json(prompt, expect="array")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="array")
     if isinstance(parsed, list) and parsed:
         return parsed
     return None
@@ -435,7 +453,7 @@ def extract_json_array_from_response(text: str) -> list:
         return None
 
 
-def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, clingen_context: str = None) -> dict:
+def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en') -> dict:
     """
     Generate analysis for a single prescription (when only one Rx is provided).
     """
@@ -481,7 +499,7 @@ EVIDENCE CALIBRATION (important):
 
 Do not include any text outside the JSON object."""
 
-    parsed = get_gemini_json(prompt, expect="object")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="object")
     if parsed and 'summary_table' in parsed and 'detailed_analysis' in parsed:
         return parsed
     if isinstance(parsed, dict):
@@ -493,7 +511,7 @@ Do not include any text outside the JSON object."""
     return None
 
 
-def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None) -> list:
+def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en') -> list:
     """
     Generate clinical questions for a single prescription.
     Returns a structured JSON array with one group card.
@@ -541,7 +559,7 @@ Example Structure:
 
 Do not include any text outside the JSON array."""
 
-    parsed = get_gemini_json(prompt, expect="array")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="array")
     if isinstance(parsed, list) and parsed:
         return parsed
     return None
@@ -565,7 +583,7 @@ def _flatten_rx_enrichment(rx_data):
     return terms
 
 
-def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
+def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 'en') -> dict:
     """
     Generate complete AI analysis with:
     - summary_table: Comparison table data
@@ -614,7 +632,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
         if prescription_data:
             print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
             # Generate comparative analysis
-            analysis = generate_comparative_analysis(disease_name, prescription_data, clingen_context)
+            analysis = generate_comparative_analysis(disease_name, prescription_data, clingen_context, language)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -625,7 +643,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
                 print("[LLM] Comparative analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_clinical_questions(disease_name, prescription_data, clingen_context)
+            clinical = generate_clinical_questions(disease_name, prescription_data, clingen_context, language)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -640,7 +658,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
         
         if rx_data:
             # Generate single analysis
-            analysis = generate_single_prescription_analysis(disease_name, rx_data, clingen_context)
+            analysis = generate_single_prescription_analysis(disease_name, rx_data, clingen_context, language)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -650,7 +668,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
                 print("[LLM] Single prescription analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_single_clinical_questions(disease_name, rx_data, clingen_context)
+            clinical = generate_single_clinical_questions(disease_name, rx_data, clingen_context, language)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -667,13 +685,13 @@ def generate_full_ai_analysis(disease_name: str, results: dict) -> dict:
         
         if disgenet_results:
             print(f"[LLM] Using fallback enrichment data: {len(disgenet_results)} entries")
-            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, clingen_context)
+            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, clingen_context, language)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
             
-            clinical = generate_single_clinical_questions(disease_name, disgenet_results, clingen_context)
+            clinical = generate_single_clinical_questions(disease_name, disgenet_results, clingen_context, language)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:

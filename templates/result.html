@@ -1657,7 +1657,8 @@
                     body: JSON.stringify({
                         disease_name: resultsData.disease_name,
                         prescription_enrichments: prescriptionEnrichments,
-                        result_id: resultsData.result_id  // Pass result_id to save AI analysis
+                        result_id: resultsData.result_id,  // Pass result_id to save AI analysis
+                        language: (window.i18n && i18n.getLang) ? i18n.getLang() : 'en'
                     })
                 });
                 
