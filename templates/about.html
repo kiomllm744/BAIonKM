@@ -604,6 +604,77 @@
                 </div>
             </div>
 
+            <!-- Interactive: how disease search works (bilingual; text driven by JS) -->
+            <h2 class="section-title"><i class="fas fa-search"></i> <span id="xp-title"></span></h2>
+            <div class="card" style="margin-bottom: 40px;">
+                <div class="card-body">
+                    <style>
+                      .xp-intro{color:#64748b;margin-bottom:16px}
+                      .xp-searchbox{position:relative;max-width:520px}
+                      .xp-searchbox input{width:100%;padding:12px 14px 12px 40px;border:2px solid #e2e8f0;border-radius:12px;font-size:1rem;font-family:inherit;outline:none}
+                      .xp-searchbox input:focus{border-color:#6366f1}
+                      .xp-searchbox > i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8}
+                      .xp-chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 6px}
+                      .xp-chip{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:6px 13px;font-size:.8rem;font-weight:600;cursor:pointer;color:#334155;transition:.15s}
+                      .xp-chip small{color:#94a3b8;font-weight:500}
+                      .xp-chip:hover{border-color:#6366f1;color:#6366f1;background:#eef2ff}
+                      .xp-chip.on{background:#6366f1;border-color:#6366f1;color:#fff}
+                      .xp-chip.on small{color:#c7d2fe}
+                      .xp-pipe{display:flex;align-items:stretch;margin:16px 0 4px;overflow-x:auto;padding:6px 2px 12px}
+                      .xp-stage{flex:1;min-width:148px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:14px;padding:14px 12px;text-align:center;opacity:.4;transform:translateY(6px);transition:.45s cubic-bezier(.2,.7,.3,1);position:relative}
+                      .xp-stage.active{opacity:1;transform:translateY(0);box-shadow:0 8px 22px -12px rgba(99,102,241,.55)}
+                      .xp-ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin:0 auto 9px;font-size:1.2rem;background:#eef2ff;color:#6366f1}
+                      .xp-num{position:absolute;top:7px;left:9px;font-size:.7rem;font-weight:800;color:#94a3b8}
+                      .xp-t{font-weight:700;font-size:.9rem}
+                      .xp-d{font-size:.76rem;color:#64748b;margin-top:4px;min-height:32px}
+                      .xp-conn{flex:0 0 30px;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:1.3rem;transition:.4s}
+                      .xp-conn.active{color:#6366f1}
+                      #xp-s-umls.used{border-color:#10b981;background:#d1fae5}
+                      #xp-s-umls.used .xp-ic{background:#fff;color:#10b981}
+                      #xp-s-umls.skipped{border-style:dashed}
+                      #xp-s-umls.skipped .xp-ic{background:#f1f5f9;color:#94a3b8}
+                      .xp-badge{display:inline-block;margin-top:7px;font-size:.66rem;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px}
+                      .xp-badge.used{background:#10b981;color:#fff}
+                      .xp-badge.skipped{background:#e2e8f0;color:#64748b}
+                      #xp-s-genes.fail{border-color:#ef4444;background:#fee2e2}
+                      #xp-s-genes.fail .xp-ic{background:#fff;color:#ef4444}
+                      .xp-explain{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-top:4px}
+                      .xp-verdict{background:#6366f1;color:#fff;border-radius:12px;padding:12px 14px;min-width:140px;text-align:center}
+                      .xp-verdict.on{background:#10b981}.xp-verdict.fail{background:#ef4444}
+                      .xp-vlabel{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;opacity:.85}
+                      .xp-vval{font-weight:800;font-size:1rem;margin-top:2px}
+                      .xp-note{font-size:.92rem;color:#334155}
+                      .xp-resolved{margin-top:8px;font-size:.83rem;color:#475569}
+                      .xp-resolved code,.xp-note code{background:#eef2ff;color:#4f46e5;padding:2px 6px;border-radius:5px;font-weight:700}
+                      .xp-table{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:18px}
+                      .xp-table th,.xp-table td{text-align:left;padding:9px 11px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+                      .xp-table th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8}
+                      .xp-table td code{background:#f1f5f9;padding:2px 6px;border-radius:5px}
+                      .xp-tag{font-size:.68rem;font-weight:800;padding:2px 8px;border-radius:999px}
+                      .xp-tag.use{background:#d1fae5;color:#047857}.xp-tag.skip{background:#e2e8f0;color:#475569}
+                      @media(max-width:720px){.xp-explain{grid-template-columns:1fr}.xp-pipe{flex-direction:column}.xp-conn{transform:rotate(90deg);flex-basis:22px}}
+                    </style>
+                    <p class="xp-intro" id="xp-intro"></p>
+                    <div class="xp-searchbox"><i class="fas fa-search"></i><input id="xp-q" type="text" autocomplete="off"></div>
+                    <div class="xp-chips" id="xp-chips"></div>
+                    <div class="xp-pipe">
+                      <div class="xp-stage" id="xp-s-type"><span class="xp-num">1</span><div class="xp-ic">⌨️</div><div class="xp-t" id="xp-t-type"></div><div class="xp-d" id="xp-d-type"></div></div>
+                      <div class="xp-conn" id="xp-c1">→</div>
+                      <div class="xp-stage" id="xp-s-umls"><span class="xp-num">2</span><div class="xp-ic">🔁</div><div class="xp-t" id="xp-t-umls"></div><div class="xp-d" id="xp-d-umls"></div><span class="xp-badge" id="xp-badge"></span></div>
+                      <div class="xp-conn" id="xp-c2">→</div>
+                      <div class="xp-stage" id="xp-s-ot"><span class="xp-num">3</span><div class="xp-ic">🎯</div><div class="xp-t" id="xp-t-ot"></div><div class="xp-d" id="xp-d-ot"></div></div>
+                      <div class="xp-conn" id="xp-c3">→</div>
+                      <div class="xp-stage" id="xp-s-genes"><span class="xp-num">4</span><div class="xp-ic">🧬</div><div class="xp-t" id="xp-t-genes"></div><div class="xp-d" id="xp-d-genes"></div></div>
+                    </div>
+                    <div class="xp-explain">
+                      <div class="xp-verdict" id="xp-verdict"><div class="xp-vlabel" id="xp-vlabel"></div><div class="xp-vval" id="xp-vval"></div></div>
+                      <div><div class="xp-note" id="xp-note"></div><div class="xp-resolved" id="xp-resolved"></div></div>
+                    </div>
+                    <h3 id="xp-ref-title" style="margin-top:22px;font-size:1rem;"></h3>
+                    <table class="xp-table"><thead id="xp-thead"></thead><tbody id="xp-ref"></tbody></table>
+                </div>
+            </div>
+
             <!-- Tech Stack -->
             <h2 class="section-title"><i class="fas fa-code"></i> <span data-i18n="about.techStack">Technology Stack</span></h2>
             <div class="card" style="margin-bottom: 40px;">
@@ -662,6 +733,131 @@
         }
 
         document.addEventListener('DOMContentLoaded', loadStats);
+
+        // ---- Interactive "how disease search works" explainer (bilingual, self-contained) ----
+        (function(){
+          if(!document.getElementById('xp-q')) return;
+          function L(){ return (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'ko'; }
+          function tr(o){ return (o && o[L()] != null) ? o[L()] : (o ? o.en : ''); }
+          var T = {
+            title:{en:'How the disease search works',ko:'질병 검색은 어떻게 작동하나요'},
+            intro:{en:'Type anything, or tap an example — watch which path it takes, and exactly when UMLS is used (to translate your words into a standard medical name) versus skipped.',ko:'아무거나 입력하거나 예시를 눌러 보세요 — 입력이 어떤 경로를 거치는지, 그리고 UMLS가 언제 사용(여러분의 표현을 표준 의학 용어로 변환)되고 언제 건너뛰는지 보여줍니다.'},
+            ph:{en:'Type a disease… e.g. asthma, MI, heart attack',ko:'질병을 입력하세요… 예: asthma, MI, heart attack'},
+            sType:{en:'You type',ko:'입력'},sUmls:{en:'UMLS bridge',ko:'UMLS 브리지'},sOt:{en:'Open Targets',ko:'Open Targets'},sGenes:{en:'Genes ready',ko:'유전자 준비'},
+            vlabel:{en:'Router decision',ko:'라우터 판단'},
+            bUsed:{en:'UMLS USED',ko:'UMLS 사용'},bSkip:{en:'SKIPPED',ko:'건너뜀'},
+            refTitle:{en:'Every scenario at a glance',ko:'모든 시나리오 한눈에'},
+            cType:{en:'You type',ko:'입력'},cRouter:{en:'Router decides',ko:'라우터 판단'},cUmls:{en:'UMLS',ko:'UMLS'},cBecomes:{en:'Reaches Open Targets as',ko:'Open Targets 결과'},
+            otD:{en:'EFO ID + live genes',ko:'EFO ID + 실시간 유전자'},otDnone:{en:'no disease found',ko:'질병 없음'},
+            gD:{en:'feed the analysis',ko:'분석에 사용'},gDnone:{en:'unresolved → warning',ko:'미해결 → 경고'}
+          };
+          var SCN = {
+            asthma:{input:'asthma',kind:{en:'standard',ko:'표준명'},verdict:{en:'Local match',ko:'로컬 일치'},umls:'skip',
+              line:{en:'not needed — standard name',ko:'불필요 — 표준명'},
+              note:{en:'<b>"asthma"</b> is already a standard disease name, so the local catalogue (22,116 diseases) matches it instantly. <b>UMLS is skipped</b>.',ko:'<b>"asthma"</b>는 이미 표준 질병명이라 로컬 카탈로그(22,116개 질병)가 즉시 일치시킵니다. <b>UMLS는 건너뜁니다</b>.'},
+              res:{en:'Matched directly → <code>asthma · EFO_0000270</code>',ko:'직접 일치 → <code>asthma · EFO_0000270</code>'}},
+            mi:{input:'MI',kind:{en:'abbreviation',ko:'약어'},verdict:{en:'Abbreviation',ko:'약어'},umls:'use',
+              line:{en:'MI → Myocardial Infarction',ko:'MI → 심근경색'},
+              note:{en:'<b>"MI"</b> is a 2–3 letter abbreviation — too short for a reliable local match, so <b>UMLS is asked first</b> and standardizes MI → "Myocardial Infarction".',ko:'<b>"MI"</b>는 2–3글자 약어라 로컬 일치가 어려워 <b>UMLS를 먼저</b> 사용해 MI → "Myocardial Infarction(심근경색)"으로 표준화합니다.'},
+              res:{en:'UMLS standardized → <code>Myocardial Infarction · EFO_0000612</code>',ko:'UMLS 표준화 → <code>Myocardial Infarction · EFO_0000612</code>'}},
+            heart:{input:'heart attack',kind:{en:'lay synonym',ko:'일상 표현'},verdict:{en:'Lay synonym',ko:'일상 표현'},umls:'use',
+              line:{en:'heart attack → Myocardial Infarction',ko:'heart attack → 심근경색'},
+              note:{en:'<b>"heart attack"</b> is an everyday synonym with few direct hits, so <b>UMLS translates it</b> into "Myocardial Infarction" for Open Targets.',ko:'<b>"heart attack"</b>는 직접 일치가 적은 일상적 동의어라 <b>UMLS가</b> "Myocardial Infarction"으로 변환해 Open Targets에서 찾습니다.'},
+              res:{en:'UMLS standardized → <code>Myocardial Infarction · EFO_0000612</code>',ko:'UMLS 표준화 → <code>Myocardial Infarction · EFO_0000612</code>'}},
+            sugar:{input:'high blood sugar',kind:{en:'lay phrase',ko:'일상 표현'},verdict:{en:'Lay phrase',ko:'일상 표현'},umls:'use',
+              line:{en:'high blood sugar → Hyperglycemia',ko:'high blood sugar → 고혈당'},
+              note:{en:'<b>"high blood sugar"</b> is a clinical phrase, not an ontology name. <b>UMLS</b> maps it to "Hyperglycemia" / diabetes concepts.',ko:'<b>"high blood sugar"</b>는 온톨로지 명칭이 아닌 임상 표현입니다. <b>UMLS</b>가 "Hyperglycemia(고혈당)" / 당뇨 개념으로 매핑합니다.'},
+              res:{en:'UMLS standardized → <code>Hyperglycemia</code> → diabetes',ko:'UMLS 표준화 → <code>Hyperglycemia</code> → 당뇨'}},
+            efo:{input:'EFO_0000270',kind:{en:'raw ID',ko:'원시 ID'},verdict:{en:'Raw ID',ko:'원시 ID'},umls:'skip',
+              line:{en:'bypassed — ID given directly',ko:'우회 — ID 직접 입력'},
+              note:{en:'You entered a raw <b>Open Targets ID</b>. The app uses it <b>directly</b> — no local search, no UMLS.',ko:'<b>Open Targets ID</b>를 직접 입력했습니다. 앱은 이를 <b>그대로 사용</b>합니다 — 로컬 검색·UMLS 없음.'},
+              res:{en:'Used directly → <code>EFO_0000270</code> (asthma)',ko:'직접 사용 → <code>EFO_0000270</code> (asthma)'}},
+            typo:{input:'diabetis',kind:{en:'typo',ko:'오타'},verdict:{en:'Typo → corrected',ko:'오타 → 교정'},umls:'skip',
+              line:{en:'not needed — typo fixed locally',ko:'불필요 — 로컬에서 오타 교정'},
+              note:{en:'<b>"diabetis"</b> is misspelled. The direct match fails, so a <b>typo-correcting</b> pass finds "diabetes".',ko:'<b>"diabetis"</b>는 오타입니다. 직접 일치가 실패하면 <b>오타 교정</b> 단계가 "diabetes"를 찾습니다.'},
+              res:{en:'Typo-corrected → <code>diabetes mellitus</code>',ko:'오타 교정 → <code>diabetes mellitus</code>'}},
+            none:{input:'qwerty',kind:{en:'no match',ko:'일치 없음'},verdict:{en:'Unresolved',ko:'미해결'},umls:'use',
+              line:{en:'tried — no concept found',ko:'시도 — 개념 없음'},
+              note:{en:'<b>"qwerty"</b> matches nothing locally, and <b>UMLS finds no concept</b> → unresolved, and the analysis warns you.',ko:'<b>"qwerty"</b>는 로컬에서 일치하지 않고 <b>UMLS도 개념을 찾지 못합니다</b> → 미해결, 분석에서 경고가 표시됩니다.'},
+              res:{en:'No match → "No genes found"',ko:'일치 없음 → "유전자 없음"'}}
+          };
+          var ORDER=['asthma','mi','heart','sugar','efo','typo','none'];
+          var cur='mi', curText='MI';
+          function dyn(key,text){
+            if(key==='abbrevDyn') return {input:text,verdict:{en:'Abbreviation',ko:'약어'},umls:'use',line:{en:'asked UMLS to expand',ko:'UMLS로 확장'},note:{en:'<b>"'+text+'"</b> is short (≤3 letters) — likely an abbreviation, so <b>UMLS is asked first</b> to expand it into a full disease name.',ko:'<b>"'+text+'"</b>는 짧아(≤3글자) 약어일 가능성이 높아 <b>UMLS를 먼저</b> 사용해 전체 질병명으로 확장합니다.'},res:{en:'UMLS expands it, then Open Targets resolves it',ko:'UMLS가 확장한 뒤 Open Targets가 해석'}};
+            if(key==='normalDyn') return {input:text,verdict:{en:'Local match',ko:'로컬 일치'},umls:'skip',line:{en:'not needed — looks standard',ko:'불필요 — 표준으로 보임'},note:{en:'<b>"'+text+'"</b> looks like a standard disease name, so the local catalogue is searched directly. <b>UMLS is skipped</b> unless results are sparse.',ko:'<b>"'+text+'"</b>는 표준 질병명처럼 보여 로컬 카탈로그를 직접 검색합니다. 결과가 적지 않으면 <b>UMLS는 건너뜁니다</b>.'},res:{en:'Searched directly in the local catalogue → Open Targets',ko:'로컬 카탈로그 직접 검색 → Open Targets'}};
+            return {input:text,verdict:{en:'Local + UMLS backup',ko:'로컬 + UMLS 보조'},umls:'use',line:{en:'used to widen the search',ko:'검색 확장에 사용'},note:{en:'<b>"'+text+'"</b> is searched locally first; since it isn\'t an obvious standard name, <b>UMLS is also queried</b> to catch synonyms/abbreviations.',ko:'<b>"'+text+'"</b>는 먼저 로컬에서 검색하고, 명확한 표준명이 아니므로 <b>UMLS도 조회</b>하여 동의어/약어를 포착합니다.'},res:{en:'Local search + UMLS synonyms → Open Targets',ko:'로컬 검색 + UMLS 동의어 → Open Targets'}};
+          }
+          function classify(t){
+            var low=(t||'').trim().toLowerCase(); if(!low) return null;
+            if(/^(efo|mondo|orphanet|hp|doid|ncit)[_:]/i.test(low)) return 'efo';
+            for(var i=0;i<ORDER.length;i++){ if(SCN[ORDER[i]].input.toLowerCase()===low) return ORDER[i]; }
+            if(low==='heart attack') return 'heart';
+            if(low.indexOf('sugar')>=0) return 'sugar';
+            if(low.length<=3) return 'abbrevDyn';
+            if(/(itis|osis|emia|pathy|diabet|cancer|asthma|disease|syndrome|arthritis)/.test(low)) return 'normalDyn';
+            return 'maybeDyn';
+          }
+          function el(id){ return document.getElementById(id); }
+          function buildChips(){
+            var c=el('xp-chips'); c.innerHTML='';
+            ORDER.forEach(function(k){
+              var s=SCN[k], b=document.createElement('button');
+              b.className='xp-chip'+(k===cur?' on':''); b.setAttribute('data-k',k);
+              b.innerHTML=s.input+' <small>· '+tr(s.kind)+'</small>';
+              b.onclick=function(){ el('xp-q').value=s.input; run(k); };
+              c.appendChild(b);
+            });
+          }
+          function buildTable(){
+            el('xp-thead').innerHTML='<tr><th>'+tr(T.cType)+'</th><th>'+tr(T.cRouter)+'</th><th>'+tr(T.cUmls)+'</th><th>'+tr(T.cBecomes)+'</th></tr>';
+            var body=el('xp-ref'); body.innerHTML='';
+            ORDER.forEach(function(k){
+              var s=SCN[k], row=document.createElement('tr');
+              var becomes=tr(s.res).replace(/^[^→]*→\s*/,'');
+              row.innerHTML='<td><code>'+s.input+'</code></td><td>'+tr(s.verdict)+'</td><td><span class="xp-tag '+(s.umls==='use'?'use':'skip')+'">'+(s.umls==='use'?tr(T.bUsed):tr(T.bSkip))+'</span></td><td>'+becomes+'</td>';
+              body.appendChild(row);
+            });
+          }
+          function setStatic(){
+            el('xp-title').textContent=tr(T.title); el('xp-intro').textContent=tr(T.intro);
+            el('xp-q').setAttribute('placeholder',tr(T.ph));
+            el('xp-t-type').textContent=tr(T.sType); el('xp-t-umls').textContent=tr(T.sUmls);
+            el('xp-t-ot').textContent=tr(T.sOt); el('xp-t-genes').textContent=tr(T.sGenes);
+            el('xp-vlabel').textContent=tr(T.vlabel); el('xp-ref-title').textContent=tr(T.refTitle);
+          }
+          var timers=[];
+          function run(key,dynText,instant){
+            cur=key; curText=dynText||(SCN[key]?SCN[key].input:dynText)||'';
+            timers.forEach(clearTimeout); timers=[];
+            var s=SCN[key]||dyn(key,dynText||'');
+            ['xp-s-type','xp-s-umls','xp-s-ot','xp-s-genes'].forEach(function(id){ el(id).className='xp-stage'; });
+            ['xp-c1','xp-c2','xp-c3'].forEach(function(id){ el(id).classList.remove('active'); });
+            document.querySelectorAll('.xp-chip').forEach(function(c){ c.classList.toggle('on',c.getAttribute('data-k')===key); });
+            var v=el('xp-verdict'); v.className='xp-verdict'+(s.umls==='use'?' on':'')+(key==='none'?' fail':'');
+            var steps=[
+              function(){ el('xp-s-type').classList.add('active'); el('xp-d-type').textContent='"'+s.input+'"'; },
+              function(){ el('xp-c1').classList.add('active'); },
+              function(){ var u=el('xp-s-umls'),b=el('xp-badge'); u.classList.add('active');
+                if(s.umls==='use'){ u.classList.add('used'); b.className='xp-badge used'; b.textContent=tr(T.bUsed); }
+                else{ u.classList.add('skipped'); b.className='xp-badge skipped'; b.textContent=tr(T.bSkip); }
+                el('xp-d-umls').textContent=tr(s.line); },
+              function(){ el('xp-c2').classList.add('active'); },
+              function(){ el('xp-s-ot').classList.add('active'); el('xp-d-ot').textContent=(key==='none'?tr(T.otDnone):tr(T.otD)); },
+              function(){ el('xp-c3').classList.add('active'); },
+              function(){ var g=el('xp-s-genes'); g.classList.add('active'); if(key==='none'){ g.classList.add('fail'); g.querySelector('.xp-ic').textContent='⚠️'; el('xp-d-genes').textContent=tr(T.gDnone); } else { g.querySelector('.xp-ic').textContent='🧬'; el('xp-d-genes').textContent=tr(T.gD); } },
+              function(){ el('xp-vval').textContent=tr(s.verdict); el('xp-note').innerHTML=tr(s.note); el('xp-resolved').innerHTML=tr(s.res); }
+            ];
+            if(instant){ steps.forEach(function(fn){ fn(); }); }
+            else { steps.forEach(function(fn,i){ timers.push(setTimeout(fn,i*380)); }); }
+          }
+          function rebuild(instant){ setStatic(); buildChips(); buildTable(); run(cur,curText,instant!==false); }
+          var dt;
+          el('xp-q').addEventListener('input',function(){ clearTimeout(dt); var val=this.value; dt=setTimeout(function(){ var k=classify(val); if(k) run(k,val); },420); });
+          document.addEventListener('langchange',function(){ rebuild(true); });
+          // initial paint (animated)
+          el('xp-q').value='MI'; setStatic(); buildChips(); buildTable(); run('mi');
+        })();
     </script>
 </body>
 </html>
