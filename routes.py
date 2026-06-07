@@ -559,6 +559,41 @@ def _blend_open_targets_relevance(query, local):
     return blended
 
 
+def _umls_open_targets_bridge(query):
+    """Last-resort, STRICTLY ADDITIVE autocomplete help. Runs only when every other
+    path (catalogue + UMLS-against-catalogue + typo correction + OT raw-text
+    relevance) found NOTHING. It tries the top UMLS-standardized names against
+    Open Targets' live search -- the same exact-resolution call the analysis
+    resolver uses -- and returns the diseases they resolve to (with real EFO IDs).
+
+    This surfaces lay phrases like "tummy ache" -> dyspepsia, where the raw text
+    matches neither the catalogue nor OT's text search, but a UMLS synonym
+    ("Stomach ache") does. Because these are exact, high-confidence resolutions
+    (a real EFO id), they bypass the fuzzy token-overlap filter that (correctly)
+    rejects them as loose name suggestions. Cached + trait-filtered + fail-safe;
+    never affects a query that already returns results."""
+    try:
+        from opentargets_service import search_disease_efo_id, looks_like_disease
+        cands = candidate_names_for_open_targets(query, limit=4)
+    except Exception as exc:
+        print(f"[autocomplete] UMLS->OT bridge failed: {exc}")
+        return []
+    seen, out = set(), []
+    for cand in cands:
+        nm = (cand.get('name') if isinstance(cand, dict) else cand) or ''
+        if not nm or nm.lower() == query.lower():
+            continue  # skip the raw text -- it already failed every earlier path
+        try:
+            m = search_disease_efo_id(nm)
+        except Exception:
+            m = None
+        if m and m.get('efo_id') and m['efo_id'] not in seen \
+                and looks_like_disease(m['efo_id'], m.get('name', '')):
+            seen.add(m['efo_id'])
+            out.append({'name': m['name'], 'id': m['efo_id']})
+    return out
+
+
 @main_bp.route('/api/diseases')
 def get_disease_suggestions():
     """Disease autocomplete.
@@ -617,6 +652,15 @@ def get_disease_suggestions():
                 if out:
                     out = _blend_open_targets_relevance(query, out)
                     return jsonify(out[:Config.MAX_SUGGESTIONS])
+
+                # Still nothing: a lay phrase ("tummy ache") that matches neither the
+                # catalogue nor OT's raw-text search, but whose UMLS-standardized
+                # name resolves at Open Targets ("Stomach ache" -> dyspepsia).
+                # Strictly additive -- runs ONLY when every other path found nothing,
+                # so no query that already works is affected.
+                bridged = _umls_open_targets_bridge(query)
+                if bridged:
+                    return jsonify(bridged[:Config.MAX_SUGGESTIONS])
         finally:
             session.close()
 
