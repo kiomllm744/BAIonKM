@@ -374,6 +374,47 @@ def get_disease_suggestions_online(query_str, limit=15):
         return []
 
 
+def ranked_disease_search(query_str, limit=15):
+    """Open Targets disease search returning relevance-ranked [{'name','id'}] hits,
+    cached (15 days). Used to reorder local autocomplete suggestions by Open
+    Targets' own relevance (so e.g. 'type 2 diabetes mellitus' floats up over
+    obscure subtypes). Short timeout + returns [] on any failure, so callers can
+    fall back to local ordering without hanging."""
+    query_str = (query_str or '').strip()
+    if not query_str:
+        return []
+    cache_q = f"{query_str}|{limit}"
+    session = Session()
+    try:
+        cached = _get_cached_response(session, 'opentargets_suggest', cache_q)
+        if cached is not None:
+            return cached
+        query = """
+        query rankedDiseaseSearch($q: String!, $size: Int!) {
+          search(queryString: $q, entityNames: ["disease"], page: {index: 0, size: $size}) {
+            hits { id name }
+          }
+        }
+        """
+        response = requests.post(
+            Config.OPENTARGETS_API_URL,
+            json={"query": query, "variables": {"q": query_str, "size": limit}},
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+            verify=Config.EXTERNAL_API_VERIFY_SSL,
+        )
+        response.raise_for_status()
+        hits = (response.json().get("data", {}).get("search", {}) or {}).get("hits", [])
+        out = [{"name": h["name"], "id": h["id"]} for h in hits if h.get("name") and h.get("id")]
+        _save_cached_response(session, 'opentargets_suggest', cache_q, out)
+        return out
+    except Exception as exc:
+        print(f"[OpenTargets] ranked suggest failed for '{query_str}': {exc}")
+        return []
+    finally:
+        session.close()
+
+
 def search_diseases_multi_online(query_str, limit=15, page_index=0):
     """
     Search Open Targets for diseases matching query_str (paginated).

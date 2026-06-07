@@ -520,6 +520,40 @@ def _local_disease_match(session, term, limit, correct=False):
     return pool[:limit]
 
 
+def _blend_open_targets_relevance(query, local):
+    """Reorder local autocomplete suggestions by Open Targets' own relevance
+    ranking (OT is purpose-built for "which disease did they mean", so it floats
+    the prominent disease — e.g. type 2 diabetes mellitus — above obscure
+    subtypes), then append any local-only extras. Cached + fail-safe: if Open
+    Targets is slow/unavailable it returns the local order unchanged, so
+    autocomplete never hangs or breaks."""
+    try:
+        from opentargets_service import ranked_disease_search
+        ot = ranked_disease_search(query, limit=Config.MAX_SUGGESTIONS)
+        if not ot and local:
+            # OT couldn't match the raw text (e.g. a typo like "diabetis"); seed it
+            # with our best local (typo-corrected) match so OT can still
+            # relevance-rank the family ("diabetes mellitus" -> type 2 DM, ...).
+            ot = ranked_disease_search(local[0].get('name', ''), limit=Config.MAX_SUGGESTIONS)
+    except Exception:
+        ot = []
+    if not ot:
+        return local
+    seen, blended = set(), []
+    for item in ot:
+        nm = item.get('name') or ''
+        k = nm.lower()
+        if nm and k not in seen:
+            seen.add(k)
+            blended.append({'name': nm, 'id': item.get('id')})
+    for item in local:
+        k = (item.get('name') or '').lower()
+        if k and k not in seen:
+            seen.add(k)
+            blended.append(item)
+    return blended
+
+
 @main_bp.route('/api/diseases')
 def get_disease_suggestions():
     """Disease autocomplete.
@@ -576,6 +610,7 @@ def get_disease_suggestions():
                     _add(_local_disease_match(session, query, Config.MAX_SUGGESTIONS, correct=True))
 
                 if out:
+                    out = _blend_open_targets_relevance(query, out)
                     return jsonify(out[:Config.MAX_SUGGESTIONS])
         finally:
             session.close()
