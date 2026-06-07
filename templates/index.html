@@ -128,27 +128,10 @@
                     </div>
                 </section>
 
-                <!-- Enrichment library selection -->
-                <section class="card" style="margin-top: 20px;">
-                    <div class="card-header">
-                        <i class="fas fa-chart-bar"></i>
-                        <h2 data-i18n="index.enrichmentLibs">Enrichment Libraries</h2>
-                    </div>
-                    <div class="card-body">
-                        <p class="form-hint" style="margin-bottom: 14px;">
-                            <i class="fas fa-info-circle"></i>
-                            <span data-i18n="index.enrichmentHint">Choose which gene-set libraries to enrich the common genes against. Pathway libraries (KEGG, Reactome, GO) reveal mechanism; DisGeNET maps the genes back to diseases.</span>
-                        </p>
-                        <div class="lib-options">
-                            {% for opt in enrichment_options or [] %}
-                            <label class="lib-option">
-                                <input type="checkbox" name="enrichment_libraries" value="{{ opt.value }}"{% if opt.default %} checked{% endif %}>
-                                <span>{{ opt.label }}</span>
-                            </label>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </section>
+                <!-- Enrichment libraries are chosen from the top-bar "Libraries" menu
+                     (default: DisGeNET). The selection is injected here as hidden
+                     inputs on submit so the form still posts enrichment_libraries. -->
+                <div id="enrich-libs-hidden" style="display:none;"></div>
 
                 <!-- Hidden input for herbs data -->
                 <input type="hidden" name="herbs_data" id="herbs-data-input">
@@ -175,5 +158,26 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Inject the top-bar "Libraries" selection into the analysis form on submit.
+        // The picker lives in the shared top bar and exposes window.getEnrichmentLibraries().
+        // An empty selection posts nothing -> the server falls back to the default (DisGeNET).
+        (function(){
+            var form = document.getElementById('analysis-form');
+            var holder = document.getElementById('enrich-libs-hidden');
+            if (!form || !holder) return;
+            form.addEventListener('submit', function(){
+                holder.innerHTML = '';
+                var libs = (typeof window.getEnrichmentLibraries === 'function') ? window.getEnrichmentLibraries() : [];
+                libs.forEach(function(v){
+                    var inp = document.createElement('input');
+                    inp.type = 'hidden';
+                    inp.name = 'enrichment_libraries';
+                    inp.value = v;
+                    holder.appendChild(inp);
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

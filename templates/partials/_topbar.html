@@ -42,6 +42,23 @@
             </div>
         </div>
     </div>
+    <div class="lib-picker" id="lib-picker">
+        <button type="button" class="lib-picker-btn" id="lib-picker-btn" aria-haspopup="true" aria-expanded="false" data-i18n-title="lib.title" title="Enrichment libraries">
+            <i class="fas fa-layer-group"></i>
+            <span data-i18n="nav.libraries">Libraries</span>
+            <span class="lib-badge" id="lib-picker-count"></span>
+        </button>
+        <div class="lib-menu" id="lib-picker-menu" hidden>
+            <div class="lib-menu-title" data-i18n="lib.title">Enrichment libraries</div>
+            {% for opt in enrichment_options or [] %}
+            <label class="lib-menu-opt">
+                <input type="checkbox" class="lib-opt" value="{{ opt.value }}" data-default="{{ '1' if opt.default else '0' }}">
+                <span>{{ opt.label }}</span>
+            </label>
+            {% endfor %}
+            <div class="lib-menu-hint" data-i18n="lib.hint">Sent to Enrichr. If none are selected, DisGeNET is used.</div>
+        </div>
+    </div>
     <button type="button" id="lang-toggle" class="lang-toggle" aria-label="Switch language">
         <span data-lang="en">EN</span>
         <span class="lang-sep">|</span>
@@ -65,4 +82,37 @@
         </a>
         {% endif %}
     </div>
+    <script>
+        // Top-bar enrichment-library picker. Persists the selection in localStorage and
+        // exposes window.getEnrichmentLibraries() for the analysis form (index.html).
+        (function(){
+            var KEY = 'baionkm.enrichLibs';
+            var picker = document.getElementById('lib-picker');
+            if (!picker) return;
+            var btn = document.getElementById('lib-picker-btn');
+            var menu = document.getElementById('lib-picker-menu');
+            var countEl = document.getElementById('lib-picker-count');
+            var boxes = Array.prototype.slice.call(picker.querySelectorAll('.lib-opt'));
+            var saved = null;
+            try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
+            boxes.forEach(function(b){
+                b.checked = Array.isArray(saved) ? saved.indexOf(b.value) >= 0 : (b.getAttribute('data-default') === '1');
+            });
+            function selected(){ return boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; }); }
+            function updateCount(){ if (countEl) { var n = selected().length; countEl.textContent = n ? String(n) : ''; } }
+            function persist(){ try { localStorage.setItem(KEY, JSON.stringify(selected())); } catch (e) {} updateCount(); }
+            window.getEnrichmentLibraries = selected;
+            boxes.forEach(function(b){ b.addEventListener('change', persist); });
+            if (Array.isArray(saved)) { updateCount(); } else { persist(); }
+            btn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var show = menu.hidden;
+                menu.hidden = !show;
+                btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+            });
+            document.addEventListener('click', function(e){
+                if (!picker.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+            });
+        })();
+    </script>
 </aside>
