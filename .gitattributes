@@ -1,0 +1,17 @@
+# Normalize line endings to LF in the repository for ALL text files.
+# This prevents the CRLF/LF churn that otherwise shows every file as "modified"
+# when the repo is opened on both Windows (office) and macOS (home).
+* text=auto eol=lf
+
+# Windows batch scripts must keep CRLF to run correctly.
+*.bat text eol=crlf
+
+# Treat these as binary so git never tries to normalize them.
+*.db   binary
+*.xlsx binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
