@@ -768,13 +768,13 @@
             otCount:{en:'{n} disease(s) · ranked + filtered',ko:'질병 {n}개 · 순위화 + 필터링'},
             colName:{en:'Disease name',ko:'질병명'},colId:{en:'Open Targets ID',ko:'Open Targets ID'},
             checking:{en:'checking…',ko:'확인 중…'},
-            vRaw:{en:'Raw ID',ko:'원시 ID'},vLocal:{en:'Direct match',ko:'직접 일치'},vUmls:{en:'Via UMLS',ko:'UMLS 경유'},vNone:{en:'Unresolved',ko:'미해결'},
+            vRaw:{en:'Raw ID',ko:'원시 ID'},vLocal:{en:'Catalogue match',ko:'카탈로그 일치'},vDirect:{en:'Open Targets direct',ko:'Open Targets 직접'},vUmls:{en:'Via UMLS',ko:'UMLS 경유'},vNone:{en:'Unresolved',ko:'미해결'},
             umlsRaw:{en:'bypassed — ID given directly',ko:'우회 — ID 직접 입력'},umlsOff:{en:'UMLS not configured',ko:'UMLS 미설정'},umlsNone:{en:'no UMLS concept',ko:'UMLS 개념 없음'},
             otNone:{en:'no disease found',ko:'질병 없음'},gReady:{en:'genes available',ko:'유전자 사용 가능'},gNone:{en:'unresolved → warning',ko:'미해결 → 경고'},
             noMatches:{en:'No matching disease found.',ko:'일치하는 질병이 없습니다.'},
             noteRaw:{en:'You entered a raw <b>Open Targets ID</b> — used directly, no name resolution.',ko:'<b>Open Targets ID</b>를 직접 입력했습니다 — 이름 해석 없이 그대로 사용합니다.'}
           };
-          var EXAMPLES=['asthma','MI','heart attack','high blood sugar','bad digestion','diabetis','EFO_0000270'];
+          var EXAMPLES=['asthma','MI','tummy ache','high blood sugar','bad digestion','diabetis','EFO_0000270'];
           var enc=encodeURIComponent;
           function el(id){ return document.getElementById(id); }
           function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
@@ -826,36 +826,43 @@
               body.appendChild(row);
             });
           }
-          function buildNote(text,isRaw,umlsAvail,topName,icd,used,match,resolved){
+          function buildNote(text,isRaw,src,trace,umls){
             if(isRaw) return tr(T.noteRaw);
-            var m = match ? ('<b>'+esc(match.name)+'</b>'+(match.id?(' (<code>'+esc(match.id)+'</code>)'):'')) : '';
-            if(!resolved){
-              var u = umlsAvail ? (topName?'':(L()==='ko'?', UMLS 개념도 없음':', and no UMLS concept')) : (L()==='ko'?' (UMLS 미설정)':' (UMLS off)');
-              return (L()==='ko')
-                ? '일치하는 질병이 없습니다 — 로컬 카탈로그에 없음'+u+'. 분석에서는 경고가 표시됩니다. (더 표준적인 이름을 쓰거나, 이런 일상 표현은 Gemini 폴백이 해결할 수 있는 지점입니다.)'
-                : 'No disease matched — not in the local catalogue'+u+'. The analysis would warn you. (Try a more standard name — or this is exactly where a Gemini fallback would help.)';
+            var nm=trace&&trace.name, id=trace&&trace.efo_id, mi=trace&&trace.matched_input;
+            var m = nm ? ('<b>'+esc(nm)+'</b>'+(id?(' (<code>'+esc(id)+'</code>)'):'')) : '';
+            if(src==='catalogue_exact'){
+              return (L()==='ko') ? '로컬 카탈로그에서 '+m+'에 정확히 일치 — Open Targets 검색이나 UMLS가 필요하지 않았습니다.'
+                                  : 'Exact match in the local catalogue → '+m+'. No Open Targets search or UMLS needed.';
             }
-            if(used){
-              var icdTxt = icd ? (' <small>(ICD-10 '+esc(icd)+')</small>') : '';
-              return (L()==='ko')
-                ? 'UMLS가 입력을 <b>'+esc(topName)+'</b>'+icdTxt+'(으)로 이해했고, Open Targets가 '+m+'에 일치시켰습니다.'
-                : 'UMLS understood your text as <b>'+esc(topName)+'</b>'+icdTxt+', which Open Targets matched to '+m+'.';
+            if(src==='user_input'){
+              return (L()==='ko') ? 'Open Targets가 입력하신 <code>'+esc(text)+'</code>을(를) <b>직접</b> '+m+'(으)로 해석했습니다. UMLS는 필요하지 않았습니다.'
+                                  : 'Open Targets resolved your text <code>'+esc(text)+'</code> <b>directly</b> → '+m+'. UMLS wasn’t needed.';
+            }
+            if(src==='umls'){
+              var icd='', cs=(umls&&umls.concepts)||[];
+              for(var i=0;i<cs.length;i++){ var cn=cs[i].preferred_name||cs[i].name||''; if(mi&&cn.toLowerCase()===String(mi).toLowerCase()&&cs[i].icd10){ icd=cs[i].icd10; break; } }
+              var icdTxt=icd?(' <small>(ICD-10 '+esc(icd)+')</small>'):'';
+              return (L()==='ko') ? 'Open Targets가 입력 텍스트를 인식하지 못했지만, UMLS가 <b>'+esc(mi)+'</b>'+icdTxt+'(으)로 표준화하여 '+m+'에 일치시켰습니다.'
+                                  : 'Open Targets couldn’t match your text, but UMLS standardized it to <b>'+esc(mi)+'</b>'+icdTxt+', which matched '+m+'.';
             }
             return (L()==='ko')
-              ? '로컬 카탈로그에서 '+m+'에 직접 일치했습니다. UMLS는 필요하지 않았습니다.'
-              : 'Matched directly in the local catalogue → '+m+'. UMLS wasn\'t needed here.';
+              ? '일치하는 질병이 없습니다 — 카탈로그·Open Targets·UMLS 모두 해결하지 못함. 분석에서는 경고가 표시됩니다. (이런 일상 표현은 Gemini 폴백이 해결할 수 있는 지점입니다.)'
+              : 'No disease matched — not resolved by the catalogue, Open Targets, or UMLS. The analysis would warn you. (This lay-phrase case is exactly where a Gemini fallback would help.)';
           }
           var timers=[], reqId=0, lastText='asthma';
-          function animate(text,isRaw,umls,sugg){
+          function animate(text,isRaw,umls,sugg,trace){
             var concepts=(umls&&umls.concepts)||[];
             var umlsAvail=!!(umls&&umls.umls_available);
             var top=concepts[0];
             var topName=top&&(top.preferred_name||top.name);
             var icd=top&&top.icd10;
-            var used=!isRaw && !!topName && topName.toLowerCase()!==text.trim().toLowerCase();
-            var match=sugg[0];
-            var resolved=isRaw || !!match;
-            var verdict=isRaw?tr(T.vRaw):(!resolved?tr(T.vNone):(used?tr(T.vUmls):tr(T.vLocal)));
+            // Precise outcome from the REAL resolver (/api/resolve-trace): WHO resolved it.
+            var src=trace&&trace.match_source;   // catalogue_exact | user_input | umls | unresolved
+            if(!src && !isRaw){ src = sugg[0] ? ((topName && topName.toLowerCase()!==text.trim().toLowerCase())?'umls':'user_input') : 'unresolved'; }
+            var used=src==='umls';
+            var resolved=isRaw || src==='user_input' || src==='umls' || src==='catalogue_exact';
+            var match=isRaw?null:((trace&&trace.efo_id)?{name:trace.name,id:trace.efo_id}:(resolved?sugg[0]:null));
+            var verdict=isRaw?tr(T.vRaw):(src==='umls'?tr(T.vUmls):(src==='user_input'?tr(T.vDirect):(src==='catalogue_exact'?tr(T.vLocal):tr(T.vNone))));
             timers.forEach(clearTimeout); timers=[];
             var steps=[
               function(){ var u=el('xp-s-umls'),b=el('xp-badge'); u.className='xp-stage active '+(used?'used':'skipped');
@@ -865,8 +872,8 @@
               function(){ el('xp-s-ot').className='xp-stage active'; el('xp-d-ot').textContent=isRaw?text:(match?((match.name||'')+(match.id?(' · '+match.id):'')):tr(T.otNone)); },
               function(){ el('xp-c3').classList.add('active'); },
               function(){ var g=el('xp-s-genes'); g.className='xp-stage active'+(resolved?'':' fail'); g.querySelector('.xp-ic').textContent=resolved?'🧬':'⚠️'; el('xp-d-genes').textContent=resolved?tr(T.gReady):tr(T.gNone); },
-              function(){ var v=el('xp-verdict'); v.className='xp-verdict'+(used?' on':'')+(!resolved?' fail':''); el('xp-vval').textContent=verdict;
-                el('xp-note').innerHTML=buildNote(text,isRaw,umlsAvail,topName,icd,used,match,resolved); el('xp-resolved').innerHTML='';
+              function(){ var v=el('xp-verdict'); v.className='xp-verdict'+(!resolved?' fail':(isRaw?'':' on')); el('xp-vval').textContent=verdict;
+                el('xp-note').innerHTML=buildNote(text,isRaw,src,trace,umls); el('xp-resolved').innerHTML='';
                 el('xp-ref-title').textContent=tr(T.matchesTitle)+(isRaw?'':(' · '+fmt(T.otCount,{n:sugg.length})));
                 fillMatches(sugg,isRaw,text); fillTrace(umls,isRaw); }
             ];
@@ -885,7 +892,8 @@
             el('xp-vval').textContent='…'; el('xp-note').textContent=''; el('xp-resolved').textContent=''; var _tb=el('xp-trace'); if(_tb) _tb.style.display='none';
             var pU = isRaw ? Promise.resolve(null) : fetch('/api/translate-symptoms?q='+enc(text)).then(function(r){return r.json();}).catch(function(){return null;});
             var pS = fetch('/api/diseases?q='+enc(text)).then(function(r){return r.json();}).catch(function(){return [];});
-            Promise.all([pU,pS]).then(function(p){ if(my!==reqId) return; animate(text,isRaw,p[0],Array.isArray(p[1])?p[1]:[]); });
+            var pT = isRaw ? Promise.resolve(null) : fetch('/api/resolve-trace?q='+enc(text)).then(function(r){return r.json();}).catch(function(){return null;});
+            Promise.all([pU,pS,pT]).then(function(p){ if(my!==reqId) return; animate(text,isRaw,p[0],Array.isArray(p[1])?p[1]:[],p[2]); });
           }
           var dt;
           el('xp-q').addEventListener('input',function(){ clearTimeout(dt); var val=this.value; dt=setTimeout(function(){ liveSearch(val); },480); });

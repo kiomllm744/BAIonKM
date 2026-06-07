@@ -677,6 +677,30 @@ def translate_symptoms():
     return jsonify(payload)
 
 
+@main_bp.route('/api/resolve-trace')
+def resolve_trace():
+    """Run the REAL disease -> Open Targets resolver and report WHO resolved it,
+    so the UI can label precisely. match_source is one of:
+      catalogue_exact (exact local match) | user_input (Open Targets resolved your
+      raw text) | umls (a UMLS-standardized name resolved it) | unresolved.
+    """
+    query = (request.args.get('q') or '').strip()
+    if not query:
+        return jsonify({'success': False, 'query': query, 'match_source': 'empty'}), 400
+    from services import resolve_disease_to_open_targets
+    res = resolve_disease_to_open_targets(query) or {}
+    return jsonify({
+        'success': True,
+        'query': query,
+        'match_source': res.get('match_source'),
+        'matched_input': res.get('matched_input'),
+        'efo_id': res.get('efo_id'),
+        'name': res.get('name'),
+        'umls_cui': res.get('umls_cui'),
+        'candidates_checked': res.get('candidates_checked', []),
+    })
+
+
 
 
 @main_bp.route('/api/herbs')
