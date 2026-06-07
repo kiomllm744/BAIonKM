@@ -200,6 +200,13 @@
       'about.step4Desc': 'The common genes are submitted to Enrichr for enrichment analysis. The system retrieves significantly enriched KEGG pathways, GO biological processes, and molecular functions to understand the biological context.',
       'about.step5Title': 'Results & Visualization',
       'about.step5Desc': 'Results are presented with interactive visualizations including gene lists, pathway charts, and statistical significance scores. All results are saved to history for future reference.',
+      'about.step6Title': 'AI Comparative Analysis',
+      'about.step6Desc': 'The enriched pathways for each prescription are sent to a generative AI model (Gemini), which compares the prescriptions, derives each one\'s core biological mechanism against the disease, and generates key differential clinical questions. The analysis follows the UI language — English or Korean.',
+      'about.archAiModule': 'AI Integrated Analysis Module',
+      'about.archAiModuleSub': 'Comparative pathway & mechanism analysis (Gemini)',
+      'about.archAiOut1': 'Unique mechanism per prescription',
+      'about.archAiOut2': 'Core mechanism per prescription',
+      'about.archAiOut3': 'Key differential clinical questions',
       'about.footerDesc': 'Bridging traditional medicine and modern genomics through computational analysis. This platform aims to help researchers understand the potential molecular mechanisms underlying traditional Chinese medicine treatments.',
 
       /* ---- history page (Phase 2) ---- */
@@ -465,6 +472,13 @@
       'about.step4Desc': '공통 유전자를 Enrichr에 제출해 강화 분석을 수행합니다. 시스템은 유의하게 강화된 KEGG 경로, GO 생물학적 과정 및 분자 기능을 조회해 생물학적 맥락을 파악합니다.',
       'about.step5Title': '결과 및 시각화',
       'about.step5Desc': '결과는 유전자 목록, 경로 차트, 통계적 유의성 점수를 포함한 대화형 시각화로 제공됩니다. 모든 결과는 향후 참조를 위해 히스토리에 저장됩니다.',
+      'about.step6Title': 'AI 비교 분석',
+      'about.step6Desc': '각 처방의 강화된 경로를 생성형 AI 모델(Gemini)에 전달하여 처방들을 비교하고, 각 처방의 질병 대비 핵심 생물학적 기전을 도출하며, 주요 감별 임상 질문을 생성합니다. 분석은 UI 언어(영어 또는 한국어)를 따릅니다.',
+      'about.archAiModule': 'AI 통합 분석 모듈',
+      'about.archAiModuleSub': '생물학적 경로 및 기전 비교 분석 (Gemini)',
+      'about.archAiOut1': '처방 별 고유 생물학적 기전 비교',
+      'about.archAiOut2': '처방 별 핵심 생물학적 기전 도출',
+      'about.archAiOut3': '핵심 기전 중심 주요 감별 질문 생성',
       'about.footerDesc': '컴퓨팅 분석을 통해 전통 의학과 현대 유전체학을 연결합니다. 이 플랫폼은 연구자가 전통 한의학 치료의 잠재적 분자 기전을 이해하도록 돕는 것을 목표로 합니다.',
 
       /* ---- history page (Phase 2) ---- */

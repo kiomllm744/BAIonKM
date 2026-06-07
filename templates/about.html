@@ -107,7 +107,12 @@
             background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
             color: white;
         }
-        
+
+        .flow-node.ai {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white;
+        }
+
         .flow-node i {
             display: block;
             font-size: 1.5rem;
@@ -480,6 +485,33 @@
                             <span data-i18n="about.goTerms">GO Terms</span>
                         </div>
                     </div>
+
+                    <i class="fas fa-arrow-down flow-arrow-down"></i>
+
+                    <!-- AI Analysis Module -->
+                    <div class="flow-node ai">
+                        <i class="fas fa-robot"></i>
+                        <span data-i18n="about.archAiModule">AI Integrated Analysis Module</span>
+                        <small data-i18n="about.archAiModuleSub">Comparative pathway &amp; mechanism analysis (Gemini)</small>
+                    </div>
+
+                    <i class="fas fa-arrow-down flow-arrow-down"></i>
+
+                    <!-- AI Output Row -->
+                    <div class="flow-row">
+                        <div class="flow-node output">
+                            <i class="fas fa-balance-scale"></i>
+                            <span data-i18n="about.archAiOut1">Unique mechanism per prescription</span>
+                        </div>
+                        <div class="flow-node output">
+                            <i class="fas fa-bullseye"></i>
+                            <span data-i18n="about.archAiOut2">Core mechanism per prescription</span>
+                        </div>
+                        <div class="flow-node output">
+                            <i class="fas fa-notes-medical"></i>
+                            <span data-i18n="about.archAiOut3">Key differential clinical questions</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -600,6 +632,14 @@
                     <div class="step-content">
                         <h4 data-i18n="about.step5Title">Results & Visualization</h4>
                         <p data-i18n="about.step5Desc">Results are presented with interactive visualizations including gene lists, pathway charts, and statistical significance scores. All results are saved to history for future reference.</p>
+                    </div>
+                </div>
+
+                <div class="process-step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <h4 data-i18n="about.step6Title">AI Comparative Analysis</h4>
+                        <p data-i18n="about.step6Desc">The enriched pathways for each prescription are sent to a generative AI model (Gemini), which compares the prescriptions, derives each one's core biological mechanism against the disease, and generates key differential clinical questions. The analysis follows the UI language — English or Korean.</p>
                     </div>
                 </div>
             </div>
