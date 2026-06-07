@@ -440,20 +440,84 @@ def _correct_token(token):
     return match[0] if match else token
 
 
+# Generic "this looks like a primary disease entity" words. A name containing one
+# of these (e.g. "diabetes MELLITUS", "Down SYNDROME") is more likely the disease a
+# clinician means than an adjective-led complication ("DIABETIC foot"), so it is
+# boosted. This is a tiny set of generic disease-category words, NOT a disease list.
+_BASE_DISEASE_WORDS = {
+    'disease', 'diseases', 'syndrome', 'disorder', 'deficiency', 'mellitus',
+    'cancer', 'carcinoma', 'tumor', 'tumour', 'neoplasm', 'failure', 'infection',
+    'anemia', 'anaemia', 'insufficiency', 'dystrophy', 'sclerosis', 'fibrosis',
+}
+
+
+def _relevance_score(name, stems, term):
+    """Rank a candidate disease name for a (possibly corrected) query.
+
+    Priority: exact name > name that LEADS with the searched word
+    ("diabetes mellitus") > the word as a standalone word anywhere
+    ("type 2 diabetes mellitus") > a name that only contains it as a substring/
+    adjective ("diabetic foot"). Real disease entities (names with a base-disease
+    word) are boosted; fewer/shorter words break ties. Replaces the old
+    "shortest-name-wins" sort, which surfaced complications above the disease."""
+    n = (name or '').lower().strip()
+    words = re.findall(r'[a-z0-9]+', n)
+    if not words:
+        return -1e9
+    wordset = set(words)
+    s = 0.0
+    if n == term:
+        s += 1000
+    if words[0] in stems:
+        s += 300
+    elif any(n.startswith(st) for st in stems):
+        s += 200
+    if wordset & stems:
+        s += 150
+    if wordset & _BASE_DISEASE_WORDS:
+        s += 200
+    s -= 5 * len(words)        # prefer fewer words (more canonical)
+    s -= 0.4 * len(n)          # mild preference for shorter names
+    return s
+
+
 def _local_disease_match(session, term, limit, correct=False):
-    """Return (name, efo_id) for diseases whose label contains every token of
-    `term` (any order). Shorter (more canonical) names first. Optionally
-    typo-correct the tokens."""
-    tokens = re.findall(r'[a-z0-9]+', term.lower())
+    """Diseases whose label contains every token of `term` (any order), ranked by
+    clinical relevance (see _relevance_score) instead of name length. When
+    `correct` is set, the salient (longest) token is typo-corrected to SEVERAL
+    nearest disease-vocabulary words (not just one) and unioned, so e.g.
+    "diabetis" surfaces BOTH "diabetes ..." and "diabetic ..." diseases rather than
+    locking onto one arbitrary stem."""
+    from sqlalchemy import or_
+    term = (term or '').lower().strip()
+    tokens = re.findall(r'[a-z0-9]+', term)
     if not tokens:
         return []
+    stems = set(tokens)
+    groups = []  # list of OR-groups; a name must match one variant from each
     if correct:
-        tokens = [_correct_token(t) for t in tokens]
+        salient = max(tokens, key=len)
+        for t in tokens:
+            if t == salient and len(t) >= 4:
+                variants = difflib.get_close_matches(t, _disease_word_vocab(), n=6, cutoff=0.80)
+                if variants:
+                    stems.update(variants)
+                    groups.append(variants)
+                else:
+                    groups.append([t])
+            else:
+                c = _correct_token(t)
+                stems.add(c)
+                groups.append([c])
+    else:
+        groups = [[t] for t in tokens]
     q = session.query(Disease.name, Disease.efo_id)
-    for t in tokens:
-        q = q.filter(func.lower(Disease.name).like(f"%{t}%"))
-    q = q.order_by(func.length(Disease.name), Disease.name).limit(limit)
-    return q.all()
+    for group in groups:
+        q = q.filter(or_(*[func.lower(Disease.name).like(f"%{v}%") for v in group]))
+    # fetch a candidate pool (shortest first), then re-rank by relevance in Python
+    pool = q.order_by(func.length(Disease.name)).limit(max(limit * 6, 60)).all()
+    pool.sort(key=lambda r: _relevance_score(r[0], stems, term), reverse=True)
+    return pool[:limit]
 
 
 @main_bp.route('/api/diseases')
