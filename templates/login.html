@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {% include 'partials/_head_i18n.html' %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - BAIonKM</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -190,13 +191,13 @@
                         <i class="fas fa-dna"></i>
                     </div>
                     <h1>BAIonKM</h1>
-                    <p>Disease-Herb Gene Analysis Platform</p>
+                    <p data-i18n="login.subtitle">Disease-Herb Gene Analysis Platform</p>
                 </div>
                 
                 <div class="login-body">
                     <div class="demo-info">
-                        <h4><i class="fas fa-lightbulb"></i> Demo Access</h4>
-                        <p>Login to view saved analysis results and example cases.</p>
+                        <h4><i class="fas fa-lightbulb"></i> <span data-i18n="login.demoAccess">Demo Access</span></h4>
+                        <p data-i18n="login.demoBlurb">Login to view saved analysis results and example cases.</p>
                     </div>
                     
                     {% if error %}
@@ -208,33 +209,34 @@
                     
                     <form class="login-form" method="POST" action="{{ url_for('main.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}">
                         <div class="form-group">
-                            <label for="username">Username</label>
+                            <label for="username" data-i18n="login.username">Username</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-user"></i>
-                                <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required autofocus>
+                                <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" data-i18n-placeholder="login.usernamePlaceholder" required autofocus>
                             </div>
                         </div>
                         
                         <div class="form-group">
-                            <label for="password">Password</label>
+                            <label for="password" data-i18n="login.password">Password</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-lock"></i>
-                                <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required>
+                                <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" data-i18n-placeholder="login.passwordPlaceholder" required>
                             </div>
                         </div>
                         
                         <button type="submit" class="btn-login">
                             <i class="fas fa-sign-in-alt"></i>
-                            Sign In
+                            <span data-i18n="login.signIn">Sign In</span>
                         </button>
                     </form>
                 </div>
                 
                 <div class="login-footer">
-                    <p><a href="/"><i class="fas fa-arrow-left"></i> Back to Analysis</a></p>
+                    <p><a href="/"><i class="fas fa-arrow-left"></i> <span data-i18n="login.back">Back to Analysis</span></a></p>
                 </div>
             </div>
         </div>
     </div>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 </body>
 </html>

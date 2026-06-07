@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {% include 'partials/_head_i18n.html' %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About - BAIonKM</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -398,65 +399,7 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fas fa-dna"></i>
-                <span>BAIonKM</span>
-            </div>
-            <nav class="nav-menu">
-                <a href="/" class="nav-item">
-                    <i class="fas fa-search"></i>
-                    <span>Analysis</span>
-                </a>
-                <a href="/database" class="nav-item">
-                    <i class="fas fa-database"></i>
-                    <span>Database</span>
-                </a>
-                <a href="/results" class="nav-item">
-                    <i class="fas fa-history"></i>
-                    <span>History</span>
-                </a>
-                <a href="/about" class="nav-item active">
-                    <i class="fas fa-info-circle"></i>
-                    <span>About</span>
-                </a>
-            </nav>
-            <div class="sidebar-stats">
-                <div class="stat-item">
-                    <i class="fas fa-disease"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="disease-count">--</span>
-                        <span class="stat-label">Diseases</span>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-leaf"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="herb-count">--</span>
-                        <span class="stat-label">Herbs</span>
-                    </div>
-                </div>
-            </div>
-            <!-- Login/Logout Section -->
-            <div class="sidebar-user">
-                {% if session.get('logged_in') %}
-                <div class="user-info">
-                    <i class="fas fa-user-check"></i>
-                    <span>{{ session.get('username', 'User') }}</span>
-                </div>
-                <a href="{{ url_for('main.logout') }}" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
-                {% else %}
-                <a href="{{ url_for('main.login') }}" class="btn-login">
-                    <i class="fas fa-sign-in-alt"></i>
-                    <span>Login</span>
-                </a>
-                {% endif %}
-            </div>
-        </aside>
+        {% include 'partials/_topbar.html' %}
 
         <!-- Main Content -->
         <main class="main-content">

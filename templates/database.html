@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {% include 'partials/_head_i18n.html' %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Database Explorer - BAIonKM</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -487,72 +488,14 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fas fa-dna"></i>
-                <span>BAIonKM</span>
-            </div>
-            <nav class="nav-menu">
-                <a href="/" class="nav-item">
-                    <i class="fas fa-search"></i>
-                    <span>Analysis</span>
-                </a>
-                <a href="/database" class="nav-item active">
-                    <i class="fas fa-database"></i>
-                    <span>Database</span>
-                </a>
-                <a href="/results" class="nav-item">
-                    <i class="fas fa-history"></i>
-                    <span>History</span>
-                </a>
-                <a href="/about" class="nav-item">
-                    <i class="fas fa-info-circle"></i>
-                    <span>About</span>
-                </a>
-            </nav>
-            <div class="sidebar-stats">
-                <div class="stat-item">
-                    <i class="fas fa-disease"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="disease-count">--</span>
-                        <span class="stat-label">Diseases</span>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-leaf"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="herb-count">--</span>
-                        <span class="stat-label">Herbs</span>
-                    </div>
-                </div>
-            </div>
-            <!-- Login/Logout Section -->
-            <div class="sidebar-user">
-                {% if session.get('logged_in') %}
-                <div class="user-info">
-                    <i class="fas fa-user-check"></i>
-                    <span>{{ session.get('username', 'User') }}</span>
-                </div>
-                <a href="{{ url_for('main.logout') }}" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
-                {% else %}
-                <a href="{{ url_for('main.login') }}" class="btn-login">
-                    <i class="fas fa-sign-in-alt"></i>
-                    <span>Login</span>
-                </a>
-                {% endif %}
-            </div>
-        </aside>
+        {% include 'partials/_topbar.html' %}
 
         <!-- Main Content -->
         <main class="main-content">
             <header class="page-header">
                 <div class="header-content">
-                    <h1><i class="fas fa-database"></i> Database Explorer</h1>
-                    <p>Browse diseases and herbs in the database with their associated genes</p>
+                    <h1><i class="fas fa-database"></i> <span data-i18n="db.title">Database Explorer</span></h1>
+                    <p data-i18n="db.subtitle">Browse diseases and herbs in the database with their associated genes</p>
                 </div>
             </header>
 
@@ -562,21 +505,21 @@
                     <div class="table-stats">
                         <div class="table-stat">
                             <div class="table-stat-value" id="total-diseases">--</div>
-                            <div class="table-stat-label">Diseases</div>
+                            <div class="table-stat-label" data-i18n="stat.diseases">Diseases</div>
                         </div>
                         <div class="table-stat herbs">
                             <div class="table-stat-value" id="total-herbs">--</div>
-                            <div class="table-stat-label">Herbs (BATMAN-TCM)</div>
+                            <div class="table-stat-label"><span data-i18n="stat.herbs">Herbs</span> (BATMAN-TCM)</div>
                         </div>
                     </div>
 
                     <!-- Tabs -->
                     <div class="tabs">
                         <button class="tab-btn active" data-tab="diseases">
-                            <i class="fas fa-virus"></i> Diseases
+                            <i class="fas fa-virus"></i> <span data-i18n="db.tabDiseases">Diseases</span>
                         </button>
                         <button class="tab-btn" data-tab="herbs">
-                            <i class="fas fa-leaf"></i> Herbs
+                            <i class="fas fa-leaf"></i> <span data-i18n="db.tabHerbs">Herbs</span>
                         </button>
                     </div>
 
@@ -584,20 +527,20 @@
                     <div class="tab-content active" id="diseases-tab">
                         <div class="search-box">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="disease-search" placeholder="Search diseases...">
+                            <input type="text" id="disease-search" placeholder="Search diseases..." data-i18n-placeholder="db.searchDiseases">
                         </div>
                         <div class="data-table-container">
                             <table class="data-table" id="diseases-table">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Disease Name</th>
-                                        <th>Associated Genes</th>
-                                        <th>Source</th>
+                                        <th data-i18n="db.colDiseaseName">Disease Name</th>
+                                        <th data-i18n="db.colAssociatedGenes">Associated Genes</th>
+                                        <th data-i18n="db.colSource">Source</th>
                                     </tr>
                                 </thead>
                                 <tbody id="diseases-tbody">
-                                    <tr><td colspan="4" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>
+                                    <tr><td colspan="4" class="loading"><i class="fas fa-spinner"></i><span data-i18n="db.loading">Loading...</span></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -608,9 +551,9 @@
                                 <div class="page-numbers" id="diseases-pages"></div>
                                 <button class="pagination-btn" id="diseases-next"><i class="fas fa-chevron-right"></i></button>
                                 <div class="page-jump">
-                                    <label>Go to:</label>
+                                    <label data-i18n="db.goto">Go to:</label>
                                     <input type="number" id="diseases-page-input" min="1" placeholder="#">
-                                    <button onclick="goToDiseasePage()">Go</button>
+                                    <button onclick="goToDiseasePage()" data-i18n="db.go">Go</button>
                                 </div>
                             </div>
                         </div>
@@ -620,21 +563,21 @@
                     <div class="tab-content" id="herbs-tab">
                         <div class="search-box">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="herb-search" placeholder="Search herbs...">
+                            <input type="text" id="herb-search" placeholder="Search herbs..." data-i18n-placeholder="db.searchHerbs">
                         </div>
                         <div class="data-table-container">
                             <table class="data-table" id="herbs-table">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Herb Name (Pinyin)</th>
-                                        <th>Target Genes</th>
-                                        <th>Compounds</th>
-                                        <th>Source</th>
+                                        <th><span data-i18n="db.colHerbName">Herb Name</span> (Pinyin)</th>
+                                        <th data-i18n="db.colTargetGenes">Target Genes</th>
+                                        <th data-i18n="db.colCompounds">Compounds</th>
+                                        <th data-i18n="db.colSource">Source</th>
                                     </tr>
                                 </thead>
                                 <tbody id="herbs-tbody">
-                                    <tr><td colspan="5" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>
+                                    <tr><td colspan="5" class="loading"><i class="fas fa-spinner"></i><span data-i18n="db.loading">Loading...</span></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -645,9 +588,9 @@
                                 <div class="page-numbers" id="herbs-pages"></div>
                                 <button class="pagination-btn" id="herbs-next"><i class="fas fa-chevron-right"></i></button>
                                 <div class="page-jump">
-                                    <label>Go to:</label>
+                                    <label data-i18n="db.goto">Go to:</label>
                                     <input type="number" id="herbs-page-input" min="1" placeholder="#">
-                                    <button onclick="goToHerbPage()">Go</button>
+                                    <button onclick="goToHerbPage()" data-i18n="db.go">Go</button>
                                 </div>
                             </div>
                         </div>
@@ -661,12 +604,12 @@
     <div class="modal-overlay" id="gene-modal">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="modal-title">Gene Details</h3>
+                <h3 id="modal-title" data-i18n="db.geneDetails">Gene Details</h3>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="modal-content">
-                    <div class="loading"><i class="fas fa-spinner"></i>Loading genes...</div>
+                    <div class="loading"><i class="fas fa-spinner"></i><span data-i18n="db.loadingGenes">Loading genes...</span></div>
                 </div>
                 <div class="pagination" id="modal-pagination" style="display:none;">
                     <div class="pagination-info" id="modal-info">Showing 0 of 0</div>
@@ -811,7 +754,7 @@
         // Load diseases
         async function loadDiseases() {
             const tbody = document.getElementById('diseases-tbody');
-            tbody.innerHTML = '<tr><td colspan="4" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="4" class="loading"><i class="fas fa-spinner"></i>${i18n.t('db.loading')}</td></tr>`;
 
             try {
                 const params = new URLSearchParams({
@@ -825,13 +768,13 @@
                 state.diseases.data = data;
 
                 if (data.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#6b7280;">No diseases found</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:#6b7280;">${i18n.t('db.noDiseases')}</td></tr>`;
                 } else {
                     tbody.innerHTML = data.data.map((d, i) => `
                         <tr onclick="showDiseaseGenes('${escapeHtml(d.name)}')">
                             <td>${(data.page - 1) * PER_PAGE + i + 1}</td>
                             <td><strong>${highlightTokens(d.name, state.diseases.search)}</strong></td>
-                            <td><span class="badge badge-purple">${d.gene_count} genes</span></td>
+                            <td><span class="badge badge-purple">${typeof d.gene_count === 'number' ? i18n.t('db.genesCount', { n: d.gene_count }) : i18n.t('db.liveOnline')}</span></td>
                             <td><span class="badge badge-blue">Open Targets</span></td>
                         </tr>
                     `).join('');
@@ -840,8 +783,9 @@
                 // Update pagination
                 const start = (data.page - 1) * PER_PAGE + 1;
                 const end = Math.min(data.page * PER_PAGE, data.total);
-                const diseaseTerm = data.search ? ` matching "${data.search}"` : '';
-                document.getElementById('diseases-info').textContent = `Showing ${start}-${end} of ${data.total}${diseaseTerm}`;
+                document.getElementById('diseases-info').textContent = data.search
+                    ? i18n.t('db.showingMatch', { start: start, end: end, total: data.total, q: data.search })
+                    : i18n.t('db.showing', { start: start, end: end, total: data.total });
                 document.getElementById('diseases-prev').disabled = data.page <= 1;
                 document.getElementById('diseases-next').disabled = data.page >= data.total_pages;
                 document.getElementById('diseases-page-input').max = data.total_pages;
@@ -854,14 +798,14 @@
 
             } catch (error) {
                 console.error('Failed to load diseases:', error);
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#ef4444;">Error loading data</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:#ef4444;">${i18n.t('db.errorLoading')}</td></tr>`;
             }
         }
 
         // Load herbs
         async function loadHerbs() {
             const tbody = document.getElementById('herbs-tbody');
-            tbody.innerHTML = '<tr><td colspan="5" class="loading"><i class="fas fa-spinner"></i>Loading...</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="5" class="loading"><i class="fas fa-spinner"></i>${i18n.t('db.loading')}</td></tr>`;
 
             try {
                 const params = new URLSearchParams({
@@ -875,14 +819,14 @@
                 state.herbs.data = data;
 
                 if (data.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#6b7280;">No herbs found</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:#6b7280;">${i18n.t('db.noHerbs')}</td></tr>`;
                 } else {
                     tbody.innerHTML = data.data.map((h, i) => `
                         <tr onclick="showHerbGenes('${escapeHtml(h.name)}')">
                             <td>${(data.page - 1) * PER_PAGE + i + 1}</td>
                             <td><strong>${escapeHtml(h.name)}</strong></td>
-                            <td><span class="badge badge-purple">${h.gene_count} genes</span></td>
-                            <td><span class="badge badge-green">${h.compound_count} compounds</span></td>
+                            <td><span class="badge badge-purple">${i18n.t('db.genesCount', { n: h.gene_count })}</span></td>
+                            <td><span class="badge badge-green">${i18n.t('db.compoundsCount', { n: h.compound_count })}</span></td>
                             <td><span class="badge badge-blue">BATMAN-TCM</span></td>
                         </tr>
                     `).join('');
@@ -891,7 +835,7 @@
                 // Update pagination
                 const start = (data.page - 1) * PER_PAGE + 1;
                 const end = Math.min(data.page * PER_PAGE, data.total);
-                document.getElementById('herbs-info').textContent = `Showing ${start}-${end} of ${data.total}`;
+                document.getElementById('herbs-info').textContent = i18n.t('db.showing', { start: start, end: end, total: data.total });
                 document.getElementById('herbs-prev').disabled = data.page <= 1;
                 document.getElementById('herbs-next').disabled = data.page >= data.total_pages;
                 document.getElementById('herbs-page-input').max = data.total_pages;
@@ -911,7 +855,7 @@
         // Show disease genes in modal
         async function showDiseaseGenes(name) {
             state.modal = { type: 'disease', name, page: 1 };
-            document.getElementById('modal-title').textContent = `Genes for: ${name}`;
+            document.getElementById('modal-title').textContent = i18n.t('db.genesFor', { name: name });
             document.getElementById('gene-modal').classList.add('active');
             loadModalGenes();
         }
@@ -919,7 +863,7 @@
         // Show herb genes in modal
         async function showHerbGenes(name) {
             state.modal = { type: 'herb', name, page: 1 };
-            document.getElementById('modal-title').textContent = `Genes for: ${name}`;
+            document.getElementById('modal-title').textContent = i18n.t('db.genesFor', { name: name });
             document.getElementById('gene-modal').classList.add('active');
             loadModalGenes();
         }
@@ -945,19 +889,19 @@
                 if (state.modal.type === 'herb') {
                     // Herb: Show compounds with genes grouped
                     if (!data.compounds || data.compounds.length === 0) {
-                        content.innerHTML = '<p style="text-align:center;color:#6b7280;">No compounds found</p>';
+                        content.innerHTML = `<p style="text-align:center;color:#6b7280;">${i18n.t('db.noCompounds')}</p>`;
                     } else {
                         content.innerHTML = `
                             <div class="modal-summary">
-                                <span class="summary-badge"><i class="fas fa-flask"></i> ${data.total_compounds} Compounds</span>
-                                <span class="summary-badge"><i class="fas fa-dna"></i> ${data.total_genes} Gene Associations</span>
+                                <span class="summary-badge"><i class="fas fa-flask"></i> ${i18n.t('db.compoundsCount', { n: data.total_compounds })}</span>
+                                <span class="summary-badge"><i class="fas fa-dna"></i> ${i18n.t('db.geneAssociations', { n: data.total_genes })}</span>
                             </div>
                             <div class="compounds-grid">
                                 ${data.compounds.map(c => `
                                     <div class="compound-card">
                                         <div class="compound-header">
-                                            <span class="compound-name"><i class="fas fa-flask"></i> ${escapeHtml(c.compound || 'Unknown')}</span>
-                                            <span class="compound-count">${c.gene_count} genes</span>
+                                            <span class="compound-name"><i class="fas fa-flask"></i> ${escapeHtml(c.compound || i18n.t('db.unknown'))}</span>
+                                            <span class="compound-count">${i18n.t('db.genesCount', { n: c.gene_count })}</span>
                                         </div>
                                         <div class="genes-box">
                                             ${c.genes.map(g => `
@@ -974,16 +918,16 @@
                 } else {
                     // Disease: Show table format
                     if (!data.data || data.data.length === 0) {
-                        content.innerHTML = '<p style="text-align:center;color:#6b7280;">No genes found</p>';
+                        content.innerHTML = `<p style="text-align:center;color:#6b7280;">${i18n.t('db.noGenes')}</p>`;
                     } else {
                         content.innerHTML = `
                             <div class="data-table-container">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
-                                            <th>Gene Symbol</th>
-                                            <th>Gene ID</th>
-                                            <th>Score</th>
+                                            <th>${i18n.t('db.colGeneSymbol')}</th>
+                                            <th>${i18n.t('db.colGeneId')}</th>
+                                            <th>${i18n.t('db.colScore')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1006,7 +950,7 @@
                         pagination.style.display = 'flex';
                         const start = (data.page - 1) * 100 + 1;
                         const end = Math.min(data.page * 100, data.total);
-                        document.getElementById('modal-info').textContent = `Showing ${start}-${end} of ${data.total}`;
+                        document.getElementById('modal-info').textContent = i18n.t('db.showing', { start: start, end: end, total: data.total });
                         document.getElementById('modal-prev').disabled = data.page <= 1;
                         document.getElementById('modal-next').disabled = data.page >= data.total_pages;
                         
@@ -1022,7 +966,7 @@
 
             } catch (error) {
                 console.error('Failed to load genes:', error);
-                content.innerHTML = '<p style="text-align:center;color:#ef4444;">Error loading genes</p>';
+                content.innerHTML = `<p style="text-align:center;color:#ef4444;">${i18n.t('db.errorLoadingGenes')}</p>`;
             }
         }
 
@@ -1125,6 +1069,13 @@
                 if (e.key === 'Enter') {
                     goToHerbPage();
                 }
+            });
+
+            // Re-localize dynamic table/modal content when the language changes.
+            document.addEventListener('langchange', () => {
+                if (state.diseases.data) loadDiseases();
+                if (state.herbs.data) loadHerbs();
+                if (document.getElementById('gene-modal').classList.contains('active')) loadModalGenes();
             });
         }
 

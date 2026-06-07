@@ -1,0 +1,17 @@
+{# Sets <html lang> from the saved choice and cloaks the page until i18n.js
+   applies translations — prevents a flash of English on a Korean-default load.
+   Include this in <head>, before the main stylesheet. #}
+<script>
+  (function () {
+    try {
+      document.documentElement.lang = localStorage.getItem('baionkm.lang') || 'ko';
+    } catch (e) { document.documentElement.lang = 'ko'; }
+    document.documentElement.className += ' i18n-cloak';
+    // Failsafe: never leave the page hidden if i18n.js fails to load.
+    setTimeout(function () {
+      document.documentElement.classList.remove('i18n-cloak');
+    }, 1500);
+  })();
+</script>
+<style>html.i18n-cloak body { visibility: hidden; }</style>
+<script src="{{ url_for('static', filename='js/i18n.js') }}"></script>

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {% include 'partials/_head_i18n.html' %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analysis Results - BAIonKM</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -1018,64 +1019,7 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar (shared shell, matches every other page) -->
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fas fa-dna"></i>
-                <span>BAIonKM</span>
-            </div>
-            <nav class="nav-menu">
-                <a href="/" class="nav-item active">
-                    <i class="fas fa-search"></i>
-                    <span>Analysis</span>
-                </a>
-                <a href="/database" class="nav-item">
-                    <i class="fas fa-database"></i>
-                    <span>Database</span>
-                </a>
-                <a href="/results" class="nav-item">
-                    <i class="fas fa-history"></i>
-                    <span>History</span>
-                </a>
-                <a href="/about" class="nav-item">
-                    <i class="fas fa-info-circle"></i>
-                    <span>About</span>
-                </a>
-            </nav>
-            <div class="sidebar-stats">
-                <div class="stat-item">
-                    <i class="fas fa-disease"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="disease-count">--</span>
-                        <span class="stat-label">Diseases</span>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-leaf"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="herb-count">--</span>
-                        <span class="stat-label">Herbs</span>
-                    </div>
-                </div>
-            </div>
-            <div class="sidebar-user">
-                {% if session.get('logged_in') %}
-                <div class="user-info">
-                    <i class="fas fa-user-check"></i>
-                    <span>{{ session.get('username', 'User') }}</span>
-                </div>
-                <a href="{{ url_for('main.logout') }}" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
-                {% else %}
-                <a href="{{ url_for('main.login') }}" class="btn-login">
-                    <i class="fas fa-sign-in-alt"></i>
-                    <span>Login</span>
-                </a>
-                {% endif %}
-            </div>
-        </aside>
+        {% include 'partials/_topbar.html' %}
 
         <!-- Main Content -->
         <main class="main-content">
@@ -1085,7 +1029,7 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-virus"></i>
-                <h2>Disease Summary</h2>
+                <h2 data-i18n="result.diseaseSummary">Disease Summary</h2>
                 {% if results.diseases %}<span class="badge">{{ results.disease_gene_count }} genes analysed</span>{% endif %}
             </div>
             <div class="card-body">
@@ -1192,7 +1136,7 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-clipboard-list"></i>
-                <h2>Prescription Summary</h2>
+                <h2 data-i18n="result.prescriptionSummary">Prescription Summary</h2>
             </div>
             <div class="card-body">
                 <div class="prescription-grid">
@@ -1289,7 +1233,7 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-dna"></i>
-                <h2>Shared Disease Targets Across Prescriptions</h2>
+                <h2 data-i18n="result.sharedTargets">Shared Disease Targets Across Prescriptions</h2>
                 <span class="badge">{{ results.common_union_count }} genes</span>
             </div>
             <div class="card-body">
@@ -1346,7 +1290,7 @@
         <div class="card ai-card">
             <div class="card-header">
                 <i class="fas fa-robot"></i>
-                <h2>AI Comparative Analysis</h2>
+                <h2 data-i18n="result.aiComparative">AI Comparative Analysis</h2>
             </div>
             <div class="card-body">
                 <!-- Loading State -->
@@ -1397,7 +1341,7 @@
         <div class="card clinical-card">
             <div class="card-header">
                 <i class="fas fa-stethoscope"></i>
-                <h2>Clinical Interview Questions</h2>
+                <h2 data-i18n="result.clinicalQuestions">Clinical Interview Questions</h2>
                 <span class="badge">Diagnostic Support</span>
             </div>
             <div class="card-body">
@@ -1423,7 +1367,7 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-chart-bar"></i>
-                <h2>Pathway Enrichment Analysis</h2>
+                <h2 data-i18n="result.pathwayEnrichment">Pathway Enrichment Analysis</h2>
                 {% if results.enrichment_libraries %}<span class="badge">{{ results.enrichment_libraries | join(' &middot; ') }}</span>{% endif %}
             </div>
             <div class="card-body">
@@ -1476,7 +1420,7 @@
         <div class="card">
             <div class="card-header">
                 <i class="fas fa-layer-group"></i>
-                <h2>Gene Overlap Across Prescriptions</h2>
+                <h2 data-i18n="result.geneOverlap">Gene Overlap Across Prescriptions</h2>
             </div>
             <div class="card-body">
                 <p style="opacity:0.75;margin-bottom:1rem;">
@@ -1525,10 +1469,10 @@
         <!-- Page Actions -->
         <div class="page-actions">
             <a href="/" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> New Analysis
+                <i class="fas fa-arrow-left"></i> <span data-i18n="result.newAnalysis">New Analysis</span>
             </a>
             <button class="btn btn-primary" onclick="window.print()">
-                <i class="fas fa-print"></i> Print Results
+                <i class="fas fa-print"></i> <span data-i18n="result.print">Print Results</span>
             </button>
         </div>
 

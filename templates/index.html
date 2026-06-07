@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    {% include 'partials/_head_i18n.html' %}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BAIonKM - Disease-Herb Gene Analysis</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -10,72 +11,14 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fas fa-dna"></i>
-                <span>BAIonKM</span>
-            </div>
-            <nav class="nav-menu">
-                <a href="/" class="nav-item active">
-                    <i class="fas fa-search"></i>
-                    <span>Analysis</span>
-                </a>
-                <a href="/database" class="nav-item">
-                    <i class="fas fa-database"></i>
-                    <span>Database</span>
-                </a>
-                <a href="/results" class="nav-item">
-                    <i class="fas fa-history"></i>
-                    <span>History</span>
-                </a>
-                <a href="/about" class="nav-item">
-                    <i class="fas fa-info-circle"></i>
-                    <span>About</span>
-                </a>
-            </nav>
-            <div class="sidebar-stats">
-                <div class="stat-item">
-                    <i class="fas fa-disease"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="disease-count">--</span>
-                        <span class="stat-label">Diseases</span>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-leaf"></i>
-                    <div class="stat-info">
-                        <span class="stat-value" id="herb-count">--</span>
-                        <span class="stat-label">Herbs</span>
-                    </div>
-                </div>
-            </div>
-            <!-- Login/Logout Section -->
-            <div class="sidebar-user">
-                {% if session.get('logged_in') %}
-                <div class="user-info">
-                    <i class="fas fa-user-check"></i>
-                    <span>{{ session.get('username', 'User') }}</span>
-                </div>
-                <a href="{{ url_for('main.logout') }}" class="btn-logout">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
-                {% else %}
-                <a href="{{ url_for('main.login') }}" class="btn-login">
-                    <i class="fas fa-sign-in-alt"></i>
-                    <span>Login</span>
-                </a>
-                {% endif %}
-            </div>
-        </aside>
+        {% include 'partials/_topbar.html' %}
 
         <!-- Main Content -->
         <main class="main-content">
             <header class="page-header">
                 <div class="header-content">
-                    <h1>Disease-Herb Gene Analysis</h1>
-                    <p>Discover common genes between diseases and traditional Chinese medicine prescriptions</p>
+                    <h1 data-i18n="index.heroTitle">Disease-Herb Gene Analysis</h1>
+                    <p data-i18n="index.heroSubtitle">Discover common genes between diseases and traditional Chinese medicine prescriptions</p>
                 </div>
             </header>
 
@@ -84,11 +27,11 @@
                 <section class="card">
                     <div class="card-header">
                         <i class="fas fa-virus"></i>
-                        <h2>Select Disease</h2>
+                        <h2 data-i18n="index.selectDisease">Select Disease</h2>
                     </div>
                     <div class="card-body">
                         <div class="form-group">
-                            <label for="disease">Disease(s) / Symptom(s)</label>
+                            <label for="disease" data-i18n="index.diseaseLabel">Disease(s) / Symptom(s)</label>
                             <div class="autocomplete-wrapper">
                                 <input
                                     type="text"
@@ -96,6 +39,7 @@
                                     name="disease"
                                     class="form-input"
                                     placeholder="Type a disease or symptom, then pick to add (up to 3)..."
+                                    data-i18n-placeholder="index.diseasePlaceholder"
                                     autocomplete="off"
                                 >
                                 <i class="fas fa-search input-icon"></i>
@@ -104,25 +48,25 @@
                             <input type="hidden" name="disease_id" id="disease-id-input">
                             <input type="hidden" name="diseases_data" id="diseases-data-input">
                             <div class="disease-chips" id="disease-chips"></div>
-                            <span class="form-hint">Add up to 3 diseases/symptoms &mdash; they're combined (union of genes; shared genes highlighted). Pick from the suggestions to add each one.</span>
+                            <span class="form-hint" data-i18n="index.diseaseHint">Add up to 3 diseases/symptoms &mdash; they're combined (union of genes; shared genes highlighted). Pick from the suggestions to add each one.</span>
                             <div class="terminology-panel" id="terminology-panel" aria-live="polite">
                                 <div class="terminology-panel-header">
-                                    <span><i class="fas fa-route"></i> Terminology Mapping</span>
-                                    <span class="terminology-status" id="terminology-status">Waiting</span>
+                                    <span><i class="fas fa-route"></i> <span data-i18n="term.title">Terminology Mapping</span></span>
+                                    <span class="terminology-status" id="terminology-status" data-i18n="term.status.waiting">Waiting</span>
                                 </div>
                                 <div class="terminology-summary" id="terminology-summary"></div>
                                 <div class="terminology-chain">
                                     <div class="terminology-step">
-                                        <span class="terminology-step-label">Input</span>
-                                        <div class="terminology-step-body" id="terminology-input">Type a disease, symptom, or clinical phrase</div>
+                                        <span class="terminology-step-label" data-i18n="term.input">Input</span>
+                                        <div class="terminology-step-body" id="terminology-input" data-i18n="term.inputHint">Type a disease, symptom, or clinical phrase</div>
                                     </div>
                                     <div class="terminology-step">
                                         <span class="terminology-step-label">UMLS</span>
-                                        <div class="terminology-step-body" id="terminology-umls">No concepts loaded</div>
+                                        <div class="terminology-step-body" id="terminology-umls" data-i18n="term.umlsEmpty">No concepts loaded</div>
                                     </div>
                                     <div class="terminology-step">
                                         <span class="terminology-step-label">Open Targets</span>
-                                        <div class="terminology-step-body" id="terminology-opentargets">No candidates loaded</div>
+                                        <div class="terminology-step-body" id="terminology-opentargets" data-i18n="term.otEmpty">No candidates loaded</div>
                                     </div>
                                 </div>
                             </div>
@@ -134,40 +78,41 @@
                 <section class="card">
                     <div class="card-header">
                         <i class="fas fa-mortar-pestle"></i>
-                        <h2>Herbal Prescriptions</h2>
+                        <h2 data-i18n="index.prescriptions">Herbal Prescriptions</h2>
                         <div class="card-actions">
                             <button type="button" class="btn btn-outline btn-sm" id="add-prescription-btn">
-                                <i class="fas fa-plus"></i> Add Prescription
+                                <i class="fas fa-plus"></i> <span data-i18n="index.addPrescription">Add Prescription</span>
                             </button>
                         </div>
                     </div>
                     <div class="card-body">
                         <div class="preset-bar" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px;">
                             <span style="font-size:0.82rem; color:#6b7280; font-weight:600;">
-                                <i class="fas fa-vial"></i> Quick test presets:
+                                <i class="fas fa-vial"></i> <span data-i18n="index.presets">Quick test presets:</span>
                             </span>
                             <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="1">Preset 1 &middot; 6 herbs</button>
                             <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="2">Preset 2 &middot; 14 herbs</button>
                             <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="3">Preset 3 &middot; 4 herbs</button>
-                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="all" style="font-weight:600;">Load all 3</button>
+                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="all" style="font-weight:600;" data-i18n="index.loadAll">Load all 3</button>
                         </div>
                         <div id="prescriptions-container">
                             <!-- Prescription 1 -->
                             <div class="prescription-card" data-index="1">
                                 <div class="prescription-header">
                                     <span class="prescription-badge">Prescription 1</span>
-                                    <button type="button" class="btn-icon remove-prescription" title="Remove prescription" style="display: none;">
+                                    <button type="button" class="btn-icon remove-prescription" title="Remove prescription" data-i18n-title="rx.removeTitle" style="display: none;">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
                                 <div class="prescription-body">
                                     <div class="autocomplete-wrapper">
                                         <div class="tags-input-container" id="tags-container-1">
-                                            <input 
-                                                type="text" 
-                                                class="tags-input herb-input" 
+                                            <input
+                                                type="text"
+                                                class="tags-input herb-input"
                                                 data-index="1"
-                                                placeholder="Type herb name or paste list..." 
+                                                placeholder="Type herb name or paste list..."
+                                                data-i18n-placeholder="index.herbPlaceholder"
                                                 autocomplete="off"
                                             >
                                         </div>
@@ -178,7 +123,7 @@
                         </div>
                         <p class="form-hint" style="margin-top: 16px;">
                             <i class="fas fa-info-circle"></i>
-                            You can add up to 3 prescriptions. Type to search or paste a comma-separated list of herbs.
+                            <span data-i18n="index.prescriptionsHint">You can add up to 3 prescriptions. Type to search or paste a comma-separated list of herbs.</span>
                         </p>
                     </div>
                 </section>
@@ -187,12 +132,12 @@
                 <section class="card" style="margin-top: 20px;">
                     <div class="card-header">
                         <i class="fas fa-chart-bar"></i>
-                        <h2>Enrichment Libraries</h2>
+                        <h2 data-i18n="index.enrichmentLibs">Enrichment Libraries</h2>
                     </div>
                     <div class="card-body">
                         <p class="form-hint" style="margin-bottom: 14px;">
                             <i class="fas fa-info-circle"></i>
-                            Choose which gene-set libraries to enrich the common genes against. Pathway libraries (KEGG, Reactome, GO) reveal mechanism; DisGeNET maps the genes back to diseases.
+                            <span data-i18n="index.enrichmentHint">Choose which gene-set libraries to enrich the common genes against. Pathway libraries (KEGG, Reactome, GO) reveal mechanism; DisGeNET maps the genes back to diseases.</span>
                         </p>
                         <div class="lib-options">
                             {% for opt in enrichment_options or [] %}
@@ -211,10 +156,10 @@
                 <!-- Action Buttons -->
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" id="clear-btn">
-                        <i class="fas fa-eraser"></i> Clear All
+                        <i class="fas fa-eraser"></i> <span data-i18n="index.clearAll">Clear All</span>
                     </button>
                     <button type="submit" class="btn btn-primary btn-lg" id="run-analysis-btn">
-                        <i class="fas fa-flask"></i> Run Analysis
+                        <i class="fas fa-flask"></i> <span data-i18n="index.runAnalysis">Run Analysis</span>
                     </button>
                 </div>
 

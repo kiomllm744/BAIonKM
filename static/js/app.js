@@ -52,7 +52,8 @@ function initializeApp() {
     setupDiseaseAutocomplete();
     document.querySelectorAll('.herb-input').forEach(setupHerbAutocomplete);
     setupEventListeners();
-    
+    relabelPrescriptions();
+
     // Click on container focuses the input
     document.querySelectorAll('.tags-input-container').forEach(container => {
         container.addEventListener('click', () => {
@@ -139,7 +140,7 @@ function renderDiseaseChips() {
     c.innerHTML = state.selectedDiseases.map((d, i) => `
         <span class="disease-chip">
             <strong>${escapeHtml(d.name)}</strong>${d.id ? `<small>${escapeHtml(d.id)}</small>` : ''}
-            <button type="button" class="disease-chip-remove" data-index="${i}" title="Remove" aria-label="Remove">&times;</button>
+            <button type="button" class="disease-chip-remove" data-index="${i}" title="${i18n.t('common.remove')}" aria-label="${i18n.t('common.remove')}">&times;</button>
         </span>
     `).join('');
     c.querySelectorAll('.disease-chip-remove').forEach(btn => {
@@ -152,7 +153,7 @@ function addDisease(name, id) {
     if (!name) return;
     if (state.selectedDiseases.some(d => d.name.toLowerCase() === name.toLowerCase())) return; // de-dupe
     if (state.selectedDiseases.length >= state.maxDiseases) {
-        showToast(`You can add up to ${state.maxDiseases} diseases/symptoms`, 'error');
+        showToast(i18n.t('toast.maxDiseases', { n: state.maxDiseases }), 'error');
         return;
     }
     state.selectedDiseases.push({ name: name, id: id || '' });
@@ -179,22 +180,22 @@ function renderTerminologyEmpty(query = '') {
     state.diseaseOk = true;          // no disease yet -> don't block the button
     state.diseaseOkFor = '';
     updateRunButton();
-    setTerminologyStatus(query ? 'Waiting' : 'Idle');
+    setTerminologyStatus(query ? i18n.t('term.status.waiting') : i18n.t('term.status.idle'));
     if (elements.terminologySummary) elements.terminologySummary.innerHTML = '';
     elements.terminologyInput.innerHTML = query
         ? `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`
-        : '<span class="terminology-empty">Type a disease, symptom, or clinical phrase</span>';
-    elements.terminologyUmls.innerHTML = '<span class="terminology-empty">No concepts loaded</span>';
-    elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">No candidates loaded</span>';
+        : `<span class="terminology-empty">${i18n.t('term.inputHint')}</span>`;
+    elements.terminologyUmls.innerHTML = `<span class="terminology-empty">${i18n.t('term.umlsEmpty')}</span>`;
+    elements.terminologyOpenTargets.innerHTML = `<span class="terminology-empty">${i18n.t('term.otEmpty')}</span>`;
 }
 
 function renderTerminologyLoading(query) {
     if (!elements.terminologyPanel) return;
-    setTerminologyStatus('Mapping', 'loading');
-    if (elements.terminologySummary) elements.terminologySummary.innerHTML = `Interpreting <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>&hellip;`;
+    setTerminologyStatus(i18n.t('term.status.mapping'), 'loading');
+    if (elements.terminologySummary) elements.terminologySummary.innerHTML = i18n.t('term.interpreting', { q: `<strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>` });
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
-    elements.terminologyUmls.innerHTML = '<span class="terminology-empty">Searching UMLS...</span>';
-    elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Waiting for normalized terms</span>';
+    elements.terminologyUmls.innerHTML = `<span class="terminology-empty">${i18n.t('term.searchingUmls')}</span>`;
+    elements.terminologyOpenTargets.innerHTML = `<span class="terminology-empty">${i18n.t('term.waitingTerms')}</span>`;
 }
 
 function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
@@ -204,7 +205,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     const candidates = Array.isArray(openTargetsSuggestions) ? openTargetsSuggestions : [];
     const hasUmls = concepts.length > 0;
 
-    setTerminologyStatus(hasUmls ? 'Live' : 'Fallback', hasUmls ? 'ready' : 'fallback');
+    setTerminologyStatus(hasUmls ? i18n.t('term.status.live') : i18n.t('term.status.fallback'), hasUmls ? 'ready' : 'fallback');
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
 
     // Plain-language summary: "We understood "<input>" as <Disease> (ICD-10 ...)"
@@ -223,12 +224,13 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     }
     if (elements.terminologySummary) {
         const noOt = candidates.length === 0;
+        const styledQuery = `<strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>`;
+        const understoodRest = `<span class="terminology-understood">${escapeHtml(primaryName)}</span>`
+            + (primaryMeta ? ` <small>${escapeHtml(primaryMeta)}</small>` : '')
+            + (noOt ? ` <small class="terminology-warn">${i18n.t('term.notInOt')}</small>` : '');
         elements.terminologySummary.innerHTML = primaryName
-            ? `We understood <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong> as `
-              + `<span class="terminology-understood">${escapeHtml(primaryName)}</span>`
-              + (primaryMeta ? ` <small>${escapeHtml(primaryMeta)}</small>` : '')
-              + (noOt ? ` <small class="terminology-warn">not in Open Targets (no gene data)</small>` : '')
-            : `Searching Open Targets for <strong>&ldquo;${escapeHtml(query)}&rdquo;</strong>&hellip;`;
+            ? i18n.t('term.understoodAs', { q: styledQuery, rest: understoodRest })
+            : i18n.t('term.searchingOt', { q: styledQuery });
     }
 
     if (hasUmls) {
@@ -240,7 +242,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
         elements.terminologyUmls.innerHTML = concepts.slice(0, 4).map(concept => {
             const name = concept.preferred_name || concept.name || '';
             const icd = concept.icd10 ? `<small>ICD-10 ${escapeHtml(concept.icd10)}</small>` : '';
-            const tip = `Standardized term${concept.cui ? ' · ' + concept.cui : ''}`;
+            const tip = i18n.t('term.standardizedTerm') + (concept.cui ? ' · ' + concept.cui : '');
             return `
                 <span class="terminology-chip umls" title="${escapeHtml(tip)}">
                     <strong>${escapeHtml(name)}</strong>${icd}
@@ -248,9 +250,9 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
             `;
         }).join('');
     } else if (payload && payload.umls_available === false) {
-        elements.terminologyUmls.innerHTML = '<span class="terminology-empty">UMLS key not configured</span>';
+        elements.terminologyUmls.innerHTML = `<span class="terminology-empty">${i18n.t('term.umlsKeyMissing')}</span>`;
     } else {
-        elements.terminologyUmls.innerHTML = '<span class="terminology-empty">No UMLS concept match</span>';
+        elements.terminologyUmls.innerHTML = `<span class="terminology-empty">${i18n.t('term.noUmlsMatch')}</span>`;
     }
 
     if (candidates.length > 0) {
@@ -258,23 +260,23 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
             const nm = typeof c === 'string' ? c : (c.name || '');
             const cid = typeof c === 'string' ? '' : (c.id || '');
             return `
-                <span class="terminology-chip open-targets selectable" data-disease="${escapeHtml(nm)}" data-id="${escapeHtml(cid)}" title="Click to select this disease">
+                <span class="terminology-chip open-targets selectable" data-disease="${escapeHtml(nm)}" data-id="${escapeHtml(cid)}" title="${escapeHtml(i18n.t('term.selectThisDisease'))}">
                     <strong>${escapeHtml(nm)}</strong>
                 </span>
             `;
         }).join('');
     } else {
-        elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Not in Open Targets &mdash; no disease-gene data for this term. Pick an Open Targets disease (try a more standard name).</span>';
+        elements.terminologyOpenTargets.innerHTML = `<span class="terminology-empty">${i18n.t('term.notInOtHint')}</span>`;
     }
 }
 
 function renderTerminologyError(query) {
     if (!elements.terminologyPanel) return;
-    setTerminologyStatus('Error', 'fallback');
+    setTerminologyStatus(i18n.t('term.status.error'), 'fallback');
     if (elements.terminologySummary) elements.terminologySummary.innerHTML = '';
     elements.terminologyInput.innerHTML = `<span class="terminology-chip"><strong>${escapeHtml(query)}</strong></span>`;
-    elements.terminologyUmls.innerHTML = '<span class="terminology-empty">UMLS lookup failed</span>';
-    elements.terminologyOpenTargets.innerHTML = '<span class="terminology-empty">Using direct Open Targets search</span>';
+    elements.terminologyUmls.innerHTML = `<span class="terminology-empty">${i18n.t('term.umlsFailed')}</span>`;
+    elements.terminologyOpenTargets.innerHTML = `<span class="terminology-empty">${i18n.t('term.usingDirectOt')}</span>`;
 }
 
 async function fetchTerminologyMapping(query, openTargetsPromise) {
@@ -559,7 +561,7 @@ function showSuggestionsWithKeyboard(container, suggestions, query, onSelect) {
     const isDiseaseObject = typeof first === 'object' && first && !first.english && 'name' in first;
 
     // Add count header for better UX
-    const countHeader = `<div class="suggestions-count"><i class="fas fa-search"></i> Found ${suggestions.length} matching result${suggestions.length !== 1 ? 's' : ''}</div>`;
+    const countHeader = `<div class="suggestions-count"><i class="fas fa-search"></i> ${i18n.t('search.found', { n: suggestions.length })}</div>`;
 
     let itemsHtml;
     if (isHerbSuggestion) {
@@ -655,7 +657,7 @@ async function addHerbTagInline(prescriptionIndex, herbName, tagsContainer, inpu
     const displayName = koreanName ? `${koreanName} (${herbName})` : herbName;
     tag.innerHTML = `
         ${escapeHtml(displayName)}
-        <span class="remove-tag" title="Remove">&times;</span>
+        <span class="remove-tag" title="${i18n.t('common.remove')}">&times;</span>
     `;
     
     tag.querySelector('.remove-tag').addEventListener('click', (e) => {
@@ -685,7 +687,7 @@ function removeHerbTagInline(prescriptionIndex, herbName, tagsContainer) {
 
 function updatePlaceholder(prescriptionIndex, input) {
     const herbs = state.prescriptions[prescriptionIndex] || [];
-    input.placeholder = herbs.length > 0 ? 'Add more herbs...' : 'Type herb name or paste list...';
+    input.placeholder = herbs.length > 0 ? i18n.t('index.herbPlaceholderMore') : i18n.t('index.herbPlaceholder');
 }
 
 // ==========================================
@@ -698,7 +700,7 @@ async function addBulkHerbs(prescriptionIndex, herbs, tagsContainer, input) {
     const duplicateHerbs = [];
     
     // Show loading toast
-    showToast('Validating herbs...', 'info');
+    showToast(i18n.t('toast.validatingHerbs'), 'info');
     
     for (const herb of herbs) {
         // Validate against database (works for both Korean and English input)
@@ -725,15 +727,15 @@ async function addBulkHerbs(prescriptionIndex, herbs, tagsContainer, input) {
     
     // Show results
     if (validHerbs.length > 0) {
-        showToast(`Added ${validHerbs.length} herb${validHerbs.length > 1 ? 's' : ''} successfully`, 'success');
+        showToast(i18n.t('toast.addedHerbs', { n: validHerbs.length }), 'success');
     }
     
     if (invalidHerbs.length > 0) {
-        showToast(`Not found in database: ${invalidHerbs.join(', ')}`, 'error', 5000);
+        showToast(i18n.t('toast.notFound', { list: invalidHerbs.join(', ') }), 'error', 5000);
     }
     
     if (duplicateHerbs.length > 0) {
-        showToast(`Already added: ${duplicateHerbs.join(', ')}`, 'warning');
+        showToast(i18n.t('toast.alreadyAdded', { list: duplicateHerbs.join(', ') }), 'warning');
     }
     
     input.value = '';
@@ -796,7 +798,7 @@ async function loadPreset(which) {
 
 function addPrescription() {
     if (state.prescriptionCount >= state.maxPrescriptions) {
-        showToast('Maximum 3 prescriptions allowed', 'warning');
+        showToast(i18n.t('toast.maxPrescriptions'), 'warning');
         return;
     }
     
@@ -809,8 +811,8 @@ function addPrescription() {
     prescriptionCard.dataset.index = index;
     prescriptionCard.innerHTML = `
         <div class="prescription-header">
-            <span class="prescription-badge">Prescription ${index}</span>
-            <button type="button" class="btn-icon remove-prescription" title="Remove prescription">
+            <span class="prescription-badge">${i18n.t('rx.badge', { n: index })}</span>
+            <button type="button" class="btn-icon remove-prescription" title="${i18n.t('rx.removeTitle')}" data-i18n-title="rx.removeTitle">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -821,7 +823,8 @@ function addPrescription() {
                         type="text" 
                         class="tags-input herb-input" 
                         data-index="${index}"
-                        placeholder="Type herb name..." 
+                        placeholder="${i18n.t('index.herbPlaceholder')}"
+                        data-i18n-placeholder="index.herbPlaceholder"
                         autocomplete="off"
                     >
                 </div>
@@ -851,7 +854,7 @@ function addPrescription() {
 
 function removePrescription(index, element) {
     if (state.prescriptionCount <= 1) {
-        showToast('At least one prescription is required', 'warning');
+        showToast(i18n.t('toast.minPrescription'), 'warning');
         return;
     }
     
@@ -874,13 +877,21 @@ function renumberPrescriptions() {
         newPrescriptions[newIndex] = state.prescriptions[oldIndex] || [];
         
         card.dataset.index = newIndex;
-        card.querySelector('.prescription-badge').textContent = `Prescription ${newIndex}`;
+        card.querySelector('.prescription-badge').textContent = i18n.t('rx.badge', { n: newIndex });
         card.querySelector('.herb-input').dataset.index = newIndex;
         card.querySelector('.tags-input-container').id = `tags-container-${newIndex}`;
     });
     
     state.prescriptions = newPrescriptions;
     state.prescriptionCount = cards.length;
+}
+
+// Re-apply the localized "Prescription N" badges (on load and on language change).
+function relabelPrescriptions() {
+    elements.prescriptionsContainer.querySelectorAll('.prescription-card').forEach((card, i) => {
+        const badge = card.querySelector('.prescription-badge');
+        if (badge) badge.textContent = i18n.t('rx.badge', { n: i + 1 });
+    });
 }
 
 function updateRemoveButtonsVisibility() {
@@ -924,7 +935,7 @@ function clearForm() {
     // Reset placeholder
     const firstInput = document.querySelector('.herb-input[data-index="1"]');
     if (firstInput) {
-        firstInput.placeholder = 'Type herb name...';
+        firstInput.placeholder = i18n.t('index.herbPlaceholder');
     }
     
     updateRemoveButtonsVisibility();
@@ -935,7 +946,7 @@ function handleFormSubmit(e) {
     e.preventDefault();
     
     if (state.selectedDiseases.length === 0) {
-        showToast('Please add at least one disease/symptom (pick it from the suggestions)', 'error');
+        showToast(i18n.t('toast.needDisease'), 'error');
         elements.diseaseInput.focus();
         return;
     }
@@ -953,14 +964,14 @@ function handleFormSubmit(e) {
     }
     
     if (!hasHerbs) {
-        showToast('Please add at least one herb to a prescription', 'error');
+        showToast(i18n.t('toast.needHerb'), 'error');
         return;
     }
     
     elements.herbsDataInput.value = JSON.stringify(herbsData);
     
     const submitBtn = elements.form.querySelector('button[type="submit"]');
-    submitBtn.innerHTML = '<span class="spinner"></span> Analyzing...';
+    submitBtn.innerHTML = '<span class="spinner"></span> ' + i18n.t('btn.analyzing');
     submitBtn.disabled = true;
 
     elements.form.submit();
@@ -973,7 +984,7 @@ function resetRunButton() {
     const btn = elements.runAnalysisBtn;
     if (!btn) return;
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-flask"></i> Run Analysis';
+    btn.innerHTML = '<i class="fas fa-flask"></i> <span data-i18n="index.runAnalysis">' + i18n.t('index.runAnalysis') + '</span>';
     updateRunButton(); // re-apply is-disabled based on current disease selection
 }
 
@@ -1001,6 +1012,18 @@ function setupEventListeners() {
     // pageshow fires on first load AND on back/forward-cache restores (unlike
     // DOMContentLoaded). Reset the submit button so it isn't stuck "Analyzing...".
     window.addEventListener('pageshow', resetRunButton);
+
+    // Re-localize dynamic content when the language changes.
+    document.addEventListener('langchange', () => {
+        relabelPrescriptions();
+        renderDiseaseChips();
+        document.querySelectorAll('.herb-input').forEach((inp) => {
+            updatePlaceholder(parseInt(inp.dataset.index, 10), inp);
+        });
+        if (elements.diseaseInput && !elements.diseaseInput.value.trim()) {
+            renderTerminologyEmpty();
+        }
+    });
 
     // Hide suggestions on outside click
     document.addEventListener('click', (e) => {

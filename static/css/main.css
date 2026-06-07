@@ -1337,3 +1337,39 @@ body {
     }
 }
 
+/* ==========================================================================
+   Language toggle (EN / 한국어) in the top app bar
+   ========================================================================== */
+.lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 20px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    transition: var(--transition);
+}
+
+.lang-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.lang-toggle [data-lang] {
+    padding: 0 1px;
+}
+
+.lang-toggle [data-lang].active {
+    color: #fff;
+    font-weight: 700;
+}
+
+.lang-toggle .lang-sep {
+    opacity: 0.35;
+}
+
