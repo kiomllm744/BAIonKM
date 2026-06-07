@@ -406,25 +406,25 @@
             <!-- Hero Section -->
             <div class="about-hero">
                 <h1><i class="fas fa-dna"></i> BAIonKM</h1>
-                <p>A computational platform for discovering shared genetic pathways between diseases and traditional Chinese medicine prescriptions through advanced bioinformatics analysis.</p>
+                <p data-i18n="about.heroBlurb">A computational platform for discovering shared genetic pathways between diseases and traditional Chinese medicine prescriptions through advanced bioinformatics analysis.</p>
             </div>
 
             <!-- System Flowchart -->
-            <h2 class="section-title"><i class="fas fa-project-diagram"></i> System Architecture</h2>
+            <h2 class="section-title"><i class="fas fa-project-diagram"></i> <span data-i18n="about.systemArchitecture">System Architecture</span></h2>
             <div class="flowchart-container">
                 <div class="flowchart">
                     <!-- Input Row -->
                     <div class="flow-row">
                         <div class="flow-node input">
                             <i class="fas fa-virus"></i>
-                            Disease Name
-                            <small>e.g., Alzheimer's Disease</small>
+                            <span data-i18n="about.archDisease">Disease Name</span>
+                            <small data-i18n="about.archDiseaseEg">e.g., Alzheimer's Disease</small>
                         </div>
                         <span class="flow-arrow"><i class="fas fa-plus"></i></span>
                         <div class="flow-node input">
                             <i class="fas fa-leaf"></i>
-                            Herbal Prescriptions
-                            <small>Up to 3 formulas</small>
+                            <span data-i18n="about.archRx">Herbal Prescriptions</span>
+                            <small data-i18n="about.archRxSub">Up to 3 formulas</small>
                         </div>
                     </div>
                     
@@ -435,13 +435,13 @@
                         <div class="flow-node database">
                             <i class="fas fa-database"></i>
                             Open Targets
-                            <small>Disease-Gene Associations</small>
+                            <small data-i18n="about.archOtSub">Disease-Gene Associations</small>
                         </div>
                         <span class="flow-arrow"><i class="fas fa-exchange-alt"></i></span>
                         <div class="flow-node database">
                             <i class="fas fa-database"></i>
                             BATMAN-TCM
-                            <small>Herb-Compound-Gene Data</small>
+                            <small data-i18n="about.archBatmanSub">Herb-Compound-Gene Data</small>
                         </div>
                     </div>
                     
@@ -450,8 +450,8 @@
                     <!-- Process Row -->
                     <div class="flow-node process">
                         <i class="fas fa-calculator"></i>
-                        Gene Set Intersection
-                        <small>Find common genes between disease & herbs</small>
+                        <span data-i18n="about.archIntersection">Gene Set Intersection</span>
+                        <small data-i18n="about.archIntersectionSub">Find common genes between disease & herbs</small>
                     </div>
                     
                     <i class="fas fa-arrow-down flow-arrow-down"></i>
@@ -460,7 +460,7 @@
                     <div class="flow-node api">
                         <i class="fas fa-cloud"></i>
                         Enrichr API
-                        <small>Pathway Enrichment Analysis</small>
+                        <small data-i18n="about.archEnrichrSub">Pathway Enrichment Analysis</small>
                     </div>
                     
                     <i class="fas fa-arrow-down flow-arrow-down"></i>
@@ -469,144 +469,143 @@
                     <div class="flow-row">
                         <div class="flow-node output">
                             <i class="fas fa-dna"></i>
-                            Common Genes
+                            <span data-i18n="about.commonGenes">Common Genes</span>
                         </div>
                         <div class="flow-node output">
                             <i class="fas fa-route"></i>
-                            KEGG Pathways
+                            <span data-i18n="about.keggPathways">KEGG Pathways</span>
                         </div>
                         <div class="flow-node output">
                             <i class="fas fa-sitemap"></i>
-                            GO Terms
+                            <span data-i18n="about.goTerms">GO Terms</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Algorithm Visualization -->
-            <h2 class="section-title"><i class="fas fa-brain"></i> Core Algorithm</h2>
+            <h2 class="section-title"><i class="fas fa-brain"></i> <span data-i18n="about.coreAlgorithm">Core Algorithm</span></h2>
             <div class="algorithm-visual">
-                <h3><i class="fas fa-intersect"></i> Set Intersection Logic</h3>
+                <h3><i class="fas fa-intersect"></i> <span data-i18n="about.setIntersectionLogic">Set Intersection Logic</span></h3>
                 <div class="set-diagram">
                     <div class="set-circle disease">
                         <i class="fas fa-virus"></i>
-                        Disease Genes
-                        <small>from Open Targets</small>
+                        <span data-i18n="about.diseaseGenes">Disease Genes</span>
+                        <small data-i18n="about.fromOpenTargets">from Open Targets</small>
                     </div>
                     <span class="set-operator">∩</span>
                     <div class="set-circle herbs">
                         <i class="fas fa-leaf"></i>
-                        Herb Targets
-                        <small>from BATMAN-TCM</small>
+                        <span data-i18n="about.herbTargets">Herb Targets</span>
+                        <small data-i18n="about.fromBatman">from BATMAN-TCM</small>
                     </div>
                     <span class="set-operator">=</span>
                     <div class="set-circle intersection">
                         <i class="fas fa-star"></i>
-                        Common Genes
-                        <small>Therapeutic Targets</small>
+                        <span data-i18n="about.commonGenes">Common Genes</span>
+                        <small data-i18n="about.therapeuticTargets">Therapeutic Targets</small>
                     </div>
                 </div>
-                <p style="text-align: center; margin-top: 20px; opacity: 0.8;">
-                    The intersection reveals genes that are both associated with the disease AND targeted by the herbal compounds,<br>
-                    suggesting potential therapeutic mechanisms of traditional medicine.
+                <p style="text-align: center; margin-top: 20px; opacity: 0.8;" data-i18n="about.algoDesc">
+                    The intersection reveals genes that are both associated with the disease AND targeted by the herbal compounds, suggesting potential therapeutic mechanisms of traditional medicine.
                 </p>
             </div>
 
             <!-- Data Sources -->
-            <h2 class="section-title"><i class="fas fa-database"></i> Data Sources</h2>
+            <h2 class="section-title"><i class="fas fa-database"></i> <span data-i18n="about.dataSources">Data Sources</span></h2>
             <div class="data-sources">
                 <div class="data-source-card opentargets">
                     <h3><i class="fas fa-hospital"></i> Open Targets</h3>
-                    <p>An open platform that integrates human genetics, genomics, transcriptomics, drugs, animal models, and the literature to score and rank gene&ndash;disease associations. Disease genes and their association scores are fetched live from the Open Targets GraphQL API.</p>
+                    <p data-i18n="about.otDesc">An open platform that integrates human genetics, genomics, transcriptomics, drugs, animal models, and the literature to score and rank gene&ndash;disease associations. Disease genes and their association scores are fetched live from the Open Targets GraphQL API.</p>
                     <div class="source-stats">
                         <div class="source-stat">
                             <div class="source-stat-value" id="opentargets-diseases">28K+</div>
-                            <div class="source-stat-label">Diseases</div>
+                            <div class="source-stat-label" data-i18n="stat.diseases">Diseases</div>
                         </div>
                         <div class="source-stat">
                             <div class="source-stat-value">60K+</div>
-                            <div class="source-stat-label">Targets</div>
+                            <div class="source-stat-label" data-i18n="about.statTargets">Targets</div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="data-source-card batman">
                     <h3><i class="fas fa-seedling"></i> BATMAN-TCM</h3>
-                    <p>Bioinformatics Analysis Tool for Molecular mechANism of Traditional Chinese Medicine. Maps herbal compounds to their gene targets using molecular similarity and network-based predictions.</p>
+                    <p data-i18n="about.batmanDesc">Bioinformatics Analysis Tool for Molecular mechANism of Traditional Chinese Medicine. Maps herbal compounds to their gene targets using molecular similarity and network-based predictions.</p>
                     <div class="source-stats">
                         <div class="source-stat">
                             <div class="source-stat-value" id="batman-herbs">437</div>
-                            <div class="source-stat-label">Herbs</div>
+                            <div class="source-stat-label" data-i18n="stat.herbs">Herbs</div>
                         </div>
                         <div class="source-stat">
                             <div class="source-stat-value">8K+</div>
-                            <div class="source-stat-label">Compounds</div>
+                            <div class="source-stat-label" data-i18n="about.statCompounds">Compounds</div>
                         </div>
                     </div>
                 </div>
                 
                 <div class="data-source-card enrichr">
                     <h3><i class="fas fa-chart-network"></i> Enrichr</h3>
-                    <p>A comprehensive gene set enrichment analysis web server. Provides access to hundreds of gene-set libraries for pathway analysis including KEGG, GO, and the <strong>DisGeNET</strong> disease gene-set library used here for enrichment.</p>
+                    <p data-i18n-html="about.enrichrDesc">A comprehensive gene set enrichment analysis web server. Provides access to hundreds of gene-set libraries for pathway analysis including KEGG, GO, and the <strong>DisGeNET</strong> disease gene-set library used here for enrichment.</p>
                     <div class="source-stats">
                         <div class="source-stat">
                             <div class="source-stat-value">200+</div>
-                            <div class="source-stat-label">Libraries</div>
+                            <div class="source-stat-label" data-i18n="about.statLibraries">Libraries</div>
                         </div>
                         <div class="source-stat">
                             <div class="source-stat-value">500K+</div>
-                            <div class="source-stat-label">Gene Sets</div>
+                            <div class="source-stat-label" data-i18n="about.statGeneSets">Gene Sets</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- How It Works -->
-            <h2 class="section-title"><i class="fas fa-cogs"></i> How It Works</h2>
+            <h2 class="section-title"><i class="fas fa-cogs"></i> <span data-i18n="about.howItWorks">How It Works</span></h2>
             <div class="process-steps">
                 <div class="process-step">
                     <div class="step-number">1</div>
                     <div class="step-content">
-                        <h4>Select Disease & Input Prescriptions</h4>
-                        <p>Enter a disease name using the autocomplete search and add up to 3 herbal prescriptions. Each prescription can contain multiple herbs separated by commas. The system validates herb names against the BATMAN-TCM database.</p>
+                        <h4 data-i18n="about.step1Title">Select Disease & Input Prescriptions</h4>
+                        <p data-i18n="about.step1Desc">Enter a disease name using the autocomplete search and add up to 3 herbal prescriptions. Each prescription can contain multiple herbs separated by commas. The system validates herb names against the BATMAN-TCM database.</p>
                     </div>
                 </div>
                 
                 <div class="process-step">
                     <div class="step-number">2</div>
                     <div class="step-content">
-                        <h4>Retrieve Gene Associations</h4>
-                        <p>The system queries Open Targets for disease-associated genes (with association scores) and BATMAN-TCM for compound-gene targets of each herb. These sources provide curated, high-quality associations from multiple lines of evidence.</p>
+                        <h4 data-i18n="about.step2Title">Retrieve Gene Associations</h4>
+                        <p data-i18n="about.step2Desc">The system queries Open Targets for disease-associated genes (with association scores) and BATMAN-TCM for compound-gene targets of each herb. These sources provide curated, high-quality associations from multiple lines of evidence.</p>
                     </div>
                 </div>
                 
                 <div class="process-step">
                     <div class="step-number">3</div>
                     <div class="step-content">
-                        <h4>Compute Gene Intersection</h4>
-                        <p>Using set theory, the system finds genes that appear in BOTH the disease gene set AND the combined herb target gene set. This intersection represents potential therapeutic targets.</p>
+                        <h4 data-i18n="about.step3Title">Compute Gene Intersection</h4>
+                        <p data-i18n="about.step3Desc">Using set theory, the system finds genes that appear in BOTH the disease gene set AND the combined herb target gene set. This intersection represents potential therapeutic targets.</p>
                     </div>
                 </div>
                 
                 <div class="process-step">
                     <div class="step-number">4</div>
                     <div class="step-content">
-                        <h4>Pathway Enrichment Analysis</h4>
-                        <p>The common genes are submitted to Enrichr for enrichment analysis. The system retrieves significantly enriched KEGG pathways, GO biological processes, and molecular functions to understand the biological context.</p>
+                        <h4 data-i18n="about.step4Title">Pathway Enrichment Analysis</h4>
+                        <p data-i18n="about.step4Desc">The common genes are submitted to Enrichr for enrichment analysis. The system retrieves significantly enriched KEGG pathways, GO biological processes, and molecular functions to understand the biological context.</p>
                     </div>
                 </div>
                 
                 <div class="process-step">
                     <div class="step-number">5</div>
                     <div class="step-content">
-                        <h4>Results & Visualization</h4>
-                        <p>Results are presented with interactive visualizations including gene lists, pathway charts, and statistical significance scores. All results are saved to history for future reference.</p>
+                        <h4 data-i18n="about.step5Title">Results & Visualization</h4>
+                        <p data-i18n="about.step5Desc">Results are presented with interactive visualizations including gene lists, pathway charts, and statistical significance scores. All results are saved to history for future reference.</p>
                     </div>
                 </div>
             </div>
 
             <!-- Tech Stack -->
-            <h2 class="section-title"><i class="fas fa-code"></i> Technology Stack</h2>
+            <h2 class="section-title"><i class="fas fa-code"></i> <span data-i18n="about.techStack">Technology Stack</span></h2>
             <div class="card" style="margin-bottom: 40px;">
                 <div class="card-body">
                     <div class="tech-stack">
@@ -626,7 +625,7 @@
             <!-- Footer -->
             <div class="about-footer">
                 <h3>BAIonKM</h3>
-                <p>Bridging traditional medicine and modern genomics through computational analysis. This platform aims to help researchers understand the potential molecular mechanisms underlying traditional Chinese medicine treatments.</p>
+                <p data-i18n="about.footerDesc">Bridging traditional medicine and modern genomics through computational analysis. This platform aims to help researchers understand the potential molecular mechanisms underlying traditional Chinese medicine treatments.</p>
                 <div class="footer-links">
                     <a href="https://platform.opentargets.org/" target="_blank" rel="noopener" class="footer-link">
                         <i class="fas fa-external-link-alt"></i> Open Targets

@@ -39,8 +39,9 @@
         <main class="main-content">
             <div class="error-wrap">
                 <div class="error-code">{{ code or 'Error' }}</div>
-                <div class="error-title">{{ title or 'Something went wrong' }}</div>
-                <p class="error-message">{{ message or 'An unexpected error occurred.' }}</p>
+                {% set _has_i18n = code in (404, 500) %}
+                <div class="error-title"{% if _has_i18n %} data-i18n="error.t{{ code }}"{% endif %}>{{ title or 'Something went wrong' }}</div>
+                <p class="error-message"{% if _has_i18n %} data-i18n="error.m{{ code }}"{% endif %}>{{ message or 'An unexpected error occurred.' }}</p>
                 <div class="error-actions">
                     <a href="/" class="btn btn-primary">
                         <i class="fas fa-arrow-left"></i> <span data-i18n="login.back">Back to Analysis</span>

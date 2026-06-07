@@ -1043,12 +1043,12 @@
                                 <span class="disease-dot">{{ dletters[loop.index0 % 3] }}</span>
                                 {{ d.name }}
                             </span>
-                            <span class="disease-item-count">{{ d.total_gene_count or d.gene_count }} genes</span>
+                            <span class="disease-item-count">{{ d.total_gene_count or d.gene_count }} <span data-i18n="result.genesUnit">genes</span></span>
                         </summary>
                         <div class="disease-item-body">
-                            <div>Total associated genes: <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} used in analysis{% endif %}</div>
+                            <div><span data-i18n="result.totalAssocGenes">Total associated genes:</span> <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} <span data-i18n="result.usedInAnalysis">used in analysis</span>{% endif %}</div>
                             <div>Open Targets ID:
-                                {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}not resolved{% endif %}
+                                {% if d.efo_id %}<a href="https://platform.opentargets.org/disease/{{ d.efo_id }}" target="_blank" rel="noopener">{{ d.efo_id }} &#8599;</a>{% else %}<span data-i18n="result.notResolved">not resolved</span>{% endif %}
                             </div>
                         </div>
                     </details>
@@ -1092,7 +1092,7 @@
                         <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ dcolors[loop.index0 % 3] }};">{{ dletters[loop.index0 % 3] }}</span>{{ nm }} ({{ v.sizes[loop.index0] }})</span>
                         {% endfor %}
                     </div>
-                    <div class="venn-note">Each number = genes shared by exactly that region &middot; center = shared by all diseases</div>
+                    <div class="venn-note" data-i18n="result.vennNote1">Each number = genes shared by exactly that region &middot; center = shared by all diseases</div>
                 </div>
                 {% endif %}
 
@@ -1100,16 +1100,16 @@
                 <div class="disease-kpis">
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.diseases | length }}</span>
-                        <span class="disease-kpi-label">Diseases combined</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiDiseasesCombined">Diseases combined</span>
                     </div>
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.disease_gene_count }}</span>
-                        <span class="disease-kpi-label">Total genes used (union)</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiTotalGenes">Total genes used (union)</span>
                     </div>
                     {% if results.diseases | length > 1 %}
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.shared_core_genes | length }}</span>
-                        <span class="disease-kpi-label">Shared by all diseases</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiSharedAll">Shared by all diseases</span>
                     </div>
                     {% endif %}
                 </div>
@@ -1122,7 +1122,7 @@
         <div class="alert alert-warning">
             <i class="fas fa-exclamation-triangle"></i>
             <div>
-                <strong>Warnings:</strong>
+                <strong data-i18n="result.warnings">Warnings:</strong>
                 <ul style="margin: 8px 0 0 16px;">
                     {% for error in results.errors %}
                     <li>{{ error }}</li>
@@ -1175,11 +1175,11 @@
                         <div class="disease-kpis rx-kpis">
                             <div class="disease-kpi">
                                 <span class="disease-kpi-value">{{ hg }}</span>
-                                <span class="disease-kpi-label">Herb genes (total)</span>
+                                <span class="disease-kpi-label" data-i18n="result.kpiHerbGenes">Herb genes (total)</span>
                             </div>
                             <div class="disease-kpi">
                                 <span class="disease-kpi-value">{{ cg }}</span>
-                                <span class="disease-kpi-label">Common genes</span>
+                                <span class="disease-kpi-label" data-i18n="result.kpiCommonGenes">Common genes</span>
                             </div>
                         </div>
                         {% endif %}
@@ -1187,16 +1187,16 @@
                         <!-- Intersecting Targets Section (expandable) -->
                         <details class="gene-targets" style="margin-top: 18px; border-top: 1px solid #f3f4f6; padding-top: 14px;">
                             <summary class="gene-targets-summary">
-                                <i class="fas fa-dna" style="color: #6366f1;"></i> Intersecting Gene Targets ({{ prescription.common_gene_count | default(0) }})
+                                <i class="fas fa-dna" style="color: #6366f1;"></i> <span data-i18n="result.intersectingTargets">Intersecting Gene Targets</span> ({{ prescription.common_gene_count | default(0) }})
                             </summary>
                             <div style="font-size: 0.68rem; color: #9ca3af; margin-bottom: 8px;">
-                                <span style="color:#16a34a;">&#9679;</span> ClinGen-validated (this disease) &nbsp;
-                                <span style="color:#0d9488;">&#9679;</span> ClinGen (other disease) &nbsp;
-                                <span style="color:#6366f1;">&#9679;</span> other
+                                <span style="color:#16a34a;">&#9679;</span> <span data-i18n="result.legendClinGenThis">ClinGen-validated (this disease)</span> &nbsp;
+                                <span style="color:#0d9488;">&#9679;</span> <span data-i18n="result.legendClinGenOther">ClinGen (other disease)</span> &nbsp;
+                                <span style="color:#6366f1;">&#9679;</span> <span data-i18n="result.legendOther">other</span>
                                 {% if results.diseases and results.diseases | length > 1 %}
-                                &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;box-shadow:0 0 0 2px #fbbf24;"></span> shared by all diseases
+                                &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;box-shadow:0 0 0 2px #fbbf24;"></span> <span data-i18n="result.legendSharedAll">shared by all diseases</span>
                                 {% endif %}
-                                &nbsp;&middot; hover a gene for evidence
+                                &nbsp;&middot; <span data-i18n="result.hoverEvidence">hover a gene for evidence</span>
                             </div>
                             <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                 {% if prescription.common_genes %}
@@ -1214,7 +1214,7 @@
                                         </span>
                                     {% endfor %}
                                 {% else %}
-                                    <span style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">No intersecting targets found</span>
+                                    <span style="font-size: 0.75rem; color: #9ca3af; font-style: italic;" data-i18n="result.noIntersecting">No intersecting targets found</span>
                                 {% endif %}
                             </div>
                         </details>
@@ -1234,7 +1234,7 @@
             <div class="card-header">
                 <i class="fas fa-dna"></i>
                 <h2 data-i18n="result.sharedTargets">Shared Disease Targets Across Prescriptions</h2>
-                <span class="badge">{{ results.common_union_count }} genes</span>
+                <span class="badge">{{ results.common_union_count }} <span data-i18n="result.genesUnit">genes</span></span>
             </div>
             <div class="card-body">
                 <div class="venn-wrap">
@@ -1270,7 +1270,7 @@
                         <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ pcolors[loop.index0 % 3] }};">{{ pletters[loop.index0 % 3] }}</span>Prescription {{ idx }} ({{ pv.sizes[loop.index0] }})</span>
                         {% endfor %}
                     </div>
-                    <div class="venn-note">Each number = disease-associated genes hit by exactly that set of prescriptions &middot; center = hit by all</div>
+                    <div class="venn-note" data-i18n="result.vennNote2">Each number = disease-associated genes hit by exactly that set of prescriptions &middot; center = hit by all</div>
                 </div>
                 <div class="disease-kpis">
                     <div class="disease-kpi">
@@ -1279,7 +1279,7 @@
                     </div>
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.gene_overlap.shared_core | length }}</span>
-                        <span class="disease-kpi-label">Shared by all prescriptions</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiSharedAllRx">Shared by all prescriptions</span>
                     </div>
                 </div>
             </div>
@@ -1296,7 +1296,7 @@
                 <!-- Loading State -->
                 <div id="ai-loading" class="ai-loading">
                     <div class="ai-loading-spinner"></div>
-                    <p>Analyzing pathways with AI...</p>
+                    <p data-i18n="result.aiLoading">Analyzing pathways with AI...</p>
                 </div>
                 
                 <!-- AI Results -->
@@ -1308,7 +1308,7 @@
                     <div class="ai-actions">
                         <button class="btn-detailed" id="btn-toggle-details" onclick="toggleDetailedAnalysis()">
                             <i class="fas fa-microscope"></i>
-                            <span>View Detailed Analysis</span>
+                            <span data-i18n="result.viewDetailed">View Detailed Analysis</span>
                         </button>
                     </div>
                     
@@ -1319,20 +1319,20 @@
                 <!-- Error State -->
                 <div id="ai-error" class="ai-error" style="display: none;">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <h4>Analysis Failed</h4>
+                    <h4 data-i18n="result.analysisFailed">Analysis Failed</h4>
                     <p id="ai-error-message">An error occurred</p>
                     <button class="btn-retry" onclick="runAiAnalysis()">
-                        <i class="fas fa-redo"></i> Retry
+                        <i class="fas fa-redo"></i> <span data-i18n="result.retry">Retry</span>
                     </button>
                 </div>
                 
                 <!-- Unavailable State -->
                 <div id="ai-unavailable" class="ai-unavailable" style="display: none;">
                     <i class="fas fa-key"></i>
-                    <h4>API Key Required</h4>
-                    <p>Set your Gemini API key to enable AI analysis:</p>
+                    <h4 data-i18n="result.apiKeyRequired">API Key Required</h4>
+                    <p data-i18n="result.setGeminiKey">Set your Gemini API key to enable AI analysis:</p>
                     <code>GEMINI_API_KEY=your_key</code>
-                    <p>Get a free key at <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #6366f1;">Google AI Studio</a></p>
+                    <p><span data-i18n="result.getFreeKey">Get a free key at</span> <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #6366f1;">Google AI Studio</a></p>
                 </div>
             </div>
         </div>
@@ -1342,13 +1342,13 @@
             <div class="card-header">
                 <i class="fas fa-stethoscope"></i>
                 <h2 data-i18n="result.clinicalQuestions">Clinical Interview Questions</h2>
-                <span class="badge">Diagnostic Support</span>
+                <span class="badge" data-i18n="result.diagnosticSupport">Diagnostic Support</span>
             </div>
             <div class="card-body">
                 <!-- Loading State -->
                 <div id="clinical-loading" class="clinical-loading">
                     <div class="clinical-loading-spinner"></div>
-                    <p>Generating clinical questions...</p>
+                    <p data-i18n="result.generatingQuestions">Generating clinical questions...</p>
                 </div>
                 
                 <!-- Clinical Results Grid -->
@@ -1357,7 +1357,7 @@
                 <!-- Unavailable/No Data State -->
                 <div id="clinical-unavailable" style="display: none; text-align: center; padding: 40px; color: #6b7280;">
                     <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 12px; color: #9ca3af;"></i>
-                    <p>Clinical questions will be generated after pathway analysis completes.</p>
+                    <p data-i18n="result.clinicalUnavailable">Clinical questions will be generated after pathway analysis completes.</p>
                 </div>
             </div>
         </div>
@@ -1375,7 +1375,7 @@
                     {% for data in results.enrichment_data %}
                     <div class="enrichment-item">
                         <div class="enrichment-item-header">
-                            <span class="rx-badge" title="{{ data.herbs | join(', ') if data.herbs else '' }}">Prescription {{ data.prescription_index or loop.index }}</span>
+                            <span class="rx-badge" title="{{ data.herbs | join(', ') if data.herbs else '' }}"><span data-i18n="result.rxLabel">Prescription</span> {{ data.prescription_index or loop.index }}</span>
                             <span class="result-count">{{ data.enrichment_data | length }} results</span>
                         </div>
                         
@@ -1384,9 +1384,9 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Term</th>
-                                    <th>P-value</th>
-                                    <th>Score</th>
+                                    <th data-i18n="result.colTerm">Term</th>
+                                    <th data-i18n="result.colPvalue">P-value</th>
+                                    <th data-i18n="result.colScoreEnr">Score</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1406,7 +1406,7 @@
                         {% else %}
                         <div class="no-results">
                             <i class="fas fa-search"></i>
-                            <p>No significant enrichment results</p>
+                            <p data-i18n="result.noSignificant">No significant enrichment results</p>
                         </div>
                         {% endif %}
                     </div>
@@ -1423,14 +1423,14 @@
                 <h2 data-i18n="result.geneOverlap">Gene Overlap Across Prescriptions</h2>
             </div>
             <div class="card-body">
-                <p style="opacity:0.75;margin-bottom:1rem;">
+                <p style="opacity:0.75;margin-bottom:1rem;" data-i18n="result.overlapIntro">
                     Enrichment above is computed on each prescription's disease-relevant
                     (&ldquo;common&rdquo;) genes. This panel shows how those targets overlap &mdash;
                     the core hit by every formula vs. the targets distinctive to a single one.
                 </p>
 
                 <h3 style="margin-bottom:0.5rem;">
-                    Core targets &mdash; shared by every prescription
+                    <span data-i18n="result.coreTargets">Core targets &mdash; shared by every prescription</span>
                     <span class="result-count">{{ results.gene_overlap.shared_core | length }}</span>
                 </h3>
                 {% if results.gene_overlap.shared_core %}
@@ -1440,14 +1440,14 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="no-results" style="margin-bottom:1.25rem;">No single target is shared by all prescriptions.</p>
+                <p class="no-results" style="margin-bottom:1.25rem;" data-i18n="result.noSingleCore">No single target is shared by all prescriptions.</p>
                 {% endif %}
 
-                <h3 style="margin-bottom:0.5rem;">Distinctive targets &mdash; hit by only one prescription</h3>
+                <h3 style="margin-bottom:0.5rem;" data-i18n="result.distinctiveTargets">Distinctive targets &mdash; hit by only one prescription</h3>
                 {% for d in results.gene_overlap.distinctive %}
                 <div style="margin:8px 0;padding:8px 10px;border:1px solid rgba(125,125,125,0.25);border-radius:6px;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                        <span class="rx-badge" title="{{ d.herbs | join(', ') }}">Prescription {{ d.index }}</span>
+                        <span class="rx-badge" title="{{ d.herbs | join(', ') }}"><span data-i18n="result.rxLabel">Prescription</span> {{ d.index }}</span>
                         <span class="result-count">{{ d.genes | length }} distinctive</span>
                         <span style="opacity:0.6;font-size:0.8rem;">{{ d.herbs | join(', ') }}</span>
                     </div>
@@ -1458,7 +1458,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <span style="opacity:0.6;font-size:0.85rem;">&mdash; none (fully overlaps the other prescriptions)</span>
+                    <span style="opacity:0.6;font-size:0.85rem;" data-i18n="result.noneOverlaps">&mdash; none (fully overlaps the other prescriptions)</span>
                     {% endif %}
                 </div>
                 {% endfor %}
@@ -1554,7 +1554,7 @@
                 await runAiAnalysis();
             } catch (error) {
                 console.error('Error:', error);
-                showAiError('Failed to initialize AI');
+                showAiError(i18n.t('result.failedInitAi'));
                 showClinicalUnavailable();
             }
         }
@@ -1572,7 +1572,7 @@
                     renderSummaryTable(aiResults.summary_table);
                 } else {
                     document.getElementById('ai-table-container').innerHTML = 
-                        '<p style="color: #6b7280; text-align: center; padding: 20px;">No comparison table data available.</p>';
+                        `<p style="color: #6b7280; text-align: center; padding: 20px;">${i18n.t('result.noComparisonData')}</p>`;
                 }
                 
                 // Store detailed analysis for toggle
@@ -1591,7 +1591,7 @@
                     showClinicalUnavailable();
                 }
             } else {
-                showAiError(aiResults.error || 'No analysis results available');
+                showAiError(aiResults.error || i18n.t('result.noAnalysisResults'));
                 showClinicalUnavailable();
             }
         }
@@ -1646,7 +1646,7 @@
                 
                 if (!hasEnrichmentData) {
                     console.warn('[AI Debug] No enrichment data available for AI analysis');
-                    showAiError('No enrichment data available. The prescription may not have significant gene-disease associations.');
+                    showAiError(i18n.t('result.noEnrichmentData'));
                     showClinicalUnavailable();
                     return;
                 }
@@ -1663,7 +1663,7 @@
                 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || 'AI analysis failed');
+                    throw new Error(errorData.error || i18n.t('result.aiAnalysisFailed'));
                 }
                 
                 const aiResults = await response.json();
@@ -1680,7 +1680,7 @@
                         renderSummaryTable(aiResults.summary_table);
                     } else {
                         document.getElementById('ai-table-container').innerHTML = 
-                            '<p style="color: #6b7280; text-align: center; padding: 20px;">No comparison table data available.</p>';
+                            `<p style="color: #6b7280; text-align: center; padding: 20px;">${i18n.t('result.noComparisonData')}</p>`;
                     }
                     
                     // Store detailed analysis for toggle
@@ -1699,7 +1699,7 @@
                         showClinicalUnavailable();
                     }
                 } else {
-                    showAiError(aiResults.error || 'No analysis results available');
+                    showAiError(aiResults.error || i18n.t('result.noAnalysisResults'));
                     showClinicalUnavailable();
                 }
                 
@@ -1713,7 +1713,7 @@
         function renderSummaryTable(tableData) {
             if (!tableData || tableData.length === 0) {
                 document.getElementById('ai-table-container').innerHTML = 
-                    '<p style="color: #6b7280; text-align: center; padding: 20px;">No summary data available</p>';
+                    `<p style="color: #6b7280; text-align: center; padding: 20px;">${i18n.t('result.noSummaryData')}</p>`;
                 return;
             }
             
@@ -1748,8 +1748,8 @@
             let html = '';
             
             clinicalData.forEach((group, index) => {
-                const groupLabel = group.group_label || `Group ${index + 1}`;
-                const suspectedDriver = group.suspected_driver || 'Analysis pending';
+                const groupLabel = group.group_label || i18n.t('result.group', { n: index + 1 });
+                const suspectedDriver = group.suspected_driver || i18n.t('result.analysisPending');
                 const questions = group.clinical_questions || [];
                 const rationale = group.rationale_hidden || '';
                 const cardId = `clinical-card-${index}`;
@@ -1762,7 +1762,7 @@
                             ${escapeHtml(groupLabel)}
                         </div>
                         <p class="clinical-suspected-driver">
-                            <strong>Suspected Driver:</strong> ${escapeHtml(suspectedDriver)}
+                            <strong>${i18n.t('result.suspectedDriver')}</strong> ${escapeHtml(suspectedDriver)}
                         </p>
                     </div>
                     <div class="clinical-group-body">
@@ -1773,7 +1773,7 @@
                     <div class="clinical-group-footer">
                         <button class="btn-rationale" onclick="toggleRationale('${cardId}', this)">
                             <i class="fas fa-lightbulb"></i>
-                            <span>Show Rationale</span>
+                            <span>${i18n.t('result.showRationale')}</span>
                         </button>
                     </div>
                     <div id="${cardId}-rationale" class="rationale-panel">
@@ -1791,11 +1791,11 @@
             
             if (isShowing) {
                 panel.classList.remove('show');
-                btn.innerHTML = '<i class="fas fa-lightbulb"></i><span>Show Rationale</span>';
+                btn.innerHTML = '<i class="fas fa-lightbulb"></i><span>' + i18n.t('result.showRationale') + '</span>';
                 btn.classList.remove('active');
             } else {
                 panel.classList.add('show');
-                btn.innerHTML = '<i class="fas fa-times"></i><span>Hide Rationale</span>';
+                btn.innerHTML = '<i class="fas fa-times"></i><span>' + i18n.t('result.hideRationale') + '</span>';
                 btn.classList.add('active');
             }
         }
@@ -1813,11 +1813,11 @@
             
             if (panel.classList.contains('show')) {
                 panel.classList.remove('show');
-                btn.innerHTML = '<i class="fas fa-microscope"></i><span>View Detailed Analysis</span>';
+                btn.innerHTML = '<i class="fas fa-microscope"></i><span>' + i18n.t('result.viewDetailed') + '</span>';
                 btn.classList.remove('active');
             } else {
                 panel.classList.add('show');
-                btn.innerHTML = '<i class="fas fa-times"></i><span>Hide Detailed Analysis</span>';
+                btn.innerHTML = '<i class="fas fa-times"></i><span>' + i18n.t('result.hideDetailed') + '</span>';
                 btn.classList.add('active');
             }
         }
