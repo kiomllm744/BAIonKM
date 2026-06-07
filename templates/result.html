@@ -175,6 +175,28 @@
             text-align: center;
         }
 
+        /* Collapsible Venn diagram toggle (diagrams are collapsed by default) */
+        .viz-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            margin: 6px auto;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 7px 14px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .viz-toggle:hover { background: #e2e8f0; color: #1f2937; }
+        .viz-caret { font-size: 0.75rem; transition: transform 0.2s ease; }
+        .viz-toggle[aria-expanded="true"] .viz-caret { transform: rotate(90deg); }
+        .venn-wrap.viz-collapsed { display: none; }
+
         /* KPI boxes below the Venn */
         .disease-kpis {
             display: grid;
@@ -1059,7 +1081,8 @@
                 {% if results.venn %}
                 {% set v = results.venn %}
                 {% set r = v.regions %}
-                <div class="venn-wrap">
+                <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                <div class="venn-wrap viz-collapsed">
                     {% if v.n == 2 %}
                     <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease gene overlap">
                         <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
@@ -1156,7 +1179,8 @@
                         {% set du = results.disease_gene_count %}
                         {% set cg = prescription.common_gene_count | default(0) %}
                         {% set hg = prescription.gene_count | default(0) %}
-                        <div class="venn-wrap rx-venn">
+                        <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                        <div class="venn-wrap rx-venn viz-collapsed">
                             <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease genes vs prescription genes overlap">
                                 <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: #64748b;"/>
                                 <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: #8b5cf6;"/>
@@ -1237,7 +1261,8 @@
                 <span class="badge">{{ results.common_union_count }} <span data-i18n="result.genesUnit">genes</span></span>
             </div>
             <div class="card-body">
-                <div class="venn-wrap">
+                <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                <div class="venn-wrap viz-collapsed">
                     {% if pv.n == 2 %}
                     <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
                         <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
@@ -1860,6 +1885,18 @@
             document.getElementById('clinical-results').style.display = 'none';
             document.getElementById('clinical-unavailable').style.display = 'block';
         }
+    </script>
+    <script>
+        // Collapsible Venn diagrams: each .viz-toggle controls the next .venn-wrap sibling.
+        // Diagrams render collapsed by default (class viz-collapsed); clicking expands them.
+        document.addEventListener('click', function(e){
+            var btn = e.target.closest('.viz-toggle');
+            if (!btn) return;
+            var viz = btn.nextElementSibling;
+            if (!viz || !viz.classList.contains('venn-wrap')) return;
+            var collapsed = viz.classList.toggle('viz-collapsed');
+            btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        });
     </script>
 </body>
 </html>
