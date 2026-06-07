@@ -374,6 +374,27 @@ def get_disease_suggestions_online(query_str, limit=15):
         return []
 
 
+# Open Targets' "disease" search index also returns measurement traits, ratios and
+# GO biological processes (e.g. "... measurement", "... ratio", GO_ processes). For
+# a disease picker we keep only real disease/phenotype ontologies and drop those
+# trait/process names -- mirrors build_disease_index.py's filter for the local catalogue.
+_DISEASE_ID_PREFIXES = ("MONDO_", "Orphanet_", "EFO_", "HP_", "DOID_", "NCIT_")
+_NON_DISEASE_SUFFIXES = (
+    " measurement", " measurements", " ratio", " percentage",
+    " levels", " level", " process", " activity",
+)
+
+
+def looks_like_disease(efo_id, name):
+    """True if (id, name) is a real disease/phenotype, not a measurement / ratio /
+    GO process that Open Targets' disease index also returns."""
+    if not (efo_id or "").startswith(_DISEASE_ID_PREFIXES):
+        return False
+    # OT / parquet names sometimes carry a trailing space, so strip before the
+    # suffix check — otherwise "... ratio " or "... percentage " sneaks through.
+    return not (name or "").lower().strip().endswith(_NON_DISEASE_SUFFIXES)
+
+
 def ranked_disease_search(query_str, limit=15):
     """Open Targets disease search returning relevance-ranked [{'name','id'}] hits,
     cached (15 days). Used to reorder local autocomplete suggestions by Open
@@ -405,7 +426,11 @@ def ranked_disease_search(query_str, limit=15):
         )
         response.raise_for_status()
         hits = (response.json().get("data", {}).get("search", {}) or {}).get("hits", [])
-        out = [{"name": h["name"], "id": h["id"]} for h in hits if h.get("name") and h.get("id")]
+        out = [
+            {"name": h["name"], "id": h["id"]}
+            for h in hits
+            if h.get("name") and h.get("id") and looks_like_disease(h["id"], h["name"])
+        ]
         _save_cached_response(session, 'opentargets_suggest', cache_q, out)
         return out
     except Exception as exc:

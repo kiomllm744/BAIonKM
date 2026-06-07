@@ -527,8 +527,13 @@ def _blend_open_targets_relevance(query, local):
     subtypes), then append any local-only extras. Cached + fail-safe: if Open
     Targets is slow/unavailable it returns the local order unchanged, so
     autocomplete never hangs or breaks."""
+    from opentargets_service import ranked_disease_search, looks_like_disease
+
+    def _ok(it):
+        return looks_like_disease(it.get('id') or '', it.get('name') or '')
+
+    local = [it for it in local if _ok(it)]   # strip trait/process junk from local too
     try:
-        from opentargets_service import ranked_disease_search
         ot = ranked_disease_search(query, limit=Config.MAX_SUGGESTIONS)
         if not ot and local:
             # OT couldn't match the raw text (e.g. a typo like "diabetis"); seed it
@@ -543,7 +548,7 @@ def _blend_open_targets_relevance(query, local):
     for item in ot:
         nm = item.get('name') or ''
         k = nm.lower()
-        if nm and k not in seen:
+        if nm and _ok(item) and k not in seen:
             seen.add(k)
             blended.append({'name': nm, 'id': item.get('id')})
     for item in local:
