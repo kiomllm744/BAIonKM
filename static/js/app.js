@@ -239,7 +239,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
         // disease -> no genes. Only Open Targets entries (which resolve to genes)
         // are selectable. Anything analyzable also appears in the Open Targets
         // column, so nothing useful is lost.
-        elements.terminologyUmls.innerHTML = concepts.slice(0, 4).map(concept => {
+        elements.terminologyUmls.innerHTML = concepts.slice(0, 6).map(concept => {
             const name = concept.preferred_name || concept.name || '';
             const icd = concept.icd10 ? `<small>ICD-10 ${escapeHtml(concept.icd10)}</small>` : '';
             const tip = i18n.t('term.standardizedTerm') + (concept.cui ? ' · ' + concept.cui : '');
@@ -256,7 +256,7 @@ function renderTerminologyMapping(query, payload, openTargetsSuggestions = []) {
     }
 
     if (candidates.length > 0) {
-        elements.terminologyOpenTargets.innerHTML = candidates.slice(0, 5).map(c => {
+        elements.terminologyOpenTargets.innerHTML = candidates.slice(0, 10).map(c => {
             const nm = typeof c === 'string' ? c : (c.name || '');
             const cid = typeof c === 'string' ? '' : (c.id || '');
             return `

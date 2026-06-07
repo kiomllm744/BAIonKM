@@ -652,7 +652,17 @@
                       .xp-table td code{background:#f1f5f9;padding:2px 6px;border-radius:5px}
                       .xp-tag{font-size:.68rem;font-weight:800;padding:2px 8px;border-radius:999px}
                       .xp-tag.use{background:#d1fae5;color:#047857}.xp-tag.skip{background:#e2e8f0;color:#475569}
-                      @media(max-width:720px){.xp-explain{grid-template-columns:1fr}.xp-pipe{flex-direction:column}.xp-conn{transform:rotate(90deg);flex-basis:22px}}
+                      .xp-trace{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:start;margin-top:18px;padding-top:16px;border-top:1px dashed #e2e8f0}
+                      .xp-th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;font-weight:800;margin-bottom:9px}
+                      .xp-clist{display:flex;flex-wrap:wrap;gap:6px}
+                      .xp-cchip{font-size:.78rem;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px;color:#334155}
+                      .xp-cchip.umls{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+                      .xp-cchip.first{background:#dcfce7;border-color:#86efac;color:#166534;font-weight:700}
+                      .xp-cchip .xp-rank{opacity:.5;font-weight:800;margin-right:5px}
+                      .xp-cchip small{color:#64748b;font-weight:600;margin-left:5px}
+                      .xp-tarrow{align-self:center;color:#cbd5e1;font-size:1.4rem}
+                      .xp-tempty{color:#94a3b8;font-size:.82rem}
+                      @media(max-width:720px){.xp-explain{grid-template-columns:1fr}.xp-pipe{flex-direction:column}.xp-conn{transform:rotate(90deg);flex-basis:22px}.xp-trace{grid-template-columns:1fr}.xp-tarrow{transform:rotate(90deg)}}
                     </style>
                     <p class="xp-intro" id="xp-intro"></p>
                     <div class="xp-searchbox"><i class="fas fa-search"></i><input id="xp-q" type="text" autocomplete="off"></div>
@@ -669,6 +679,11 @@
                     <div class="xp-explain">
                       <div class="xp-verdict" id="xp-verdict"><div class="xp-vlabel" id="xp-vlabel"></div><div class="xp-vval" id="xp-vval"></div></div>
                       <div><div class="xp-note" id="xp-note"></div><div class="xp-resolved" id="xp-resolved"></div></div>
+                    </div>
+                    <div class="xp-trace" id="xp-trace">
+                      <div><div class="xp-th" id="xp-th-umls"></div><div class="xp-clist" id="xp-umls-list"></div></div>
+                      <div class="xp-tarrow">→</div>
+                      <div><div class="xp-th" id="xp-th-cand"></div><div class="xp-clist" id="xp-cand-list"></div></div>
                     </div>
                     <h3 id="xp-ref-title" style="margin-top:22px;font-size:1rem;"></h3>
                     <table class="xp-table"><thead id="xp-thead"></thead><tbody id="xp-ref"></tbody></table>
@@ -741,12 +756,16 @@
           function tr(o){ return (o && o[L()] != null) ? o[L()] : (o ? o.en : ''); }
           var T = {
             title:{en:'How the disease search works — live',ko:'질병 검색은 어떻게 작동하나요 — 실시간'},
-            intro:{en:'This runs the REAL search. Type a disease, abbreviation, or lay phrase (or tap an example) — it calls UMLS + the Open Targets catalogue and animates exactly what happens, including whether UMLS was used.',ko:'실제 검색을 실행합니다. 질병명, 약어, 또는 일상 표현을 입력(또는 예시 클릭)하면 UMLS와 Open Targets 카탈로그를 호출해 무슨 일이 일어나는지(UMLS 사용 여부 포함)를 애니메이션으로 보여줍니다.'},
+            intro:{en:'This runs the REAL search. Type a disease, abbreviation, or lay phrase (or tap an example) — it calls UMLS and the Open Targets catalogue, ranks matches by Open Targets relevance, drops non-disease traits (measurements / ratios), and animates exactly what happens: what UMLS recognized, the names sent to Open Targets (first match wins), and the ranked diseases that come back.',ko:'실제 검색을 실행합니다. 질병명, 약어, 또는 일상 표현을 입력(또는 예시 클릭)하면 UMLS와 Open Targets 카탈로그를 호출하고, Open Targets 관련성으로 순위를 매기고, 질병이 아닌 형질(측정값·비율)을 제거한 뒤, 실제 과정을 보여줍니다: UMLS가 인식한 것, Open Targets로 전달되는 이름(첫 일치 채택), 돌아오는 순위화된 질병 목록.'},
             ph:{en:'Type a disease… e.g. asthma, MI, bad digestion',ko:'질병을 입력하세요… 예: asthma, MI, bad digestion'},
             sType:{en:'You type',ko:'입력'},sUmls:{en:'UMLS bridge',ko:'UMLS 브리지'},sOt:{en:'Open Targets',ko:'Open Targets'},sGenes:{en:'Result',ko:'결과'},
             vlabel:{en:'Result',ko:'결과'},
             bUsed:{en:'UMLS USED',ko:'UMLS 사용'},bSkip:{en:'NOT NEEDED',ko:'불필요'},
-            matchesTitle:{en:'Top matches (live, from the Open Targets catalogue)',ko:'상위 일치 결과 (Open Targets 카탈로그 실시간)'},
+            matchesTitle:{en:'Open Targets matches — ranked by relevance, traits filtered out',ko:'Open Targets 일치 — 관련성 순위화, 형질 제외'},
+            thUmls:{en:'① UMLS recognized',ko:'① UMLS 인식'},
+            umlsCount:{en:'{n} concept(s)',ko:'개념 {n}개'},
+            thCand:{en:'② Sent to Open Targets — priority order, first match wins',ko:'② Open Targets로 전달 — 우선순위 순, 첫 일치 채택'},
+            otCount:{en:'{n} disease(s) · ranked + filtered',ko:'질병 {n}개 · 순위화 + 필터링'},
             colName:{en:'Disease name',ko:'질병명'},colId:{en:'Open Targets ID',ko:'Open Targets ID'},
             checking:{en:'checking…',ko:'확인 중…'},
             vRaw:{en:'Raw ID',ko:'원시 ID'},vLocal:{en:'Direct match',ko:'직접 일치'},vUmls:{en:'Via UMLS',ko:'UMLS 경유'},vNone:{en:'Unresolved',ko:'미해결'},
@@ -759,6 +778,28 @@
           var enc=encodeURIComponent;
           function el(id){ return document.getElementById(id); }
           function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':s); return d.innerHTML; }
+          function fmt(o,v){ return tr(o).replace(/\{(\w+)\}/g,function(_,k){ return (v&&v[k]!=null)?v[k]:''; }); }
+          function fillTrace(umls,isRaw){
+            var box=el('xp-trace'); if(!box) return;
+            if(isRaw||!umls){ box.style.display='none'; return; }
+            box.style.display='';
+            var concepts=(umls.concepts)||[], cands=(umls.candidate_names)||[];
+            el('xp-th-umls').textContent=tr(T.thUmls)+' · '+fmt(T.umlsCount,{n:concepts.length});
+            var ul=el('xp-umls-list'); ul.innerHTML='';
+            if(!concepts.length){ ul.innerHTML='<span class="xp-tempty">'+tr(T.umlsNone)+'</span>'; }
+            else concepts.slice(0,8).forEach(function(c){
+              var nm=c.preferred_name||c.name||''; var icd=c.icd10?('<small>ICD-10 '+esc(c.icd10)+'</small>'):'';
+              var s=document.createElement('span'); s.className='xp-cchip umls'; s.innerHTML=esc(nm)+icd; ul.appendChild(s);
+            });
+            el('xp-th-cand').textContent=tr(T.thCand);
+            var cl=el('xp-cand-list'); cl.innerHTML='';
+            if(!cands.length){ cl.innerHTML='<span class="xp-tempty">—</span>'; }
+            else cands.slice(0,6).forEach(function(c,i){
+              var nm=(typeof c==='string')?c:((c&&c.name)||'');
+              var s=document.createElement('span'); s.className='xp-cchip'+(i===0?' first':'');
+              s.innerHTML='<span class="xp-rank">'+(i+1)+'</span>'+esc(nm); cl.appendChild(s);
+            });
+          }
           function setStatic(){
             el('xp-title').textContent=tr(T.title); el('xp-intro').textContent=tr(T.intro);
             el('xp-q').setAttribute('placeholder',tr(T.ph));
@@ -779,7 +820,7 @@
             var body=el('xp-ref'); body.innerHTML='';
             if(isRaw){ body.innerHTML='<tr><td colspan="2"><code>'+esc(text)+'</code></td></tr>'; return; }
             if(!sugg.length){ body.innerHTML='<tr><td colspan="2" style="color:#94a3b8">'+tr(T.noMatches)+'</td></tr>'; return; }
-            sugg.slice(0,6).forEach(function(s){
+            sugg.slice(0,10).forEach(function(s){
               var row=document.createElement('tr');
               row.innerHTML='<td>'+esc(s.name)+'</td><td>'+(s.id?'<code>'+esc(s.id)+'</code>':'<span style="color:#94a3b8">—</span>')+'</td>';
               body.appendChild(row);
@@ -825,7 +866,9 @@
               function(){ el('xp-c3').classList.add('active'); },
               function(){ var g=el('xp-s-genes'); g.className='xp-stage active'+(resolved?'':' fail'); g.querySelector('.xp-ic').textContent=resolved?'🧬':'⚠️'; el('xp-d-genes').textContent=resolved?tr(T.gReady):tr(T.gNone); },
               function(){ var v=el('xp-verdict'); v.className='xp-verdict'+(used?' on':'')+(!resolved?' fail':''); el('xp-vval').textContent=verdict;
-                el('xp-note').innerHTML=buildNote(text,isRaw,umlsAvail,topName,icd,used,match,resolved); el('xp-resolved').innerHTML=''; fillMatches(sugg,isRaw,text); }
+                el('xp-note').innerHTML=buildNote(text,isRaw,umlsAvail,topName,icd,used,match,resolved); el('xp-resolved').innerHTML='';
+                el('xp-ref-title').textContent=tr(T.matchesTitle)+(isRaw?'':(' · '+fmt(T.otCount,{n:sugg.length})));
+                fillMatches(sugg,isRaw,text); fillTrace(umls,isRaw); }
             ];
             steps.forEach(function(fn,i){ timers.push(setTimeout(fn,i*340)); });
           }
@@ -839,7 +882,7 @@
             el('xp-s-type').classList.add('active'); el('xp-d-type').textContent='"'+text+'"'; el('xp-c1').classList.add('active');
             el('xp-s-umls').classList.add('active'); el('xp-d-umls').textContent=tr(T.checking);
             el('xp-badge').className='xp-badge skipped'; el('xp-badge').textContent='…';
-            el('xp-vval').textContent='…'; el('xp-note').textContent=''; el('xp-resolved').textContent='';
+            el('xp-vval').textContent='…'; el('xp-note').textContent=''; el('xp-resolved').textContent=''; var _tb=el('xp-trace'); if(_tb) _tb.style.display='none';
             var pU = isRaw ? Promise.resolve(null) : fetch('/api/translate-symptoms?q='+enc(text)).then(function(r){return r.json();}).catch(function(){return null;});
             var pS = fetch('/api/diseases?q='+enc(text)).then(function(r){return r.json();}).catch(function(){return [];});
             Promise.all([pU,pS]).then(function(p){ if(my!==reqId) return; animate(text,isRaw,p[0],Array.isArray(p[1])?p[1]:[]); });

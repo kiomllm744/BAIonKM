@@ -672,7 +672,7 @@ def translate_symptoms():
             'candidate_names': []
         }), 400
 
-    payload = translate_clinical_text(query, limit=10)
+    payload = translate_clinical_text(query, limit=15)
     payload['success'] = True
     return jsonify(payload)
 
