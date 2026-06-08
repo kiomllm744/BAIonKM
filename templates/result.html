@@ -1192,10 +1192,10 @@
                                 <text x="318" y="50" class="venn-letter" style="fill: #8b5cf6;">B</text>
                             </svg>
                             <div class="venn-legend">
-                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #64748b;">A</span>Disease genes ({{ du }})</span>
-                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #8b5cf6;">B</span>Prescription {{ prescription.index }} herb genes ({{ hg }})</span>
+                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #64748b;">A</span><span data-i18n="result.vennDiseaseGenes">Disease genes</span> ({{ du }})</span>
+                                <span class="venn-legend-item"><span class="venn-legend-letter" style="background: #8b5cf6;">B</span><span data-i18n="result.rxLabel">Prescription</span> {{ prescription.index }} <span data-i18n="result.vennHerbGenes">herb genes</span> ({{ hg }})</span>
                             </div>
-                            <div class="venn-note">Overlap = disease-associated genes this prescription targets</div>
+                            <div class="venn-note" data-i18n="result.vennOverlapNote">Overlap = disease-associated genes this prescription targets</div>
                         </div>
                         <div class="disease-kpis rx-kpis">
                             <div class="disease-kpi">
@@ -1293,7 +1293,7 @@
                     {% endif %}
                     <div class="venn-legend">
                         {% for idx in pv.indices %}
-                        <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ pcolors[loop.index0 % 3] }};">{{ pletters[loop.index0 % 3] }}</span>Prescription {{ idx }} ({{ pv.sizes[loop.index0] }})</span>
+                        <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ pcolors[loop.index0 % 3] }};">{{ pletters[loop.index0 % 3] }}</span><span data-i18n="result.rxLabel">Prescription</span> {{ idx }} ({{ pv.sizes[loop.index0] }})</span>
                         {% endfor %}
                     </div>
                     <div class="venn-note" data-i18n="result.vennNote2">Each number = disease-associated genes hit by exactly that set of prescriptions &middot; center = hit by all</div>
