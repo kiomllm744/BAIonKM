@@ -305,6 +305,7 @@ def generate_comparative_analysis(disease_name: str, prescription_data: dict, cl
     
     # Build dynamic column names
     group_columns = ", ".join([f'"Group {i}"' for i in range(1, num_groups + 1)])
+    group_names = ", ".join([f"Group {i}" for i in range(1, num_groups + 1)])
     
     clingen_section = ""
     if clingen_context and "Official ClinGen matches found" in clingen_context:
@@ -339,7 +340,7 @@ You must return your response in a strict JSON format with exactly two keys: "su
    - A single string containing a comprehensive, Markdown-formatted report.
    - This report must include:
      - "1. The High-Level Comparison": A brief summary of the fundamental differences.
-     - "2. Deep Dive into Pathways": A detailed breakdown of the mechanism for each group (Group 1, Group 2, Group 3).
+     - "2. Deep Dive into Pathways": A detailed breakdown of the mechanism for each group ({group_names}). Analyze ONLY the groups listed above; do NOT add, mention, or describe any group that was not provided.
      - Use bolding and bullet points for readability.
 
 EVIDENCE CALIBRATION (important):

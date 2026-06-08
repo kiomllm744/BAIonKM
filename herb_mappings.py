@@ -428,7 +428,7 @@ HERB_NAME_MAPPINGS = {
     "zhen zhu": "진주",
     "zhi ju zi": "지구자",
     "zhi ke": "지각",
-    "zhi ma": "흑지마",
+    "zhi ma": "지마",
     "zhi mu": "지모",
     "zhi qiao": "지각 (동의어)",
     "zhi shi": "지실",
