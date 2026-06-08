@@ -332,7 +332,7 @@ You must return your response in a strict JSON format with exactly two keys: "su
 1. "summary_table":
    - An array of objects representing the rows of a comparison table.
    - Each object must have the keys: "Feature", {group_columns}.
-   - Include rows for: "Primary Driver", "Key Tissue", "Main Consequence", and "Cancer Risk".
+   - Include rows for: "Primary Driver", "Key Tissue", and "Main Consequence".
    - Keep the values in this table concise (under 10 words).
 
 2. "detailed_analysis":
@@ -483,7 +483,7 @@ You must return your response in a strict JSON format with exactly two keys: "su
 
 1. "summary_table":
    - An array of objects with keys: "Feature", "Finding".
-   - Include rows for: "Primary Driver", "Key Tissue", "Main Consequence", "Cancer Risk".
+   - Include rows for: "Primary Driver", "Key Tissue", "Main Consequence".
    - Keep values concise (under 10 words).
 
 2. "detailed_analysis":
