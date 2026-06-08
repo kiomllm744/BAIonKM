@@ -4,6 +4,7 @@ Provides real-time target-disease associations and autocomplete disease searches
 """
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import requests
 from sqlalchemy import create_engine
@@ -238,36 +239,43 @@ def fetch_live_associated_genes(efo_id, limit=None):
 
         gene_scores = {}
         complete = True
-        if limit is None:
-            # Page through EVERY associated target (Open Targets association score
-            # is 0.0-1.0, same range as the old DisGeNET scores).
-            index, total = 0, None
-            while True:
-                try:
-                    rows, count = _fetch_targets_page(efo_id, index, _TARGETS_PAGE_SIZE)
-                except Exception as exc:
-                    # A page failed even after retries: keep what we have but don't
-                    # cache a partial set (so a later run re-fetches the full list).
-                    print(f"[OpenTargets] page {index} failed for {efo_id}: {exc}")
-                    complete = False
-                    break
-                if total is None:
-                    total = count
-                if not rows:
-                    break
-                for row in rows:
-                    sym = (row.get("target") or {}).get("approvedSymbol")
-                    if sym:
-                        gene_scores[sym] = row.get("score", 0.0)
-                index += 1
-                if len(rows) < _TARGETS_PAGE_SIZE or index * _TARGETS_PAGE_SIZE >= (total or 0):
-                    break
-        else:
-            rows, _ = _fetch_targets_page(efo_id, 0, limit)
-            for row in rows:
+
+        def _merge(rows):
+            for row in (rows or []):
                 sym = (row.get("target") or {}).get("approvedSymbol")
                 if sym:
                     gene_scores[sym] = row.get("score", 0.0)
+
+        if limit is None:
+            # Fetch EVERY associated target. Open Targets caps a single page, so we
+            # page through; page 0 gives the authoritative count, then the remaining
+            # pages are fetched CONCURRENTLY so a large disease (10+ pages) costs ~one
+            # round-trip instead of a slow sequential crawl. (Association score is
+            # 0.0-1.0, same range as the old DisGeNET scores.)
+            try:
+                rows0, total = _fetch_targets_page(efo_id, 0, _TARGETS_PAGE_SIZE)
+            except Exception as exc:
+                print(f"[OpenTargets] page 0 failed for {efo_id}: {exc}")
+                return {}                      # nothing fetched -> don't cache
+            _merge(rows0)
+            total = total or len(rows0)
+            n_pages = max(1, (total + _TARGETS_PAGE_SIZE - 1) // _TARGETS_PAGE_SIZE)
+            if n_pages > 1:
+                with ThreadPoolExecutor(max_workers=min(6, n_pages - 1)) as ex:
+                    futs = [ex.submit(_fetch_targets_page, efo_id, i, _TARGETS_PAGE_SIZE)
+                            for i in range(1, n_pages)]
+                    for fut in as_completed(futs):
+                        try:
+                            rows, _ = fut.result()
+                            _merge(rows)
+                        except Exception as exc:
+                            # A page failed even after retries: keep what we have but
+                            # don't cache a partial set (a later run re-fetches it all).
+                            print(f"[OpenTargets] a page failed for {efo_id}: {exc}")
+                            complete = False
+        else:
+            rows, _ = _fetch_targets_page(efo_id, 0, limit)
+            _merge(rows)
 
         if complete:
             _save_cached_response(session, provider, efo_id, gene_scores)

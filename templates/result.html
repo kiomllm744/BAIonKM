@@ -1825,7 +1825,8 @@
             // keep the loading state visible while the background job runs
             document.getElementById('ai-loading').style.display = 'block';
             document.getElementById('clinical-loading').style.display = 'block';
-            await new Promise(r => setTimeout(r, 4000));
+            // check soon on the first pass (fast generations), then back off
+            await new Promise(r => setTimeout(r, attempt === 0 ? 1500 : 3500));
             try {
                 const id = resultsData.result_id;
                 const mode = resultsData.disease_gene_mode || 'union';
