@@ -13,6 +13,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, jsonif
 from sqlalchemy import func, desc, text, case
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from models import Herb, AnalysisResult, ExternalLookupCache, Disease
 from services import analyze_prescriptions, compute_disease_venn
 from config import Config
@@ -256,6 +257,18 @@ def init_results_table():
     # raise "no such table", swallowed by their broad excepts). checkfirst
     # makes this a no-op when the table is already present.
     ExternalLookupCache.__table__.create(bind=engine, checkfirst=True)
+
+    # Shared "AI generation in progress" marker, keyed by (result_id, mode). Lives
+    # in the DB so it is visible to ALL gunicorn workers (an in-memory set is not,
+    # which made polls on a different worker wrongly report "absent"). Composite PK
+    # makes _claim_ai_inflight's INSERT atomic across workers.
+    from sqlalchemy import MetaData as _MD, Table as _T, Column as _C, Integer as _I, Text as _Tx, DateTime as _DT
+    _md = _MD()
+    _T('ai_inflight', _md,
+       _C('result_id', _I, primary_key=True),
+       _C('mode', _Tx, primary_key=True),
+       _C('started_at', _DT, nullable=False))
+    _md.create_all(engine, checkfirst=True)
 
 # Initialize table on import
 init_results_table()
@@ -1218,14 +1231,72 @@ def delete_result(result_id):
 
 
 # --- Background-job bookkeeping for AI analysis ----------------------------------
-# AI generation is a long (~30s) Gemini call. We treat it as a background job so
-# that switching the intersection/union tabs quickly never kicks off duplicate
-# generations: a (result_id, mode) already being generated returns "processing",
-# and the client polls /api/ai-analysis/result until it is saved. The set is
-# per-process (best-effort across gunicorn workers); the mode-keyed DB save is
-# idempotent, so a rare cross-worker duplicate just overwrites harmlessly.
-_ai_inflight = set()
-_ai_inflight_lock = threading.Lock()
+# AI generation is a long (~30s) Gemini call run in a background thread; the client
+# polls /api/ai-analysis/result until it is saved. The "currently generating"
+# marker lives in the DATABASE (table ai_inflight), NOT in process memory, so it is
+# shared across all gunicorn workers -- otherwise the worker that starts a
+# generation and the worker that handles a poll disagree, the poll wrongly reports
+# "absent", and the UI shows a spurious error / re-triggers. A timestamp lets a
+# crashed generation's marker go stale and be reclaimed.
+# Above the client's max polling window (~210s) so a slow generation never goes
+# stale mid-run; only a crashed worker's marker is reclaimed (its finally never ran).
+AI_INFLIGHT_TTL_SECONDS = 300
+
+
+def _ai_inflight_stale_before():
+    from datetime import timedelta
+    return datetime.utcnow() - timedelta(seconds=AI_INFLIGHT_TTL_SECONDS)
+
+
+def _claim_ai_inflight(result_id, mode):
+    """Atomically claim AI generation for (result_id, mode) across all workers.
+    Returns True if WE should generate, False if another worker already is."""
+    s = Session()
+    try:
+        # clear a stale marker (a crashed/killed generation) so it can be retried
+        s.execute(text("DELETE FROM ai_inflight WHERE result_id=:r AND mode=:m AND started_at < :t"),
+                  {"r": result_id, "m": mode, "t": _ai_inflight_stale_before()})
+        s.commit()
+        try:
+            s.execute(text("INSERT INTO ai_inflight (result_id, mode, started_at) VALUES (:r, :m, :t)"),
+                      {"r": result_id, "m": mode, "t": datetime.utcnow()})
+            s.commit()
+            return True
+        except IntegrityError:
+            s.rollback()          # another worker holds a fresh marker
+            return False
+    except Exception as e:
+        print(f"[ai-inflight] claim failed: {e}")
+        s.rollback()
+        return True               # fail open: better to generate than to stall
+    finally:
+        s.close()
+
+
+def _release_ai_inflight(result_id, mode):
+    s = Session()
+    try:
+        s.execute(text("DELETE FROM ai_inflight WHERE result_id=:r AND mode=:m"),
+                  {"r": result_id, "m": mode})
+        s.commit()
+    except Exception as e:
+        print(f"[ai-inflight] release failed: {e}")
+        s.rollback()
+    finally:
+        s.close()
+
+
+def _is_ai_inflight(result_id, mode):
+    """True if a fresh generation marker exists for (result_id, mode)."""
+    s = Session()
+    try:
+        row = s.execute(text("SELECT 1 FROM ai_inflight WHERE result_id=:r AND mode=:m AND started_at >= :t"),
+                        {"r": result_id, "m": mode, "t": _ai_inflight_stale_before()}).first()
+        return row is not None
+    except Exception:
+        return False
+    finally:
+        s.close()
 
 
 def _saved_ai_for(result_id, mode):
@@ -1356,30 +1427,28 @@ def ai_analysis():
             'has_ai_analysis': False
         }), 503
 
-    # Background-job dedup: return a finished analysis directly, or tell the client
-    # to poll if one is already being generated (don't start a duplicate).
-    key = (result_id, mode) if result_id else None
-    if key:
+    # Background-job dedup (shared across workers via the ai_inflight table):
+    # return a finished analysis directly, or tell the client to poll if a
+    # generation is already running (don't start a duplicate).
+    if result_id:
         already = _saved_ai_for(result_id, mode)
         if already:
             return jsonify(already)
-        with _ai_inflight_lock:
-            if key in _ai_inflight:
-                return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
-            _ai_inflight.add(key)
+        if not _claim_ai_inflight(result_id, mode):
+            # another worker is already generating this (result_id, mode)
+            return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
 
-        # Run Gemini in a background thread so the request returns immediately and is
-        # never cut off by the gunicorn request timeout. The client polls
-        # /api/ai-analysis/result for this (result_id, mode) until it is saved.
+        # We claimed it: run Gemini in a background thread so the request returns
+        # immediately (never cut off by the gunicorn timeout). The client polls
+        # /api/ai-analysis/result -- which now reads the shared marker -- until saved.
         def _bg(disease_name=disease_name, prescription_enrichments=prescription_enrichments,
-                result_id=result_id, mode=mode, language=language, key=key):
+                result_id=result_id, mode=mode, language=language):
             try:
                 _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language)
             except Exception as e:
                 print(f"[ai-analysis] background generation failed: {e}")
             finally:
-                with _ai_inflight_lock:
-                    _ai_inflight.discard(key)
+                _release_ai_inflight(result_id, mode)
 
         threading.Thread(target=_bg, daemon=True).start()
         return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
@@ -1416,8 +1485,8 @@ def ai_analysis_result():
     saved = _saved_ai_for(result_id, mode)
     if saved:
         return jsonify(saved)
-    with _ai_inflight_lock:
-        processing = (result_id, mode) in _ai_inflight
+    # Shared marker -> a poll on ANY worker sees a generation started on any other.
+    processing = _is_ai_inflight(result_id, mode)
     return jsonify({'status': 'processing' if processing else 'absent', 'has_ai_analysis': False})
 
 
