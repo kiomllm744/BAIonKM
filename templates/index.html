@@ -48,6 +48,14 @@
                             <input type="hidden" name="disease_id" id="disease-id-input">
                             <input type="hidden" name="diseases_data" id="diseases-data-input">
                             <div class="disease-chips" id="disease-chips"></div>
+                            <div class="disease-preset-bar" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px;">
+                                <span style="font-size:0.82rem; color:#6b7280; font-weight:600;">
+                                    <i class="fas fa-bolt"></i> <span data-i18n="index.diseasePresets">Quick add:</span>
+                                </span>
+                                <button type="button" class="btn btn-outline btn-sm disease-preset-btn" data-disease-name="type 2 diabetes mellitus" data-disease-id="MONDO_0005148">type 2 diabetes mellitus</button>
+                                <button type="button" class="btn btn-outline btn-sm disease-preset-btn" data-disease-name="myofascial pain syndrome" data-disease-id="EFO_1001054">myofascial pain syndrome</button>
+                                <button type="button" class="btn btn-outline btn-sm disease-preset-btn" data-disease-add-both="1" style="font-weight:600;" data-i18n="index.addBothDiseases">Add both</button>
+                            </div>
                             <span class="form-hint" data-i18n="index.diseaseHint">Add up to 3 diseases &mdash; they're combined (union of genes; shared genes highlighted). Pick from the suggestions to add each one.</span>
                             <div class="terminology-panel" id="terminology-panel" aria-live="polite">
                                 <div class="terminology-panel-header">

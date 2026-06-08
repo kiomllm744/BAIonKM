@@ -990,7 +990,21 @@ function setupEventListeners() {
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => loadPreset(btn.dataset.preset));
     });
-    
+
+    // Quick-add default diseases (mirrors the prescription presets). "Add both"
+    // adds every named preset button's disease; individual buttons add their own.
+    document.querySelectorAll('.disease-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.dataset.diseaseAddBoth) {
+                document.querySelectorAll('.disease-preset-btn[data-disease-id]').forEach(b => {
+                    addDisease(b.dataset.diseaseName, b.dataset.diseaseId);
+                });
+            } else {
+                addDisease(btn.dataset.diseaseName, btn.dataset.diseaseId);
+            }
+        });
+    });
+
     if (elements.form) {
         elements.form.addEventListener('submit', handleFormSubmit);
     }
