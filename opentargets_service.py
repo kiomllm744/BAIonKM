@@ -3,6 +3,8 @@ Open Targets GraphQL API Service with Database Caching.
 Provides real-time target-disease associations and autocomplete disease searches.
 """
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import requests
 from sqlalchemy import create_engine
@@ -167,10 +169,62 @@ def search_disease_efo_id(disease_name):
         session.close()
 
 
-def fetch_live_associated_genes(efo_id, limit=300):
+# Open Targets rejects very large page sizes (a single page of ~5000 returns
+# null), so to fetch EVERY associated target we page through in safe chunks.
+_TARGETS_PAGE_SIZE = 2000
+
+_ASSOCIATED_TARGETS_QUERY = """
+query getAssociatedTargets($efoId: String!, $index: Int!, $size: Int!) {
+  disease(efoId: $efoId) {
+    associatedTargets(page: {index: $index, size: $size}) {
+      count
+      rows {
+        target { approvedSymbol }
+        score
+      }
+    }
+  }
+}
+"""
+
+
+def _fetch_targets_page(efo_id, index, size, attempts=3):
+    """Fetch one page of associated targets. Returns (rows, total_count).
+
+    Retries on transient failures (timeouts, connection resets, 5xx) with a
+    short backoff -- fetching ALL genes pages through several requests, so one
+    flaky page must not lose the whole set.
     """
-    Query Open Targets Platform in real-time to get target genes and scores for an EFO ID.
-    Uses caching to avoid repeated API calls.
+    last_exc = None
+    for attempt in range(attempts):
+        try:
+            response = requests.post(
+                Config.OPENTARGETS_API_URL,
+                json={"query": _ASSOCIATED_TARGETS_QUERY,
+                      "variables": {"efoId": efo_id, "index": index, "size": size}},
+                headers={"Content-Type": "application/json"},
+                timeout=Config.OPENTARGETS_TIMEOUT_SECONDS,
+                verify=Config.EXTERNAL_API_VERIFY_SSL,
+            )
+            response.raise_for_status()
+            at = (((response.json().get("data") or {}).get("disease") or {})
+                  .get("associatedTargets") or {})
+            return (at.get("rows") or []), (at.get("count") or 0)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                time.sleep(0.6 * (attempt + 1))
+    raise last_exc
+
+
+def fetch_live_associated_genes(efo_id, limit=None):
+    """
+    Query Open Targets for a disease's target genes + association scores.
+
+    limit=None (default) fetches ALL associated targets via pagination (no cap).
+    Pass an int to fetch only the top-N in a single request (legacy behaviour).
+    Cached -- the full and capped results use different cache keys, so changing
+    the mode never serves a stale set.
     """
     efo_id = (efo_id or '').strip()
     if not efo_id:
@@ -178,53 +232,53 @@ def fetch_live_associated_genes(efo_id, limit=300):
 
     session = Session()
     try:
-        # Check cache
-        cached = _get_cached_response(session, 'opentargets_genes', efo_id)
+        provider = 'opentargets_genes_full' if limit is None else 'opentargets_genes'
+        cached = _get_cached_response(session, provider, efo_id)
         if cached is not None:
             return cached
 
-        query = """
-        query getAssociatedTargets($efoId: String!, $size: Int!) {
-          disease(efoId: $efoId) {
-            id
-            name
-            associatedTargets(page: {index: 0, size: $size}) {
-              rows {
-                target {
-                  id
-                  approvedSymbol
-                }
-                score
-              }
-            }
-          }
-        }
-        """
-        variables = {"efoId": efo_id, "size": limit}
-        headers = {"Content-Type": "application/json"}
-        
-        response = requests.post(
-            Config.OPENTARGETS_API_URL,
-            json={"query": query, "variables": variables},
-            headers=headers,
-            timeout=Config.OPENTARGETS_TIMEOUT_SECONDS,
-            verify=Config.EXTERNAL_API_VERIFY_SSL
-        )
-        response.raise_for_status()
-        
-        disease = (response.json().get("data") or {}).get("disease") or {}
-        rows = (disease.get("associatedTargets") or {}).get("rows", [])
-
         gene_scores = {}
-        for row in rows:
-            gene_symbol = row.get("target", {}).get("approvedSymbol")
-            score = row.get("score", 0.0)
-            if gene_symbol:
-                # DisGeNET scores were in 0.0-1.0 range, Open Targets association score is also 0.0-1.0.
-                gene_scores[gene_symbol] = score
-                
-        # Save to cache
-        _save_cached_response(session, 'opentargets_genes', efo_id, gene_scores)
+        complete = True
+
+        def _merge(rows):
+            for row in (rows or []):
+                sym = (row.get("target") or {}).get("approvedSymbol")
+                if sym:
+                    gene_scores[sym] = row.get("score", 0.0)
+
+        if limit is None:
+            # Fetch EVERY associated target. Open Targets caps a single page, so we
+            # page through; page 0 gives the authoritative count, then the remaining
+            # pages are fetched CONCURRENTLY so a large disease (10+ pages) costs ~one
+            # round-trip instead of a slow sequential crawl. (Association score is
+            # 0.0-1.0, same range as the old DisGeNET scores.)
+            try:
+                rows0, total = _fetch_targets_page(efo_id, 0, _TARGETS_PAGE_SIZE)
+            except Exception as exc:
+                print(f"[OpenTargets] page 0 failed for {efo_id}: {exc}")
+                return {}                      # nothing fetched -> don't cache
+            _merge(rows0)
+            total = total or len(rows0)
+            n_pages = max(1, (total + _TARGETS_PAGE_SIZE - 1) // _TARGETS_PAGE_SIZE)
+            if n_pages > 1:
+                with ThreadPoolExecutor(max_workers=min(6, n_pages - 1)) as ex:
+                    futs = [ex.submit(_fetch_targets_page, efo_id, i, _TARGETS_PAGE_SIZE)
+                            for i in range(1, n_pages)]
+                    for fut in as_completed(futs):
+                        try:
+                            rows, _ = fut.result()
+                            _merge(rows)
+                        except Exception as exc:
+                            # A page failed even after retries: keep what we have but
+                            # don't cache a partial set (a later run re-fetches it all).
+                            print(f"[OpenTargets] a page failed for {efo_id}: {exc}")
+                            complete = False
+        else:
+            rows, _ = _fetch_targets_page(efo_id, 0, limit)
+            _merge(rows)
+
+        if complete:
+            _save_cached_response(session, provider, efo_id, gene_scores)
         return gene_scores
     except Exception as exc:
         print(f"[OpenTargets] Fetch associated targets failed for {efo_id}: {exc}")

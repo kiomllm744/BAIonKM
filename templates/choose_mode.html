@@ -95,6 +95,26 @@
             background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 0.85rem;
         }
         .choose-errors ul { margin: 0; padding-left: 18px; }
+
+        /* Region highlight: preview which genes a mode will analyse.
+           union -> the whole diagram glows; intersection -> only the shared
+           centre (an SVG-clipped lens) lights up and the rest dims. */
+        .choice-venn .venn-svg { transition: filter .18s ease; }
+        .choice-venn .venn-circle { transition: fill-opacity .18s ease; }
+        .choice-venn .hl-region {
+            fill: #f59e0b; fill-opacity: 0; stroke: #b45309; stroke-width: 2.5;
+            stroke-opacity: 0; pointer-events: none;
+            transition: fill-opacity .18s ease, stroke-opacity .18s ease;
+        }
+        .choice-venn[data-hl="intersection"] .hl-region { fill-opacity: .6; stroke-opacity: .9; }
+        .choice-venn[data-hl="intersection"] .venn-circle { fill-opacity: .1; }
+        .choice-venn[data-hl="union"] .venn-circle { fill-opacity: .42; }
+        .choice-venn[data-hl="union"] .venn-svg { filter: drop-shadow(0 0 7px rgba(99,102,241,.55)); }
+        .hl-caption {
+            margin-top: 10px; font-size: .82rem; font-weight: 600; color: #6b7280;
+            text-align: center; min-height: 1.15em;
+        }
+        .mode-btn.is-previewing { border-color: var(--primary-color); box-shadow: var(--shadow-md); }
     </style>
 </head>
 <body>
@@ -126,11 +146,16 @@
                     {% if venn.venn %}
                     {% set v = venn.venn %}
                     {% set r = v.regions %}
-                    <div class="venn-wrap">
+                    <div class="venn-wrap choice-venn" id="choiceVenn">
                         {% if v.n == 2 %}
                         <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                            <defs>
+                                <clipPath id="cvClipB2"><circle cx="220" cy="110" r="92"/></clipPath>
+                            </defs>
                             <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
                             <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
+                            <!-- intersection (A∩B) lens, lit up in intersection mode -->
+                            <circle cx="140" cy="110" r="92" class="hl-region" clip-path="url(#cvClipB2)"/>
                             <text x="92" y="117" class="venn-count">{{ r.A }}</text>
                             <text x="180" y="117" class="venn-count venn-core">{{ r.AB }}</text>
                             <text x="268" y="117" class="venn-count">{{ r.B }}</text>
@@ -139,9 +164,17 @@
                         </svg>
                         {% elif v.n == 3 %}
                         <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                            <defs>
+                                <clipPath id="cvClipB3"><circle cx="228" cy="132" r="92"/></clipPath>
+                                <clipPath id="cvClipC3"><circle cx="180" cy="212" r="92"/></clipPath>
+                            </defs>
                             <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
                             <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
                             <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ dcolors[2] }};"/>
+                            <!-- intersection (A∩B∩C) centre, lit up in intersection mode -->
+                            <g clip-path="url(#cvClipB3)"><g clip-path="url(#cvClipC3)">
+                                <circle cx="132" cy="132" r="92" class="hl-region"/>
+                            </g></g>
                             <text x="92" y="116" class="venn-count">{{ r.A }}</text>
                             <text x="268" y="116" class="venn-count">{{ r.B }}</text>
                             <text x="180" y="270" class="venn-count">{{ r.C }}</text>
@@ -161,6 +194,7 @@
                         </div>
                         <div class="venn-note" data-i18n="result.vennNote1">Each number = genes shared by exactly that region &middot; center = shared by all diseases</div>
                     </div>
+                    <div class="hl-caption" id="hlCaption" data-i18n="choose.hlHint">Hover an option below to preview which genes it analyses.</div>
                     {% endif %}
 
                     <div class="count-chips">
@@ -226,5 +260,46 @@
             </form>
         </main>
     </div>
+
+    <script>
+        // Preview which part of the Venn each mode analyses: hovering/focusing a
+        // button lights up the region it uses (union = whole diagram, intersection
+        // = the shared centre) and updates the caption. Purely a visual aid.
+        (function () {
+            const venn = document.getElementById('choiceVenn');
+            const caption = document.getElementById('hlCaption');
+            if (!venn) return;
+            const t = (k, fb) => (window.i18n && i18n.t) ? i18n.t(k) : fb;
+            const captionFor = {
+                intersection: () => t('choose.hlIntersection', 'Intersection → only the shared centre of the diagram.'),
+                union: () => t('choose.hlUnion', 'Union → the whole diagram (all genes).'),
+                both: () => t('choose.hlBoth', 'Both → runs the whole diagram and the shared centre.'),
+            };
+            const hint = () => t('choose.hlHint', 'Hover an option below to preview which genes it analyses.');
+            function preview(mode, btn) {
+                // union & both both light up the whole diagram; intersection the centre
+                venn.setAttribute('data-hl', mode === 'intersection' ? 'intersection' : 'union');
+                if (caption) caption.textContent = (captionFor[mode] || hint)();
+                if (btn) btn.classList.add('is-previewing');
+            }
+            function clear(btn) {
+                venn.removeAttribute('data-hl');
+                if (caption) caption.textContent = hint();
+                if (btn) btn.classList.remove('is-previewing');
+            }
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                if (btn.disabled) return;
+                const mode = btn.value;
+                btn.addEventListener('mouseenter', () => preview(mode, btn));
+                btn.addEventListener('focus', () => preview(mode, btn));
+                btn.addEventListener('mouseleave', () => clear(btn));
+                btn.addEventListener('blur', () => clear(btn));
+            });
+            // keep the caption correct if the language is toggled
+            document.addEventListener('langchange', () => {
+                if (!venn.getAttribute('data-hl') && caption) caption.textContent = hint();
+            });
+        })();
+    </script>
 </body>
 </html>

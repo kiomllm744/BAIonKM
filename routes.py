@@ -5,6 +5,7 @@ import json
 import re
 import hmac
 import difflib
+import threading
 from datetime import datetime
 from functools import wraps
 from urllib.parse import urlparse
@@ -1216,22 +1217,128 @@ def delete_result(result_id):
         session.close()
 
 
+# --- Background-job bookkeeping for AI analysis ----------------------------------
+# AI generation is a long (~30s) Gemini call. We treat it as a background job so
+# that switching the intersection/union tabs quickly never kicks off duplicate
+# generations: a (result_id, mode) already being generated returns "processing",
+# and the client polls /api/ai-analysis/result until it is saved. The set is
+# per-process (best-effort across gunicorn workers); the mode-keyed DB save is
+# idempotent, so a rare cross-worker duplicate just overwrites harmlessly.
+_ai_inflight = set()
+_ai_inflight_lock = threading.Lock()
+
+
+def _saved_ai_for(result_id, mode):
+    """Return the saved AI dict for (result_id, mode) if present and complete,
+    else None. Handles the mode-keyed blob and the legacy bare blob."""
+    if not result_id:
+        return None
+    s = Session()
+    try:
+        row = s.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+        if not row or not row.ai_analysis_json:
+            return None
+        blob = json.loads(row.ai_analysis_json)
+        if isinstance(blob, dict):
+            if 'has_ai_analysis' in blob:            # legacy bare blob (single mode)
+                return blob if blob.get('has_ai_analysis') else None
+            entry = blob.get(mode)
+            if isinstance(entry, dict) and entry.get('has_ai_analysis'):
+                return entry
+        return None
+    except Exception:
+        return None
+    finally:
+        s.close()
+
+
+def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language):
+    """Build the inputs, run the Gemini analysis, and (when result_id is given)
+    save it mode-keyed onto the row. Returns the ai_results dict. Runs either
+    synchronously (no result_id) or inside a background thread (result_id)."""
+    analysis_results = {'prescription_enrichments': prescription_enrichments}
+
+    # Pull saved prescriptions (with the ClinGen overlay) for the active mode.
+    if result_id:
+        _sess = Session()
+        try:
+            _row = _sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+            if _row:
+                _saved = json.loads(_row.results_json)
+                if isinstance(_saved, dict) and _saved.get('both'):
+                    _mode_data = (_saved.get('modes', {}) or {}).get(mode, {}) or {}
+                    analysis_results['prescriptions'] = _mode_data.get('prescriptions', [])
+                else:
+                    analysis_results['prescriptions'] = _saved.get('prescriptions', [])
+        except Exception as e:
+            print(f"[ai-analysis] could not load saved prescriptions: {e}")
+        finally:
+            _sess.close()
+
+    ai_results = generate_full_ai_analysis(disease_name, analysis_results, language=language)
+
+    # Save mode-keyed, merging so a 'both' row keeps the other tab's AI.
+    if result_id and ai_results.get('has_ai_analysis'):
+        _save_sess = Session()
+        try:
+            result = _save_sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+            if result:
+                payload = {}
+                if result.ai_analysis_json:
+                    try:
+                        _prev = json.loads(result.ai_analysis_json)
+                        if isinstance(_prev, dict) and 'has_ai_analysis' not in _prev:
+                            payload = _prev
+                    except Exception:
+                        payload = {}
+                payload[mode] = ai_results
+                try:
+                    result.ai_analysis_json = json.dumps(payload, default=str, ensure_ascii=False)
+                    _save_sess.commit()
+                    print(f"[DB] Saved AI analysis ({mode}) for result {result_id}")
+                except (TypeError, ValueError) as json_err:
+                    print(f"[DB] JSON serialization error: {json_err}")
+                    import re
+                    def clean_for_json(obj):
+                        if isinstance(obj, str):
+                            return re.sub(r'[\x00-\x1f\x7f-\x9f]', '', obj)
+                        elif isinstance(obj, dict):
+                            return {k: clean_for_json(v) for k, v in obj.items()}
+                        elif isinstance(obj, list):
+                            return [clean_for_json(i) for i in obj]
+                        return obj
+                    payload[mode] = clean_for_json(ai_results)
+                    result.ai_analysis_json = json.dumps(payload, default=str)
+                    _save_sess.commit()
+                    print(f"[DB] Saved cleaned AI analysis ({mode}) for result {result_id}")
+        except Exception as e:
+            print(f"[DB] Error saving AI analysis: {e}")
+            _save_sess.rollback()
+        finally:
+            _save_sess.close()
+
+    return ai_results
+
+
 @main_bp.route('/api/ai-analysis', methods=['POST'])
 def ai_analysis():
     """API endpoint to generate AI analysis for results.
-    
+
     Returns structured JSON with:
     - summary_table: Comparison table data
     - detailed_analysis: Full markdown analysis
     - clinical_questions: Diagnostic interview questions
-    
+
     If result_id is provided, saves the AI analysis to the database.
+    Deduplicated: an already-saved (result_id, mode) is returned as-is, and a
+    generation already in flight returns {status: 'processing'} (HTTP 202) so the
+    client polls instead of starting a second Gemini call.
     """
     data = request.get_json()
-    
+
     if not data:
         return jsonify({'error': 'No data provided'}), 400
-    
+
     disease_name = data.get('disease_name', '')
     prescription_enrichments = data.get('prescription_enrichments', {})
     result_id = data.get('result_id')  # Optional: save to this result
@@ -1239,94 +1346,48 @@ def ai_analysis():
     mode = (data.get('mode') or 'union')  # which disease-gene mode this AI run is for
     if mode not in ('union', 'intersection'):
         mode = 'union'
-    
+
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
-    
+
     if not Config.GEMINI_API_KEY:
         return jsonify({
             'error': 'AI analysis not configured. Please set the GEMINI_API_KEY environment variable.',
             'has_ai_analysis': False
         }), 503
-    
+
+    # Background-job dedup: return a finished analysis directly, or tell the client
+    # to poll if one is already being generated (don't start a duplicate).
+    key = (result_id, mode) if result_id else None
+    if key:
+        already = _saved_ai_for(result_id, mode)
+        if already:
+            return jsonify(already)
+        with _ai_inflight_lock:
+            if key in _ai_inflight:
+                return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
+            _ai_inflight.add(key)
+
+        # Run Gemini in a background thread so the request returns immediately and is
+        # never cut off by the gunicorn request timeout. The client polls
+        # /api/ai-analysis/result for this (result_id, mode) until it is saved.
+        def _bg(disease_name=disease_name, prescription_enrichments=prescription_enrichments,
+                result_id=result_id, mode=mode, language=language, key=key):
+            try:
+                _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language)
+            except Exception as e:
+                print(f"[ai-analysis] background generation failed: {e}")
+            finally:
+                with _ai_inflight_lock:
+                    _ai_inflight.discard(key)
+
+        threading.Thread(target=_bg, daemon=True).start()
+        return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
+
+    # No result_id: cannot save or poll, so run synchronously and return the result.
     try:
-        # Build the results structure for generate_full_ai_analysis
-        analysis_results = {
-            'prescription_enrichments': prescription_enrichments
-        }
-
-        # Pull the saved prescriptions (with ClinGen common_genes_validity) so the
-        # AI gets the clinical-validity overlay. The frontend only sends enrichment
-        # tables, so load the rest from the saved analysis row.
-        if result_id:
-            _sess = Session()
-            try:
-                _row = _sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
-                if _row:
-                    _saved = json.loads(_row.results_json)
-                    # A 'both' row nests per-mode results under modes.{intersection,union};
-                    # pull this tab's prescriptions so the ClinGen overlay matches the mode.
-                    if isinstance(_saved, dict) and _saved.get('both'):
-                        _mode_data = (_saved.get('modes', {}) or {}).get(mode, {}) or {}
-                        analysis_results['prescriptions'] = _mode_data.get('prescriptions', [])
-                    else:
-                        analysis_results['prescriptions'] = _saved.get('prescriptions', [])
-            except Exception as e:
-                print(f"[ai-analysis] could not load saved prescriptions: {e}")
-            finally:
-                _sess.close()
-
-        # Generate full AI analysis (summary_table, detailed_analysis, clinical_questions)
-        ai_results = generate_full_ai_analysis(disease_name, analysis_results, language=language)
-        
-        # Save AI analysis to database if result_id provided and analysis succeeded
-        if result_id and ai_results.get('has_ai_analysis'):
-            _save_sess = Session()
-            try:
-                result = _save_sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
-                if result:
-                    # Store AI keyed by mode: {mode: ai_results}. Merge with any existing
-                    # blob so a 'both' row keeps the other tab's AI when this one is run.
-                    payload = {}
-                    if result.ai_analysis_json:
-                        try:
-                            _prev = json.loads(result.ai_analysis_json)
-                            # Keep an already mode-keyed dict; discard a legacy bare blob.
-                            if isinstance(_prev, dict) and 'has_ai_analysis' not in _prev:
-                                payload = _prev
-                        except Exception:
-                            payload = {}
-                    payload[mode] = ai_results
-                    # Ensure AI analysis can be serialized to JSON
-                    try:
-                        result.ai_analysis_json = json.dumps(payload, default=str, ensure_ascii=False)
-                        _save_sess.commit()
-                        print(f"[DB] Saved AI analysis ({mode}) for result {result_id}")
-                    except (TypeError, ValueError) as json_err:
-                        print(f"[DB] JSON serialization error: {json_err}")
-                        # Try with more aggressive cleaning
-                        import re
-                        def clean_for_json(obj):
-                            if isinstance(obj, str):
-                                # Remove control characters
-                                return re.sub(r'[\x00-\x1f\x7f-\x9f]', '', obj)
-                            elif isinstance(obj, dict):
-                                return {k: clean_for_json(v) for k, v in obj.items()}
-                            elif isinstance(obj, list):
-                                return [clean_for_json(i) for i in obj]
-                            return obj
-                        payload[mode] = clean_for_json(ai_results)
-                        result.ai_analysis_json = json.dumps(payload, default=str)
-                        _save_sess.commit()
-                        print(f"[DB] Saved cleaned AI analysis ({mode}) for result {result_id}")
-            except Exception as e:
-                print(f"[DB] Error saving AI analysis: {e}")
-                _save_sess.rollback()
-            finally:
-                _save_sess.close()
-        
+        ai_results = _run_ai_generation(disease_name, prescription_enrichments, None, mode, language)
         return jsonify(ai_results)
-        
     except Exception as e:
         return jsonify({
             'error': f'AI analysis failed: {str(e)}',
@@ -1335,6 +1396,29 @@ def ai_analysis():
             'detailed_analysis': None,
             'clinical_questions': None
         }), 500
+
+
+@main_bp.route('/api/ai-analysis/result')
+def ai_analysis_result():
+    """Poll endpoint for a background AI-analysis run.
+
+    Returns the saved analysis for (result_id, mode) once it is ready, otherwise
+    {status: 'processing'} while it is still generating or {status: 'absent'} if
+    nothing is running. Lets a tab fill itself in when ready without re-triggering
+    Gemini on every tab switch.
+    """
+    result_id = request.args.get('result_id', type=int)
+    mode = request.args.get('mode') or 'union'
+    if mode not in ('union', 'intersection'):
+        mode = 'union'
+    if not result_id:
+        return jsonify({'status': 'absent', 'has_ai_analysis': False})
+    saved = _saved_ai_for(result_id, mode)
+    if saved:
+        return jsonify(saved)
+    with _ai_inflight_lock:
+        processing = (result_id, mode) in _ai_inflight
+    return jsonify({'status': 'processing' if processing else 'absent', 'has_ai_analysis': False})
 
 
 @main_bp.route('/api/ai-analysis/status')
