@@ -221,6 +221,22 @@
         .viz-toggle[aria-expanded="true"] .viz-caret { transform: rotate(90deg); }
         .venn-wrap.viz-collapsed { display: none; }
 
+        /* Static highlight of the region this analysis actually used: union lights
+           up the whole diagram, intersection the shared center (SVG-clipped lens). */
+        .used-venn .hl-region {
+            fill: #f59e0b; fill-opacity: 0; stroke: #b45309; stroke-width: 2.5;
+            stroke-opacity: 0; pointer-events: none;
+        }
+        .used-venn[data-hl="intersection"] .hl-region { fill-opacity: .55; stroke-opacity: .9; }
+        .used-venn[data-hl="intersection"] .venn-circle { fill-opacity: .1; }
+        .used-venn[data-hl="union"] .venn-circle { fill-opacity: .38; }
+        .used-note {
+            display: flex; align-items: center; gap: 8px; margin: 4px 0 14px;
+            padding: 9px 13px; border-radius: 9px; font-size: 0.82rem; font-weight: 500;
+            background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+        }
+        .used-note i { color: #d97706; }
+
         /* KPI boxes below the Venn */
         .disease-kpis {
             display: grid;
@@ -1116,12 +1132,20 @@
                 {% if results.venn %}
                 {% set v = results.venn %}
                 {% set r = v.regions %}
+                {% set used_mode = 'intersection' if results.disease_gene_mode == 'intersection' else 'union' %}
+                {% if used_mode == 'intersection' %}
+                <div class="used-note"><i class="fas fa-circle-info"></i> <span data-i18n="result.usedIntersection">This analysis used the shared center &mdash; genes common to all selected diseases.</span></div>
+                {% else %}
+                <div class="used-note"><i class="fas fa-circle-info"></i> <span data-i18n="result.usedUnion">This analysis used the whole diagram &mdash; genes linked to any selected disease.</span></div>
+                {% endif %}
                 <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
-                <div class="venn-wrap viz-collapsed">
+                <div class="venn-wrap viz-collapsed used-venn" data-hl="{{ used_mode }}">
                     {% if v.n == 2 %}
                     <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                        <defs><clipPath id="rvClipB2"><circle cx="220" cy="110" r="92"/></clipPath></defs>
                         <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
                         <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
+                        <circle cx="140" cy="110" r="92" class="hl-region" clip-path="url(#rvClipB2)"/>
                         <text x="92" y="117" class="venn-count">{{ r.A }}</text>
                         <text x="180" y="117" class="venn-count venn-core">{{ r.AB }}</text>
                         <text x="268" y="117" class="venn-count">{{ r.B }}</text>
@@ -1130,9 +1154,16 @@
                     </svg>
                     {% elif v.n == 3 %}
                     <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                        <defs>
+                            <clipPath id="rvClipB3"><circle cx="228" cy="132" r="92"/></clipPath>
+                            <clipPath id="rvClipC3"><circle cx="180" cy="212" r="92"/></clipPath>
+                        </defs>
                         <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
                         <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
                         <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ dcolors[2] }};"/>
+                        <g clip-path="url(#rvClipB3)"><g clip-path="url(#rvClipC3)">
+                            <circle cx="132" cy="132" r="92" class="hl-region"/>
+                        </g></g>
                         <text x="92" y="116" class="venn-count">{{ r.A }}</text>
                         <text x="268" y="116" class="venn-count">{{ r.B }}</text>
                         <text x="180" y="270" class="venn-count">{{ r.C }}</text>
@@ -1757,52 +1788,58 @@
                     })
                 });
                 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || i18n.t('result.aiAnalysisFailed'));
-                }
-                
+                // A 202 with {status:'processing'} means another request is already
+                // generating this tab's analysis -- poll for it instead of starting
+                // a duplicate Gemini run.
                 const aiResults = await response.json();
-                
-                // Hide loading states
-                document.getElementById('ai-loading').style.display = 'none';
-                document.getElementById('clinical-loading').style.display = 'none';
-                
-                if (aiResults.has_ai_analysis) {
-                    document.getElementById('ai-results').style.display = 'block';
-                    
-                    // Render summary table
-                    if (aiResults.summary_table && aiResults.summary_table.length > 0) {
-                        renderSummaryTable(aiResults.summary_table);
-                    } else {
-                        document.getElementById('ai-table-container').innerHTML = 
-                            `<p style="color: #6b7280; text-align: center; padding: 20px;">${i18n.t('result.noComparisonData')}</p>`;
-                    }
-                    
-                    // Store detailed analysis for toggle
-                    if (aiResults.detailed_analysis) {
-                        document.getElementById('detailed-analysis').innerHTML = 
-                            formatMarkdown(aiResults.detailed_analysis);
-                    } else {
-                        document.getElementById('btn-toggle-details').style.display = 'none';
-                    }
-                    
-                    // Render clinical questions as cards
-                    if (aiResults.clinical_questions && Array.isArray(aiResults.clinical_questions)) {
-                        document.getElementById('clinical-results').style.display = 'grid';
-                        renderClinicalCards(aiResults.clinical_questions);
-                    } else {
-                        showClinicalUnavailable();
-                    }
-                } else {
-                    showAiError(aiResults.error || i18n.t('result.noAnalysisResults'));
-                    showClinicalUnavailable();
+                if (aiResults.status === 'processing') {
+                    pollAiResult(0);
+                    return;
                 }
-                
+                if (!response.ok && !aiResults.has_ai_analysis) {
+                    showAiError(aiResults.error || i18n.t('result.aiAnalysisFailed'));
+                    showClinicalUnavailable();
+                    return;
+                }
+                displayAiResults(aiResults);
+
             } catch (err) {
                 console.error('AI error:', err);
                 showAiError(err.message);
                 showClinicalUnavailable();
+            }
+        }
+
+        // Background-job poller. AI generation runs server-side; we poll for this
+        // tab's (result_id, mode) result so that switching the intersection/union
+        // tabs quickly never starts a duplicate Gemini run -- the tab fills itself
+        // in when the analysis is ready, whichever tab you happen to be on.
+        let aiRetriggers = 0;
+        async function pollAiResult(attempt) {
+            const MAX_ATTEMPTS = 60; // ~4 min at 4s between polls
+            if (attempt > MAX_ATTEMPTS) {
+                showAiError(i18n.t('result.aiAnalysisFailed'));
+                showClinicalUnavailable();
+                return;
+            }
+            // keep the loading state visible while the background job runs
+            document.getElementById('ai-loading').style.display = 'block';
+            document.getElementById('clinical-loading').style.display = 'block';
+            await new Promise(r => setTimeout(r, 4000));
+            try {
+                const id = resultsData.result_id;
+                const mode = resultsData.disease_gene_mode || 'union';
+                const data = await (await fetch(
+                    `/api/ai-analysis/result?result_id=${encodeURIComponent(id)}&mode=${encodeURIComponent(mode)}`
+                )).json();
+                if (data.has_ai_analysis) { displayAiResults(data); return; }
+                if (data.status === 'processing') { pollAiResult(attempt + 1); return; }
+                // 'absent': whoever was generating it stopped without saving. Re-run
+                // once or twice via the normal path, then give up.
+                if (aiRetriggers < 2) { aiRetriggers++; runAiAnalysis(); }
+                else { showAiError(i18n.t('result.aiAnalysisFailed')); showClinicalUnavailable(); }
+            } catch (e) {
+                pollAiResult(attempt + 1);
             }
         }
         

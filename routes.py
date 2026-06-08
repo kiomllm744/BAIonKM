@@ -5,6 +5,7 @@ import json
 import re
 import hmac
 import difflib
+import threading
 from datetime import datetime
 from functools import wraps
 from urllib.parse import urlparse
@@ -1216,22 +1217,60 @@ def delete_result(result_id):
         session.close()
 
 
+# --- Background-job bookkeeping for AI analysis ----------------------------------
+# AI generation is a long (~30s) Gemini call. We treat it as a background job so
+# that switching the intersection/union tabs quickly never kicks off duplicate
+# generations: a (result_id, mode) already being generated returns "processing",
+# and the client polls /api/ai-analysis/result until it is saved. The set is
+# per-process (best-effort across gunicorn workers); the mode-keyed DB save is
+# idempotent, so a rare cross-worker duplicate just overwrites harmlessly.
+_ai_inflight = set()
+_ai_inflight_lock = threading.Lock()
+
+
+def _saved_ai_for(result_id, mode):
+    """Return the saved AI dict for (result_id, mode) if present and complete,
+    else None. Handles the mode-keyed blob and the legacy bare blob."""
+    if not result_id:
+        return None
+    s = Session()
+    try:
+        row = s.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+        if not row or not row.ai_analysis_json:
+            return None
+        blob = json.loads(row.ai_analysis_json)
+        if isinstance(blob, dict):
+            if 'has_ai_analysis' in blob:            # legacy bare blob (single mode)
+                return blob if blob.get('has_ai_analysis') else None
+            entry = blob.get(mode)
+            if isinstance(entry, dict) and entry.get('has_ai_analysis'):
+                return entry
+        return None
+    except Exception:
+        return None
+    finally:
+        s.close()
+
+
 @main_bp.route('/api/ai-analysis', methods=['POST'])
 def ai_analysis():
     """API endpoint to generate AI analysis for results.
-    
+
     Returns structured JSON with:
     - summary_table: Comparison table data
     - detailed_analysis: Full markdown analysis
     - clinical_questions: Diagnostic interview questions
-    
+
     If result_id is provided, saves the AI analysis to the database.
+    Deduplicated: an already-saved (result_id, mode) is returned as-is, and a
+    generation already in flight returns {status: 'processing'} (HTTP 202) so the
+    client polls instead of starting a second Gemini call.
     """
     data = request.get_json()
-    
+
     if not data:
         return jsonify({'error': 'No data provided'}), 400
-    
+
     disease_name = data.get('disease_name', '')
     prescription_enrichments = data.get('prescription_enrichments', {})
     result_id = data.get('result_id')  # Optional: save to this result
@@ -1239,16 +1278,28 @@ def ai_analysis():
     mode = (data.get('mode') or 'union')  # which disease-gene mode this AI run is for
     if mode not in ('union', 'intersection'):
         mode = 'union'
-    
+
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
-    
+
     if not Config.GEMINI_API_KEY:
         return jsonify({
             'error': 'AI analysis not configured. Please set the GEMINI_API_KEY environment variable.',
             'has_ai_analysis': False
         }), 503
-    
+
+    # Background-job dedup: return a finished analysis directly, or tell the client
+    # to poll if one is already being generated (don't start a duplicate).
+    key = (result_id, mode) if result_id else None
+    if key:
+        already = _saved_ai_for(result_id, mode)
+        if already:
+            return jsonify(already)
+        with _ai_inflight_lock:
+            if key in _ai_inflight:
+                return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
+            _ai_inflight.add(key)
+
     try:
         # Build the results structure for generate_full_ai_analysis
         analysis_results = {
@@ -1326,7 +1377,7 @@ def ai_analysis():
                 _save_sess.close()
         
         return jsonify(ai_results)
-        
+
     except Exception as e:
         return jsonify({
             'error': f'AI analysis failed: {str(e)}',
@@ -1335,6 +1386,35 @@ def ai_analysis():
             'detailed_analysis': None,
             'clinical_questions': None
         }), 500
+    finally:
+        # Always release the in-flight slot so a later run (e.g. after an error)
+        # is allowed to start again.
+        if key:
+            with _ai_inflight_lock:
+                _ai_inflight.discard(key)
+
+
+@main_bp.route('/api/ai-analysis/result')
+def ai_analysis_result():
+    """Poll endpoint for a background AI-analysis run.
+
+    Returns the saved analysis for (result_id, mode) once it is ready, otherwise
+    {status: 'processing'} while it is still generating or {status: 'absent'} if
+    nothing is running. Lets a tab fill itself in when ready without re-triggering
+    Gemini on every tab switch.
+    """
+    result_id = request.args.get('result_id', type=int)
+    mode = request.args.get('mode') or 'union'
+    if mode not in ('union', 'intersection'):
+        mode = 'union'
+    if not result_id:
+        return jsonify({'status': 'absent', 'has_ai_analysis': False})
+    saved = _saved_ai_for(result_id, mode)
+    if saved:
+        return jsonify(saved)
+    with _ai_inflight_lock:
+        processing = (result_id, mode) in _ai_inflight
+    return jsonify({'status': 'processing' if processing else 'absent', 'has_ai_analysis': False})
 
 
 @main_bp.route('/api/ai-analysis/status')
