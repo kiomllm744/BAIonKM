@@ -620,18 +620,33 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
 
     for i, genes in enumerate(common_genes):
         results['prescriptions'][i]['common_gene_count'] = len(genes)
-        # Store common genes ordered by Open Targets score (highest first) with
-        # their scores; the scores dict is built in the same order.
-        ordered = _by_ot_score(genes)
+        # ClinGen clinical-validity overlay first -- it defines the display groups
+        # (this-disease / other-disease / other) that drive BOTH the chip colours
+        # and the ordering below.
+        validity = _clingen_validity_for(genes, gene_scores, match_diseases, gene_evidence)
+
+        def _group_rank(g, _validity=validity):
+            # Mirror the result.html chip-colour logic exactly so each colour
+            # category forms one contiguous block:
+            #   0 = ClinGen-validated for THIS disease (green, most valid)
+            #   1 = ClinGen-validated for another disease (blue)
+            #   2 = no ClinGen (other, slate)
+            cg = (_validity.get(g) or {}).get('clingen') or {}
+            is_clingen = cg.get('source') == 'clingen'
+            if is_clingen and cg.get('disease_specific'):
+                return 0
+            if is_clingen:
+                return 1
+            return 2
+
+        # Order by validity GROUP first, then Open Targets score (desc) within each
+        # group, then gene name -- most clinically-valid genes first, OT-ranked.
+        ordered = sorted(genes, key=lambda g: (_group_rank(g), -gene_scores.get(g, 0.0), g))
         results['prescriptions'][i]['common_genes'] = ordered
         results['prescriptions'][i]['common_genes_scores'] = {
             gene: round(gene_scores.get(gene, 0.0), 4) for gene in ordered
         }
-        # ClinGen clinical-validity overlay + Open Targets evidence types for the
-        # common (disease-relevant) genes
-        results['prescriptions'][i]['common_genes_validity'] = _clingen_validity_for(
-            genes, gene_scores, match_diseases, gene_evidence
-        )
+        results['prescriptions'][i]['common_genes_validity'] = validity
         results['prescriptions'][i]['common_genes_evidence'] = {
             g: gene_evidence[g] for g in genes if gene_evidence.get(g)
         }
@@ -757,6 +772,14 @@ def compute_disease_venn(disease_name, efo_id=None, diseases=None):
     """
     res = analyze_prescriptions(disease_name, [], efo_id=efo_id, diseases=diseases)
     intersection_count = len(res.get('shared_core_genes', []))
+    # This call deliberately passes NO herbs (we only want the disease Venn before
+    # the user picks a mode), so the herb-overlap check fires a "No common genes
+    # found between disease and any prescription" error that is meaningless here.
+    # Drop it; keep genuine disease-resolution errors.
+    venn_errors = [
+        e for e in res.get('errors', [])
+        if 'No common genes found' not in e
+    ]
     return {
         'diseases': res.get('diseases', []),
         'venn': res.get('venn'),
@@ -764,5 +787,5 @@ def compute_disease_venn(disease_name, efo_id=None, diseases=None):
         'union_count': res.get('union_gene_count', res.get('disease_gene_count', 0)),
         'intersection_count': intersection_count,
         'has_intersection': intersection_count > 0,
-        'errors': res.get('errors', []),
+        'errors': venn_errors,
     }
