@@ -612,13 +612,20 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
     
     # Find common genes (set operations - very fast!)
     common_genes = find_common_genes(disease_genes, all_herb_genes)
-    
+
+    # Order disease-relevant gene lists by Open Targets association score (desc),
+    # breaking ties alphabetically -- the most disease-associated targets first.
+    def _by_ot_score(gene_iterable):
+        return sorted(gene_iterable, key=lambda g: (-gene_scores.get(g, 0.0), g))
+
     for i, genes in enumerate(common_genes):
         results['prescriptions'][i]['common_gene_count'] = len(genes)
-        # Store common genes as a simple list with their Open Targets scores
-        results['prescriptions'][i]['common_genes'] = sorted(genes)
+        # Store common genes ordered by Open Targets score (highest first) with
+        # their scores; the scores dict is built in the same order.
+        ordered = _by_ot_score(genes)
+        results['prescriptions'][i]['common_genes'] = ordered
         results['prescriptions'][i]['common_genes_scores'] = {
-            gene: round(gene_scores.get(gene, 0.0), 4) for gene in genes
+            gene: round(gene_scores.get(gene, 0.0), 4) for gene in ordered
         }
         # ClinGen clinical-validity overlay + Open Targets evidence types for the
         # common (disease-relevant) genes
@@ -641,7 +648,7 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
     unique_genes = find_unique_genes(common_genes)
     for i, genes in enumerate(unique_genes):
         results['prescriptions'][i]['unique_gene_count'] = len(genes)
-        results['prescriptions'][i]['distinctive_genes'] = sorted(genes)
+        results['prescriptions'][i]['distinctive_genes'] = _by_ot_score(genes)
 
     # Gene-overlap summary (pure set logic, no API). This is how prescriptions are
     # compared -- "core" targets shared across formulas vs targets distinctive to
@@ -649,14 +656,14 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
     # when formulas share herbs.
     common_sets = [set(c) for c in common_genes]
     non_empty_common = [s for s in common_sets if s]
-    shared_core = sorted(set.intersection(*non_empty_common)) if non_empty_common else []
+    shared_core = _by_ot_score(set.intersection(*non_empty_common)) if non_empty_common else []
     results['gene_overlap'] = {
         'shared_core': shared_core,  # disease targets hit by every prescription that hits the disease
         'distinctive': [
             {
                 'index': i + 1,
                 'herbs': results['prescriptions'][i].get('herbs', []),
-                'genes': sorted(unique_genes[i]),
+                'genes': _by_ot_score(unique_genes[i]),
             }
             for i in range(len(common_genes))
         ],
