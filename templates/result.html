@@ -230,12 +230,6 @@
         .used-venn[data-hl="intersection"] .hl-region { fill-opacity: .55; stroke-opacity: .9; }
         .used-venn[data-hl="intersection"] .venn-circle { fill-opacity: .1; }
         .used-venn[data-hl="union"] .venn-circle { fill-opacity: .38; }
-        .used-note {
-            display: flex; align-items: center; gap: 8px; margin: 4px 0 14px;
-            padding: 9px 13px; border-radius: 9px; font-size: 0.82rem; font-weight: 500;
-            background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
-        }
-        .used-note i { color: #d97706; }
 
         /* KPI boxes below the Venn */
         .disease-kpis {
@@ -1133,11 +1127,6 @@
                 {% set v = results.venn %}
                 {% set r = v.regions %}
                 {% set used_mode = 'intersection' if results.disease_gene_mode == 'intersection' else 'union' %}
-                {% if used_mode == 'intersection' %}
-                <div class="used-note"><i class="fas fa-circle-info"></i> <span data-i18n="result.usedIntersection">This analysis used the shared center &mdash; genes common to all selected diseases.</span></div>
-                {% else %}
-                <div class="used-note"><i class="fas fa-circle-info"></i> <span data-i18n="result.usedUnion">This analysis used the whole diagram &mdash; genes linked to any selected disease.</span></div>
-                {% endif %}
                 <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
                 <div class="venn-wrap viz-collapsed used-venn" data-hl="{{ used_mode }}">
                     {% if v.n == 2 %}
