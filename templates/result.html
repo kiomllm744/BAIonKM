@@ -1166,11 +1166,12 @@
                     {% for prescription in results.prescriptions %}
                     <div class="prescription-item" style="display: flex; flex-direction: column;">
                         <div class="prescription-item-header">
-                            <span class="rx-badge">Prescription {{ prescription.index }}</span>
+                            <span class="rx-badge"><span data-i18n="result.rxLabel">Prescription</span> {{ prescription.index }}</span>
                         </div>
                         <div class="herb-tags">
                             {% for herb in prescription.herbs %}
-                            <span class="herb-tag">{{ herb }}</span>
+                            {% set hk = herb_korean(herb) %}
+                            <span class="herb-tag" data-en="{{ herb }}"{% if hk and hk != herb %} data-ko="{{ hk }}"{% endif %}>{{ herb }}</span>
                             {% endfor %}
                         </div>
 
@@ -1524,7 +1525,20 @@
             checkAndRunAiAnalysis();
             alignPrescriptionRows();
             loadSidebarStats();
+            applyHerbLang();
         });
+
+        // Show herb names in Korean (Hangul, from the herb dictionary) when the UI
+        // is Korean, and in pinyin otherwise. Runs on load and on every language
+        // toggle (the 'langchange' event from i18n.js).
+        function applyHerbLang() {
+            const ko = document.documentElement.lang === 'ko';
+            document.querySelectorAll('.herb-tag[data-en]').forEach(el => {
+                const k = el.getAttribute('data-ko');
+                el.textContent = (ko && k) ? k : el.getAttribute('data-en');
+            });
+        }
+        document.addEventListener('langchange', applyHerbLang);
 
         // Populate the sidebar Diseases/Herbs counts (same as the other pages).
         async function loadSidebarStats() {
