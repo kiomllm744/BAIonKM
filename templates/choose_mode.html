@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    {% include 'partials/_head_i18n.html' %}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choose gene-set mode - BAIonKM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        /* choose-mode-specific styles; base layout/components come from main.css */
+        .choose-intro { margin-bottom: 6px; }
+        .choose-intro h1 {
+            font-size: 1.4rem; font-weight: 700; color: #111827; margin-bottom: 8px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .choose-intro h1 i { color: var(--primary-color); }
+        .choose-intro p { color: #6b7280; font-size: 0.92rem; line-height: 1.55; max-width: 720px; }
+
+        /* Venn diagram of disease gene overlaps (mirrors result.html) */
+        .venn-wrap {
+            margin-top: 8px; display: flex; flex-direction: column; align-items: center;
+        }
+        .venn-svg { width: 100%; max-width: 360px; height: auto; }
+        .venn-circle { fill-opacity: 0.22; stroke-opacity: 0.9; stroke-width: 2; }
+        .venn-circle[style*="6366f1"] { stroke: #6366f1; }
+        .venn-circle[style*="0d9488"] { stroke: #0d9488; }
+        .venn-circle[style*="d97706"] { stroke: #d97706; }
+        .venn-count { fill: #111827; font-size: 15px; font-weight: 700; text-anchor: middle; }
+        .venn-core { font-size: 18px; }
+        .venn-letter { font-size: 18px; font-weight: 800; text-anchor: middle; }
+        .venn-legend {
+            margin-top: 12px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px;
+        }
+        .venn-legend-item {
+            display: inline-flex; align-items: center; gap: 7px;
+            font-size: 0.82rem; color: #374151; font-weight: 500;
+        }
+        .venn-legend-letter {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 50%; color: #fff;
+            font-size: 0.68rem; font-weight: 700; flex-shrink: 0;
+        }
+        .venn-note { margin-top: 10px; font-size: 0.72rem; color: #9ca3af; text-align: center; }
+
+        /* Union / intersection count chips under the Venn */
+        .count-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 18px; }
+        .count-chip {
+            display: flex; flex-direction: column; align-items: center; min-width: 150px;
+            padding: 14px 20px; border-radius: var(--radius-md, 12px);
+            border: 1px solid var(--border-color); background: #fafafa;
+        }
+        .count-chip .cc-value { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+        .count-chip.union .cc-value { color: #6366f1; }
+        .count-chip.inter .cc-value { color: #0d9488; }
+        .count-chip .cc-label { font-size: 0.78rem; color: #6b7280; margin-top: 6px; font-weight: 600; }
+
+        /* The three choice cards */
+        .mode-choices {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px; margin-top: 4px;
+        }
+        .mode-btn {
+            display: flex; flex-direction: column; align-items: flex-start; text-align: left;
+            gap: 8px; padding: 20px; width: 100%; cursor: pointer;
+            background: #fff; border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-lg, 16px); transition: all 0.15s ease;
+            font-family: inherit;
+        }
+        .mode-btn:hover:not(:disabled) {
+            border-color: var(--primary-color); box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        .mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .mode-btn .mb-head { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; font-weight: 700; color: #111827; }
+        .mode-btn .mb-head i { font-size: 1.1rem; }
+        .mode-btn.m-inter .mb-head i { color: #0d9488; }
+        .mode-btn.m-union .mb-head i { color: #6366f1; }
+        .mode-btn.m-both  .mb-head i { color: #d97706; }
+        .mode-btn .mb-desc { font-size: 0.83rem; color: #6b7280; line-height: 1.5; }
+        .mode-btn .mb-count {
+            margin-top: auto; font-size: 0.76rem; font-weight: 700; color: #374151;
+            background: #f3f4f6; padding: 3px 10px; border-radius: 999px;
+        }
+
+        .empty-warn {
+            margin-top: 16px; padding: 12px 16px; border-radius: 10px;
+            background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+            font-size: 0.85rem; display: flex; align-items: center; gap: 10px;
+        }
+        .empty-warn i { color: #d97706; }
+        .choose-errors {
+            margin-top: 16px; padding: 12px 16px; border-radius: 10px;
+            background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: 0.85rem;
+        }
+        .choose-errors ul { margin: 0; padding-left: 18px; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        {% include 'partials/_topbar.html' %}
+
+        <main class="main-content">
+            {% set dcolors = ['#6366f1', '#0d9488', '#d97706'] %}
+            {% set dletters = ['A', 'B', 'C'] %}
+
+            <div class="choose-intro">
+                <h1><i class="fas fa-diagram-project"></i> <span data-i18n="choose.title">How should we combine the disease genes?</span></h1>
+                <p>
+                    <span data-i18n="choose.subtitle">You selected more than one disease. Choose whether the analysis should use genes shared by all diseases (intersection), genes in any disease (union), or run both side by side.</span>
+                </p>
+            </div>
+
+            <!-- Disease overlap card -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-virus"></i>
+                    <h2 data-i18n="choose.diseaseOverlap">Disease gene overlap</h2>
+                </div>
+                <div class="card-body">
+                    <p style="color:#4b5563; font-size:0.92rem; margin-bottom:4px;">
+                        <strong>{{ venn.disease_name }}</strong>
+                    </p>
+
+                    {% if venn.venn %}
+                    {% set v = venn.venn %}
+                    {% set r = v.regions %}
+                    <div class="venn-wrap">
+                        {% if v.n == 2 %}
+                        <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                            <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
+                            <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
+                            <text x="92" y="117" class="venn-count">{{ r.A }}</text>
+                            <text x="180" y="117" class="venn-count venn-core">{{ r.AB }}</text>
+                            <text x="268" y="117" class="venn-count">{{ r.B }}</text>
+                            <text x="42" y="50" class="venn-letter" style="fill: {{ dcolors[0] }};">A</text>
+                            <text x="318" y="50" class="venn-letter" style="fill: {{ dcolors[1] }};">B</text>
+                        </svg>
+                        {% elif v.n == 3 %}
+                        <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Disease gene overlap">
+                            <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[0] }};"/>
+                            <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ dcolors[1] }};"/>
+                            <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ dcolors[2] }};"/>
+                            <text x="92" y="116" class="venn-count">{{ r.A }}</text>
+                            <text x="268" y="116" class="venn-count">{{ r.B }}</text>
+                            <text x="180" y="270" class="venn-count">{{ r.C }}</text>
+                            <text x="180" y="96" class="venn-count">{{ r.AB }}</text>
+                            <text x="122" y="194" class="venn-count">{{ r.AC }}</text>
+                            <text x="238" y="194" class="venn-count">{{ r.BC }}</text>
+                            <text x="180" y="160" class="venn-count venn-core">{{ r.ABC }}</text>
+                            <text x="48" y="58" class="venn-letter" style="fill: {{ dcolors[0] }};">A</text>
+                            <text x="312" y="58" class="venn-letter" style="fill: {{ dcolors[1] }};">B</text>
+                            <text x="180" y="336" class="venn-letter" style="fill: {{ dcolors[2] }};">C</text>
+                        </svg>
+                        {% endif %}
+                        <div class="venn-legend">
+                            {% for nm in v.names %}
+                            <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ dcolors[loop.index0 % 3] }};">{{ dletters[loop.index0 % 3] }}</span>{{ nm }} ({{ v.sizes[loop.index0] }})</span>
+                            {% endfor %}
+                        </div>
+                        <div class="venn-note" data-i18n="result.vennNote1">Each number = genes shared by exactly that region &middot; center = shared by all diseases</div>
+                    </div>
+                    {% endif %}
+
+                    <div class="count-chips">
+                        <div class="count-chip union">
+                            <span class="cc-value">{{ venn.union_count }}</span>
+                            <span class="cc-label" data-i18n="choose.unionCount">genes in any disease (union)</span>
+                        </div>
+                        <div class="count-chip inter">
+                            <span class="cc-value">{{ venn.intersection_count }}</span>
+                            <span class="cc-label" data-i18n="choose.intersectionCount">genes shared by all (intersection)</span>
+                        </div>
+                    </div>
+
+                    {% if venn.errors %}
+                    <div class="choose-errors">
+                        <ul>
+                            {% for e in venn.errors %}<li>{{ e }}</li>{% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Choice form: re-POSTs the same inputs with disease_gene_mode set -->
+            <form method="POST" action="{{ url_for('main.analyze') }}">
+                <input type="hidden" name="disease" value="{{ form_disease }}">
+                <input type="hidden" name="disease_id" value="{{ form_disease_id }}">
+                <input type="hidden" name="diseases_data" value="{{ form_diseases }}">
+                <input type="hidden" name="herbs_data" value="{{ form_herbs }}">
+                {% for lib in form_libs %}
+                <input type="hidden" name="enrichment_libraries" value="{{ lib }}">
+                {% endfor %}
+
+                {% if not venn.has_intersection %}
+                <div class="empty-warn">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span data-i18n="choose.intersectionEmptyWarn">The selected diseases share no common genes, so only the Union analysis is available.</span>
+                </div>
+                {% endif %}
+
+                <div class="mode-choices">
+                    <button type="submit" name="disease_gene_mode" value="intersection"
+                            class="mode-btn m-inter" {% if not venn.has_intersection %}disabled{% endif %}>
+                        <span class="mb-head"><i class="fas fa-circle-dot"></i> <span data-i18n="choose.intersectionLabel">Intersection</span></span>
+                        <span class="mb-desc" data-i18n="choose.intersectionDesc">Analyse only the genes shared by every selected disease &mdash; the common core.</span>
+                        <span class="mb-count">{{ venn.intersection_count }} <span data-i18n="choose.genesWord">genes</span></span>
+                    </button>
+
+                    <button type="submit" name="disease_gene_mode" value="union"
+                            class="mode-btn m-union">
+                        <span class="mb-head"><i class="fas fa-circle-nodes"></i> <span data-i18n="choose.unionLabel">Union</span></span>
+                        <span class="mb-desc" data-i18n="choose.unionDesc">Analyse every gene linked to any of the selected diseases.</span>
+                        <span class="mb-count">{{ venn.union_count }} <span data-i18n="choose.genesWord">genes</span></span>
+                    </button>
+
+                    <button type="submit" name="disease_gene_mode" value="both"
+                            class="mode-btn m-both" {% if not venn.has_intersection %}disabled{% endif %}>
+                        <span class="mb-head"><i class="fas fa-layer-group"></i> <span data-i18n="choose.bothLabel">Both</span></span>
+                        <span class="mb-desc" data-i18n="choose.bothDesc">Run both analyses and compare them side by side in two tabs.</span>
+                        <span class="mb-count" data-i18n="choose.bothCount">intersection + union</span>
+                    </button>
+                </div>
+            </form>
+        </main>
+    </div>
+</body>
+</html>
