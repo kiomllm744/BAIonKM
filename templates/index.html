@@ -79,11 +79,6 @@
                     <div class="card-header">
                         <i class="fas fa-mortar-pestle"></i>
                         <h2 data-i18n="index.prescriptions">Herbal Prescriptions</h2>
-                        <div class="card-actions">
-                            <button type="button" class="btn btn-outline btn-sm" id="add-prescription-btn">
-                                <i class="fas fa-plus"></i> <span data-i18n="index.addPrescription">Add Prescription</span>
-                            </button>
-                        </div>
                     </div>
                     <div class="card-body">
                         <div class="preset-bar" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:16px;">
@@ -91,9 +86,8 @@
                                 <i class="fas fa-vial"></i> <span data-i18n="index.presets">Quick test presets:</span>
                             </span>
                             <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="1">Preset 1 &middot; 6 herbs</button>
-                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="2">Preset 2 &middot; 14 herbs</button>
-                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="3">Preset 3 &middot; 4 herbs</button>
-                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="all" style="font-weight:600;" data-i18n="index.loadAll">Load all 3</button>
+                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="2">Preset 2 &middot; 4 herbs</button>
+                            <button type="button" class="btn btn-outline btn-sm preset-btn" data-preset="all" style="font-weight:600;" data-i18n="index.loadAll">Load both</button>
                         </div>
                         <div id="prescriptions-container">
                             <!-- Prescription 1 -->
@@ -120,10 +114,34 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Prescription 2 -->
+                            <div class="prescription-card" data-index="2">
+                                <div class="prescription-header">
+                                    <span class="prescription-badge">Prescription 2</span>
+                                    <button type="button" class="btn-icon remove-prescription" title="Remove prescription" data-i18n-title="rx.removeTitle" style="display: none;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="prescription-body">
+                                    <div class="autocomplete-wrapper">
+                                        <div class="tags-input-container" id="tags-container-2">
+                                            <input
+                                                type="text"
+                                                class="tags-input herb-input"
+                                                data-index="2"
+                                                placeholder="Type herb name or paste list..."
+                                                data-i18n-placeholder="index.herbPlaceholder"
+                                                autocomplete="off"
+                                            >
+                                        </div>
+                                        <div class="suggestions-dropdown herb-suggestions"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <p class="form-hint" style="margin-top: 16px;">
                             <i class="fas fa-info-circle"></i>
-                            <span data-i18n="index.prescriptionsHint">You can add up to 3 prescriptions. Type to search or paste a comma-separated list of herbs.</span>
+                            <span data-i18n="index.prescriptionsHint">Fill one or both prescriptions. Type to search or paste a comma-separated list of herbs.</span>
                         </p>
                     </div>
                 </section>

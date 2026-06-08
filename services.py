@@ -447,12 +447,19 @@ def _clingen_validity_for(common_genes, gene_scores, diseases, gene_evidence=Non
     return validity
 
 
-def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, libraries=None):
+def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
+                          libraries=None, disease_gene_mode='union'):
     """
     Main analysis function - ONLINE REAL-TIME VERSION.
 
     `libraries` is the list of Enrichr libraries to enrich against (user choice);
     when None it falls back to Config.ENRICHMENT_LIBRARIES.
+
+    `disease_gene_mode` selects which disease-gene set drives the whole pipeline
+    (common genes, per-prescription Venns, enrichment, AI):
+      - 'union' (default): genes associated with ANY selected disease.
+      - 'intersection': only genes associated with ALL selected diseases (the
+        "shared core"). With a single disease it is identical to union.
 
     Supports ONE or SEVERAL diseases. With multiple diseases the disease gene
     sets are UNIONed (a gene linked to ANY selected disease is included), keeping
@@ -537,12 +544,20 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, 
             gene_evidence.setdefault(g, set()).update(labels)
     gene_evidence = {g: sorted(v) for g, v in gene_evidence.items()}
 
-    disease_genes = list(gene_scores.keys())
-    results['disease_gene_count'] = len(disease_genes)
-    # shared core = genes associated with ALL diseases that returned any genes
+    # Both sets are always computed (cheap, no API): the UNION (genes in ANY
+    # disease) and the shared core = INTERSECTION (genes in ALL diseases). The
+    # chosen mode decides which one drives the rest of the pipeline.
+    union_genes = list(gene_scores.keys())
     shared_core = set.intersection(*per_disease_sets) if per_disease_sets else set()
     results['shared_core_genes'] = sorted(shared_core)
     multi = len(resolved) > 1
+    results['disease_gene_mode'] = disease_gene_mode
+    results['union_gene_count'] = len(union_genes)
+    if disease_gene_mode == 'intersection' and multi:
+        disease_genes = sorted(shared_core)          # genes shared by ALL diseases
+    else:
+        disease_genes = union_genes                  # union (also used for 1 disease)
+    results['disease_gene_count'] = len(disease_genes)
     match_diseases = [{'name': r['name'], 'efo_id': r['efo_id']} for r in resolved]
 
     # Venn region counts for the gene sets used (2 or 3 diseases) -> overlap diagram
@@ -566,9 +581,18 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, 
         }
 
     if not disease_genes:
-        results['errors'].append("No genes found for the selected disease(s)")
+        if disease_gene_mode == 'intersection' and multi:
+            # The diseases share no gene at all -> intersection mode has nothing
+            # to analyse. Flag it so the UI can show a friendly empty state (the
+            # disease summary + Venn are already populated above).
+            results['empty_intersection'] = True
+            results['errors'].append(
+                "No genes are shared by all selected diseases (intersection is empty)."
+            )
+        else:
+            results['errors'].append("No genes found for the selected disease(s)")
         return results
-        
+
     # Get herb genes for each prescription (batch queries - fast!)
     all_herb_genes = []
     for i, herb_names in enumerate(herb_lists):
@@ -588,13 +612,20 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, 
     
     # Find common genes (set operations - very fast!)
     common_genes = find_common_genes(disease_genes, all_herb_genes)
-    
+
+    # Order disease-relevant gene lists by Open Targets association score (desc),
+    # breaking ties alphabetically -- the most disease-associated targets first.
+    def _by_ot_score(gene_iterable):
+        return sorted(gene_iterable, key=lambda g: (-gene_scores.get(g, 0.0), g))
+
     for i, genes in enumerate(common_genes):
         results['prescriptions'][i]['common_gene_count'] = len(genes)
-        # Store common genes as a simple list with their Open Targets scores
-        results['prescriptions'][i]['common_genes'] = sorted(genes)
+        # Store common genes ordered by Open Targets score (highest first) with
+        # their scores; the scores dict is built in the same order.
+        ordered = _by_ot_score(genes)
+        results['prescriptions'][i]['common_genes'] = ordered
         results['prescriptions'][i]['common_genes_scores'] = {
-            gene: round(gene_scores.get(gene, 0.0), 4) for gene in genes
+            gene: round(gene_scores.get(gene, 0.0), 4) for gene in ordered
         }
         # ClinGen clinical-validity overlay + Open Targets evidence types for the
         # common (disease-relevant) genes
@@ -617,7 +648,7 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, 
     unique_genes = find_unique_genes(common_genes)
     for i, genes in enumerate(unique_genes):
         results['prescriptions'][i]['unique_gene_count'] = len(genes)
-        results['prescriptions'][i]['distinctive_genes'] = sorted(genes)
+        results['prescriptions'][i]['distinctive_genes'] = _by_ot_score(genes)
 
     # Gene-overlap summary (pure set logic, no API). This is how prescriptions are
     # compared -- "core" targets shared across formulas vs targets distinctive to
@@ -625,14 +656,14 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, 
     # when formulas share herbs.
     common_sets = [set(c) for c in common_genes]
     non_empty_common = [s for s in common_sets if s]
-    shared_core = sorted(set.intersection(*non_empty_common)) if non_empty_common else []
+    shared_core = _by_ot_score(set.intersection(*non_empty_common)) if non_empty_common else []
     results['gene_overlap'] = {
         'shared_core': shared_core,  # disease targets hit by every prescription that hits the disease
         'distinctive': [
             {
                 'index': i + 1,
                 'herbs': results['prescriptions'][i].get('herbs', []),
-                'genes': sorted(unique_genes[i]),
+                'genes': _by_ot_score(unique_genes[i]),
             }
             for i in range(len(common_genes))
         ],
@@ -713,3 +744,25 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None, 
             results['errors'].append(f"Enrichment analysis error: {str(e)}")
 
     return results
+
+
+def compute_disease_venn(disease_name, efo_id=None, diseases=None):
+    """Resolve the selected diseases and fetch ONLY their gene sets (no herbs,
+    no enrichment, no AI) so the choice screen can show the disease Venn fast.
+
+    Reuses analyze_prescriptions (with empty herb_lists) so the Venn here is
+    byte-identical to the one on the result page -- the disease resolution +
+    Open Targets fetches are cached, so the subsequent full run is ~free.
+    Returns the disease list, the Venn, and the union / intersection counts.
+    """
+    res = analyze_prescriptions(disease_name, [], efo_id=efo_id, diseases=diseases)
+    intersection_count = len(res.get('shared_core_genes', []))
+    return {
+        'diseases': res.get('diseases', []),
+        'venn': res.get('venn'),
+        'disease_name': res.get('disease_name', ''),
+        'union_count': res.get('union_gene_count', res.get('disease_gene_count', 0)),
+        'intersection_count': intersection_count,
+        'has_intersection': intersection_count > 0,
+        'errors': res.get('errors', []),
+    }

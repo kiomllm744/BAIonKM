@@ -4,9 +4,9 @@
 
 // State management
 const state = {
-    prescriptions: { 1: [] },
-    prescriptionCount: 1,
-    maxPrescriptions: 3,
+    prescriptions: { 1: [], 2: [] },
+    prescriptionCount: 2,
+    maxPrescriptions: 2,
     activeDropdown: null,
     selectedIndex: -1,
     selectedDiseases: [], // chosen diseases [{name, id}], up to maxDiseases
@@ -766,16 +766,12 @@ async function validateHerb(herbName) {
 // Preset herb formulas for quick testing. Each maps to its prescription slot.
 const PRESCRIPTION_PRESETS = {
     1: ['Shu di huang', 'Shan yao', 'Shan zhu yu', 'Ze xie', 'Mu dan pi', 'Fu ling'],
-    2: ['Ban xia', 'Mai ya', 'Bai zhu', 'Cang zhu', 'Fu ling', 'Tian ma', 'Chen pi',
-        'Shen qu', 'Ren shen', 'Gan jiang', 'Sheng jiang', 'Huang qi', 'Ze xie', 'Huang bai'],
-    3: ['Huang lian', 'Huang bai', 'Huang qin', 'Zhi zi']
+    2: ['Huang lian', 'Huang bai', 'Huang qin', 'Zhi zi']
 };
 
 // Fill a single prescription slot with its preset (creates the slot if needed).
 async function fillPresetSlot(slot) {
-    while (state.prescriptionCount < slot) {
-        addPrescription();
-    }
+    if (slot > state.maxPrescriptions) return;   // 2 fixed slots; no dynamic add
     const tagsContainer = document.getElementById(`tags-container-${slot}`);
     if (!tagsContainer) return;
     const input = tagsContainer.querySelector('.herb-input');
@@ -788,7 +784,7 @@ async function fillPresetSlot(slot) {
 // Handle a preset button click ("1" | "2" | "3" | "all").
 async function loadPreset(which) {
     if (which === 'all') {
-        for (const slot of [1, 2, 3]) {
+        for (const slot of [1, 2]) {
             await fillPresetSlot(slot);
         }
         return;
@@ -915,7 +911,7 @@ function clearForm() {
     syncDiseasesField();
     updateRunButton();
 
-    // Clear all herbs
+    // Clear all herbs from the (two fixed) prescription slots
     Object.keys(state.prescriptions).forEach(index => {
         const tagsContainer = document.getElementById(`tags-container-${index}`);
         if (tagsContainer) {
@@ -923,22 +919,12 @@ function clearForm() {
         }
         state.prescriptions[index] = [];
     });
-    
-    // Remove extra prescriptions
-    while (state.prescriptionCount > 1) {
-        const lastCard = elements.prescriptionsContainer.lastElementChild;
-        delete state.prescriptions[state.prescriptionCount];
-        lastCard.remove();
-        state.prescriptionCount--;
-    }
-    
-    // Reset placeholder
-    const firstInput = document.querySelector('.herb-input[data-index="1"]');
-    if (firstInput) {
-        firstInput.placeholder = i18n.t('index.herbPlaceholder');
-    }
-    
-    updateRemoveButtonsVisibility();
+
+    // Reset placeholders on both inputs
+    document.querySelectorAll('.herb-input').forEach(inp => {
+        inp.placeholder = i18n.t('index.herbPlaceholder');
+    });
+
     elements.diseaseInput.focus();
 }
 

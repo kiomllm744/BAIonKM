@@ -103,6 +103,30 @@
         }
         .disease-item-body a { color: #6366f1; text-decoration: underline; }
 
+        /* Mode tab bar (only shown for a 'both' result: intersection / union) */
+        .mode-tabs {
+            display: inline-flex; gap: 4px; padding: 4px;
+            background: #f1f5f9; border-radius: 12px; margin-bottom: 20px;
+        }
+        .mode-tab {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 18px; border-radius: 9px; text-decoration: none;
+            font-size: 0.9rem; font-weight: 600; color: #64748b; transition: all 0.15s ease;
+        }
+        .mode-tab i { font-size: 0.85rem; }
+        .mode-tab:hover { color: #334155; }
+        .mode-tab.active { background: #fff; color: #4f46e5; box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.08)); }
+
+        /* Empty-intersection state */
+        .empty-state {
+            text-align: center; padding: 56px 24px;
+        }
+        .empty-state .es-icon {
+            font-size: 2.6rem; color: #f59e0b; margin-bottom: 16px;
+        }
+        .empty-state h2 { font-size: 1.25rem; font-weight: 700; color: #111827; margin-bottom: 10px; }
+        .empty-state p { color: #6b7280; font-size: 0.92rem; max-width: 520px; margin: 0 auto 22px; line-height: 1.6; }
+
         /* Venn diagram of disease gene overlaps */
         .venn-wrap {
             margin-top: 22px;
@@ -1045,6 +1069,17 @@
 
         <!-- Main Content -->
         <main class="main-content">
+        {% if results._tabs %}
+        <!-- Mode tab bar: only present for a 'both' result -->
+        <div class="mode-tabs" role="tablist">
+            {% for m in results._tabs.order %}
+            <a class="mode-tab {% if m == results._tabs.active %}active{% endif %}" href="{{ request.path }}?tab={{ m }}">
+                <i class="fas {% if m == 'intersection' %}fa-circle-dot{% else %}fa-circle-nodes{% endif %}"></i>
+                <span data-i18n="result.tab{% if m == 'intersection' %}Intersection{% else %}Union{% endif %}">{% if m == 'intersection' %}Intersection{% else %}Union{% endif %}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
         <!-- Disease Summary Card -->
         {% set dcolors = ['#6366f1', '#0d9488', '#d97706'] %}
         {% set dletters = ['A', 'B', 'C'] %}
@@ -1140,6 +1175,24 @@
             </div>
         </div>
 
+        {% if results.empty_intersection %}
+        <!-- Intersection has no genes: show a friendly empty state instead of the
+             (necessarily empty) prescription / enrichment / AI sections. -->
+        <div class="card">
+            <div class="card-body">
+                <div class="empty-state">
+                    <div class="es-icon"><i class="fas fa-circle-exclamation"></i></div>
+                    <h2 data-i18n="result.emptyIntersectionTitle">No shared genes</h2>
+                    <p data-i18n="result.emptyIntersectionBody">The selected diseases have no genes in common, so the intersection analysis is empty. Try the Union analysis instead.</p>
+                    {% if results._tabs and 'union' in results._tabs.order %}
+                    <a class="btn btn-primary" href="{{ request.path }}?tab=union">
+                        <i class="fas fa-circle-nodes"></i> <span data-i18n="result.tabUnion">Union</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
         <!-- Errors/Warnings -->
         {% if results.errors %}
         <div class="alert alert-warning">
@@ -1216,8 +1269,8 @@
                             </summary>
                             <div style="font-size: 0.68rem; color: #9ca3af; margin-bottom: 8px;">
                                 <span style="color:#16a34a;">&#9679;</span> <span data-i18n="result.legendClinGenThis">ClinGen-validated (this disease)</span> &nbsp;
-                                <span style="color:#0d9488;">&#9679;</span> <span data-i18n="result.legendClinGenOther">ClinGen (other disease)</span> &nbsp;
-                                <span style="color:#6366f1;">&#9679;</span> <span data-i18n="result.legendOther">other</span>
+                                <span style="color:#2563eb;">&#9679;</span> <span data-i18n="result.legendClinGenOther">ClinGen (other disease)</span> &nbsp;
+                                <span style="color:#64748b;">&#9679;</span> <span data-i18n="result.legendOther">other</span>
                                 {% if results.diseases and results.diseases | length > 1 %}
                                 &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;box-shadow:0 0 0 2px #fbbf24;"></span> <span data-i18n="result.legendSharedAll">shared by all diseases</span>
                                 {% endif %}
@@ -1233,8 +1286,8 @@
                                         {% set ds = cg and cg.get('disease_specific') %}
                                         {% set dz = (prescription.common_genes_diseases or {}).get(gene) %}
                                         {% set core = results.shared_core_genes and gene in results.shared_core_genes %}
-                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: {% if ds %}#f0fdf4{% elif is_clingen %}#f0fdfa{% else %}#f0f4ff{% endif %}; border: 1px solid {% if ds %}#86efac{% elif is_clingen %}#99f6e4{% else %}#c7d2fe{% endif %};{% if core %} box-shadow: 0 0 0 2px #fbbf24;{% endif %} color: #4338ca; cursor: default;" title="{{ gene }}{% if sc %} &mdash; OT score {{ sc }}{% endif %}{% if is_clingen %} &mdash; ClinGen: {{ cg.get('classification') }}{% endif %}{% if v and v.evidence %} &mdash; evidence: {{ v.evidence | join('/') }}{% endif %}{% if dz %} &mdash; linked to: {{ dz | join(', ') }}{% endif %}{% if core %} (shared by all selected diseases){% endif %}">
-                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: {% if ds %}#16a34a{% elif is_clingen %}#0d9488{% else %}#6366f1{% endif %};"></i>
+                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: {% if ds %}#f0fdf4{% elif is_clingen %}#eff6ff{% else %}#f8fafc{% endif %}; border: 1px solid {% if ds %}#86efac{% elif is_clingen %}#bfdbfe{% else %}#cbd5e1{% endif %};{% if core %} box-shadow: 0 0 0 2px #fbbf24;{% endif %} color: #4338ca; cursor: default;" title="{{ gene }}{% if sc %} &mdash; OT score {{ sc }}{% endif %}{% if is_clingen %} &mdash; ClinGen: {{ cg.get('classification') }}{% endif %}{% if v and v.evidence %} &mdash; evidence: {{ v.evidence | join('/') }}{% endif %}{% if dz %} &mdash; linked to: {{ dz | join(', ') }}{% endif %}{% if core %} (shared by all selected diseases){% endif %}">
+                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: {% if ds %}#16a34a{% elif is_clingen %}#2563eb{% else %}#64748b{% endif %};"></i>
                                             <strong>{{ gene }}</strong>
                                         </span>
                                     {% endfor %}
@@ -1492,6 +1545,8 @@
         </div>
         {% endif %}
 
+        {% endif %}{# end of: not empty_intersection #}
+
         <!-- Page Actions -->
         <div class="page-actions">
             <a href="/" class="btn btn-secondary">
@@ -1697,6 +1752,7 @@
                         disease_name: resultsData.disease_name,
                         prescription_enrichments: prescriptionEnrichments,
                         result_id: resultsData.result_id,  // Pass result_id to save AI analysis
+                        mode: resultsData.disease_gene_mode || 'union',  // which tab's AI to save
                         language: (window.i18n && i18n.getLang) ? i18n.getLang() : 'en'
                     })
                 });

@@ -13,7 +13,7 @@ from sqlalchemy import func, desc, text, case
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from models import Herb, AnalysisResult, ExternalLookupCache, Disease
-from services import analyze_prescriptions
+from services import analyze_prescriptions, compute_disease_venn
 from config import Config
 from llm_service import generate_full_ai_analysis
 from umls_service import candidate_names_for_open_targets, translate_clinical_text
@@ -103,19 +103,117 @@ def _is_safe_next(target):
     )
 
 
-def _saved_result_data(result):
-    """Build the result.html context dict from a saved AnalysisResult row."""
+def _saved_result_data(result, tab=None):
+    """Build the result.html context dict from a saved AnalysisResult row.
+
+    A 'both' row stores {both, modes:{intersection, union}}; we render ONE mode
+    at a time (the active tab) and attach tab-bar info. The AI blob is mode-keyed
+    ({mode: ai}); a legacy bare AI blob is treated as the current mode's.
+    """
     try:
         data = json.loads(result.results_json)
-        data['result_id'] = result.id
     except Exception:
         data = {}
+    if not isinstance(data, dict):
+        data = {}
+
+    if data.get('both'):
+        modes = data.get('modes', {}) or {}
+        active = tab if tab in modes else 'intersection'
+        ctx = modes.get(active) or {}
+        ctx['_tabs'] = {
+            'active': active,
+            'order': [m for m in ('intersection', 'union') if m in modes],
+            'disease_name': data.get('disease_name', ''),
+        }
+        if data.get('provenance') and not ctx.get('provenance'):
+            ctx['provenance'] = data.get('provenance')
+        current_mode = active
+    else:
+        ctx = data
+        current_mode = ctx.get('disease_gene_mode') or 'union'
+
+    ctx['result_id'] = result.id
+
     if result.ai_analysis_json:
         try:
-            data['saved_ai_analysis'] = json.loads(result.ai_analysis_json)
+            ai = json.loads(result.ai_analysis_json)
+            if isinstance(ai, dict) and 'has_ai_analysis' in ai:
+                ai = {current_mode: ai}          # legacy bare blob -> key by mode
+            ctx['saved_ai_analysis'] = ai.get(current_mode) if isinstance(ai, dict) else None
         except Exception:
-            data['saved_ai_analysis'] = None
-    return data
+            ctx['saved_ai_analysis'] = None
+    return ctx
+
+
+def _run_and_save(disease_name, disease_id, diseases, herb_lists, selected_libs, mode):
+    """Run the analysis for the chosen disease-gene mode (or both), save ONE
+    history row, and Post/Redirect/Get to the result view."""
+    if mode == 'both':
+        r_int = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None,
+                                      diseases=diseases, libraries=selected_libs or None,
+                                      disease_gene_mode='intersection')
+        r_uni = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None,
+                                      diseases=diseases, libraries=selected_libs or None,
+                                      disease_gene_mode='union')
+        results = {
+            'both': True,
+            'modes': {'intersection': r_int, 'union': r_uni},
+            'disease_name': r_uni.get('disease_name') or disease_name,
+            'disease_gene_mode': 'both',
+        }
+        common_src = r_uni            # union -> non-empty common count for the history list
+    else:
+        results = analyze_prescriptions(disease_name, herb_lists, efo_id=disease_id or None,
+                                        diseases=diseases, libraries=selected_libs or None,
+                                        disease_gene_mode=mode)
+        common_src = results
+
+    try:
+        prov = _build_provenance()
+    except Exception as e:
+        print(f"Error building provenance: {e}")
+        prov = None
+    if prov:
+        results['provenance'] = prov
+        if results.get('both'):
+            results['modes']['intersection']['provenance'] = prov
+            results['modes']['union']['provenance'] = prov
+
+    result_id = None
+    db_session = Session()
+    try:
+        _common = set()
+        for _rx in (common_src or {}).get('prescriptions', []):
+            _common.update(_rx.get('common_genes', []))
+        new_result = AnalysisResult(
+            disease_name=results.get('disease_name') or disease_name,
+            prescriptions=json.dumps(herb_lists),
+            results_json=json.dumps(results, default=str),
+            common_genes_count=len(_common),
+            created_at=datetime.utcnow()
+        )
+        db_session.add(new_result)
+        db_session.commit()
+        result_id = new_result.id
+    except Exception as e:
+        print(f"Error saving result: {e}")
+        db_session.rollback()
+    finally:
+        db_session.close()
+
+    if result_id is not None:
+        session['last_result_id'] = result_id
+        return redirect(url_for('main.view_last_result'), code=303)
+
+    # Save failed (rare) -> render directly (pick the intersection tab for 'both').
+    if results.get('both'):
+        ctx = dict(results['modes'].get('intersection') or {})
+        ctx['_tabs'] = {'active': 'intersection',
+                        'order': [m for m in ('intersection', 'union') if m in results['modes']],
+                        'disease_name': results.get('disease_name', '')}
+        return render_template('result.html', results=ctx)
+    return render_template('result.html', results=results)
 
 
 # Ensure the analysis_results table has the ai_analysis_json column
@@ -966,54 +1064,28 @@ def analyze():
         # User-chosen enrichment libraries (falls back to the config default).
         selected_libs = [lib for lib in request.form.getlist('enrichment_libraries') if lib]
 
-        # Perform analysis (exact picked ID skips re-resolution; diseases list = multi-disease union)
-        results = analyze_prescriptions(
-            disease_name, herb_lists, efo_id=disease_id or None,
-            diseases=diseases, libraries=selected_libs or None
-        )
+        # Disease-gene mode: union / intersection / both. Empty on the first POST.
+        mode = request.form.get('disease_gene_mode', '').strip()
+        n_diseases = len(diseases) if diseases else (1 if disease_name else 0)
 
-        # Record the data sources/versions used, so the result is auditable and reproducible
-        try:
-            results['provenance'] = _build_provenance()
-        except Exception as e:
-            print(f"Error building provenance: {e}")
-        
-        # Save to history (try/finally so the DB session never leaks on error)
-        result_id = None
-        db_session = Session()
-        try:
-            # common genes live per-prescription, not at the top level
-            _common = set()
-            for _rx in results.get('prescriptions', []):
-                _common.update(_rx.get('common_genes', []))
+        # Single disease -> union == intersection; skip the choice screen.
+        if n_diseases <= 1:
+            return _run_and_save(disease_name, disease_id, diseases, herb_lists, selected_libs, 'union')
 
-            new_result = AnalysisResult(
-                disease_name=results.get('disease_name') or disease_name,
-                prescriptions=json.dumps(herb_lists),
-                results_json=json.dumps(results, default=str),
-                common_genes_count=len(_common),
-                created_at=datetime.utcnow()
+        # 2+ diseases, no mode chosen yet -> show the disease Venn + choice buttons.
+        # The buttons re-POST this same form with disease_gene_mode set.
+        if mode not in ('union', 'intersection', 'both'):
+            venn = compute_disease_venn(disease_name, efo_id=disease_id or None, diseases=diseases)
+            return render_template(
+                'choose_mode.html', venn=venn,
+                # echo the RAW posted strings so the re-POST is byte-identical
+                form_disease=disease_name, form_disease_id=disease_id,
+                form_diseases=diseases_json, form_herbs=herbs_data_json,
+                form_libs=selected_libs,
             )
-            db_session.add(new_result)
-            db_session.commit()
-            result_id = new_result.id
-        except Exception as e:
-            print(f"Error saving result: {e}")
-            db_session.rollback()
-        finally:
-            db_session.close()
 
-        # Post/Redirect/Get: stash the id in the server-side session and redirect
-        # to a GET view, so a browser refresh/back does NOT re-POST and re-run the
-        # whole analysis (which previously also inserted a duplicate history row).
-        # The id lives in the session, not the URL, so there's no enumerable public
-        # link to saved results (history viewing stays login-gated).
-        if result_id is not None:
-            session['last_result_id'] = result_id
-            return redirect(url_for('main.view_last_result'), code=303)
-
-        # Saving failed (rare) -> render directly so the user still sees results.
-        return render_template('result.html', results=results)
+        # 2+ diseases + a mode was chosen -> run it (or both).
+        return _run_and_save(disease_name, disease_id, diseases, herb_lists, selected_libs, mode)
 
     return redirect(url_for('main.index'))
 
@@ -1028,12 +1100,13 @@ def view_last_result():
     result_id = session.get('last_result_id')
     if not result_id:
         return redirect(url_for('main.index'))
+    tab = request.args.get('tab')   # 'intersection' | 'union' for a 'both' result
     db_session = Session()
     try:
         result = db_session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
         if not result:
             return redirect(url_for('main.index'))
-        return render_template('result.html', results=_saved_result_data(result))
+        return render_template('result.html', results=_saved_result_data(result, tab=tab))
     finally:
         db_session.close()
 
@@ -1113,12 +1186,13 @@ def get_result_detail(result_id):
 @login_required
 def view_result(result_id):
     """View a specific saved result (login required)."""
+    tab = request.args.get('tab')   # 'intersection' | 'union' for a 'both' result
     db_session = Session()
     try:
         result = db_session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
         if not result:
             return redirect(url_for('main.results'))
-        return render_template('result.html', results=_saved_result_data(result))
+        return render_template('result.html', results=_saved_result_data(result, tab=tab))
     finally:
         db_session.close()
 
@@ -1162,6 +1236,9 @@ def ai_analysis():
     prescription_enrichments = data.get('prescription_enrichments', {})
     result_id = data.get('result_id')  # Optional: save to this result
     language = (data.get('language') or 'en')  # UI language for the AI analysis text
+    mode = (data.get('mode') or 'union')  # which disease-gene mode this AI run is for
+    if mode not in ('union', 'intersection'):
+        mode = 'union'
     
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
@@ -1187,7 +1264,13 @@ def ai_analysis():
                 _row = _sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
                 if _row:
                     _saved = json.loads(_row.results_json)
-                    analysis_results['prescriptions'] = _saved.get('prescriptions', [])
+                    # A 'both' row nests per-mode results under modes.{intersection,union};
+                    # pull this tab's prescriptions so the ClinGen overlay matches the mode.
+                    if isinstance(_saved, dict) and _saved.get('both'):
+                        _mode_data = (_saved.get('modes', {}) or {}).get(mode, {}) or {}
+                        analysis_results['prescriptions'] = _mode_data.get('prescriptions', [])
+                    else:
+                        analysis_results['prescriptions'] = _saved.get('prescriptions', [])
             except Exception as e:
                 print(f"[ai-analysis] could not load saved prescriptions: {e}")
             finally:
@@ -1202,11 +1285,23 @@ def ai_analysis():
             try:
                 result = _save_sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
                 if result:
+                    # Store AI keyed by mode: {mode: ai_results}. Merge with any existing
+                    # blob so a 'both' row keeps the other tab's AI when this one is run.
+                    payload = {}
+                    if result.ai_analysis_json:
+                        try:
+                            _prev = json.loads(result.ai_analysis_json)
+                            # Keep an already mode-keyed dict; discard a legacy bare blob.
+                            if isinstance(_prev, dict) and 'has_ai_analysis' not in _prev:
+                                payload = _prev
+                        except Exception:
+                            payload = {}
+                    payload[mode] = ai_results
                     # Ensure AI analysis can be serialized to JSON
                     try:
-                        result.ai_analysis_json = json.dumps(ai_results, default=str, ensure_ascii=False)
+                        result.ai_analysis_json = json.dumps(payload, default=str, ensure_ascii=False)
                         _save_sess.commit()
-                        print(f"[DB] Saved AI analysis for result {result_id}")
+                        print(f"[DB] Saved AI analysis ({mode}) for result {result_id}")
                     except (TypeError, ValueError) as json_err:
                         print(f"[DB] JSON serialization error: {json_err}")
                         # Try with more aggressive cleaning
@@ -1220,9 +1315,10 @@ def ai_analysis():
                             elif isinstance(obj, list):
                                 return [clean_for_json(i) for i in obj]
                             return obj
-                        result.ai_analysis_json = json.dumps(clean_for_json(ai_results), default=str)
+                        payload[mode] = clean_for_json(ai_results)
+                        result.ai_analysis_json = json.dumps(payload, default=str)
                         _save_sess.commit()
-                        print(f"[DB] Saved cleaned AI analysis for result {result_id}")
+                        print(f"[DB] Saved cleaned AI analysis ({mode}) for result {result_id}")
             except Exception as e:
                 print(f"[DB] Error saving AI analysis: {e}")
                 _save_sess.rollback()
