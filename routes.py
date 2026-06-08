@@ -195,12 +195,15 @@ def logout():
 @main_bp.context_processor
 def _inject_enrichment_options():
     """Make the enrichment-library choices available to every template
-    (so all index.html renders, including error fallbacks, have them)."""
+    (so all index.html renders, including error fallbacks, have them).
+    Also expose herb_korean() so templates can render the Korean (Hangul)
+    name for a pinyin herb (returns '' when there is no mapping)."""
     return {
         'enrichment_options': [
             {'value': name, 'label': label, 'default': name in Config.ENRICHMENT_LIBRARIES}
             for name, label in Config.ENRICHMENT_LIBRARY_LABELS.items()
-        ]
+        ],
+        'herb_korean': get_korean_name,
     }
 
 
