@@ -9,7 +9,7 @@ from datetime import datetime
 from functools import wraps
 from urllib.parse import urlparse
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
-from sqlalchemy import func, desc, text
+from sqlalchemy import func, desc, text, case
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from models import Herb, AnalysisResult, ExternalLookupCache, Disease
@@ -256,7 +256,11 @@ def get_diseases_paginated():
                     for token in search.lower().split():
                         q = q.filter(func.lower(Disease.name).like(f"%{token}%"))
                 total = q.count()
-                rows = (q.order_by(Disease.name)
+                # Sort A->Z (case-insensitive); names starting with a digit/symbol
+                # (e.g. "11-beta-hydroxylase deficiency") go AFTER Z, not first.
+                _first = func.lower(func.substr(Disease.name, 1, 1))
+                _alpha_first = case((_first.between('a', 'z'), 0), else_=1)
+                rows = (q.order_by(_alpha_first, func.lower(Disease.name))
                         .offset((page - 1) * per_page)
                         .limit(per_page)
                         .all())
