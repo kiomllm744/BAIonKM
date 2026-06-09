@@ -1183,13 +1183,8 @@
                         <span class="disease-kpi-value">{{ results.disease_gene_count }}</span>
                         <span class="disease-kpi-label" data-i18n="result.kpiTotalGenes{% if results.disease_gene_mode == 'intersection' %}Intersection{% endif %}">Total genes used{% if results.disease_gene_mode == 'intersection' %} (intersection){% else %} (union){% endif %}</span>
                     </div>
-                    {# "Shared by all diseases" is redundant in intersection mode (the used genes ARE the shared ones), so hide it there. #}
-                    {% if results.diseases | length > 1 and results.disease_gene_mode != 'intersection' %}
-                    <div class="disease-kpi">
-                        <span class="disease-kpi-value">{{ results.shared_core_genes | length }}</span>
-                        <span class="disease-kpi-label" data-i18n="result.kpiSharedAll">Shared by all diseases</span>
-                    </div>
-                    {% endif %}
+                    {# Both modes show only these 2 cards: the "Shared by all diseases"
+                       count is redundant with the total-genes-used card in both modes. #}
                 </div>
                 {% endif %}
             </div>
@@ -1856,12 +1851,22 @@
                 html += `<th>${headerLabel(col)}</th>`;
             });
             html += '</tr></thead><tbody>';
-            
-            tableData.forEach(row => {
+
+            // Pin the Feature (first) column to fixed template labels by row order so
+            // the row names never depend on the model's wording (always "주요 원인",
+            // not "주요 구동 요인", etc.). The prompt always emits these 3 rows in order.
+            const featureLabels = [
+                i18n.t('result.aiRowDriver'),
+                i18n.t('result.aiRowTissue'),
+                i18n.t('result.aiRowConsequence'),
+            ];
+            tableData.forEach((row, rowIdx) => {
                 html += '<tr>';
                 columns.forEach((col, idx) => {
                     const cellClass = idx === 0 ? 'feature-cell' : '';
-                    html += `<td class="${cellClass}">${row[col] || '-'}</td>`;
+                    const val = (idx === 0 && rowIdx < featureLabels.length)
+                        ? featureLabels[rowIdx] : (row[col] || '-');
+                    html += `<td class="${cellClass}">${val}</td>`;
                 });
                 html += '</tr>';
             });
