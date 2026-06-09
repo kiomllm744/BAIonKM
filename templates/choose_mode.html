@@ -74,10 +74,23 @@
         }
         .mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .mode-btn .mb-head { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; font-weight: 700; color: #111827; }
-        .mode-btn .mb-head i { font-size: 1.1rem; }
-        .mode-btn.m-inter .mb-head i { color: #0d9488; }
-        .mode-btn.m-union .mb-head i { color: #6366f1; }
-        .mode-btn.m-both  .mb-head i { color: #d97706; }
+        /* Mini-Venn icon mirrors the big diagram so each card "connects" to it:
+           intersection = the shared centre lit, union = both circles lit, both = both. */
+        .mode-ic { width: 42px; height: 26px; flex-shrink: 0; }
+        .mode-ic .mc { fill: none; stroke: currentColor; stroke-width: 1.7; opacity: .5; }
+        .mode-ic .mc-on { fill: currentColor; fill-opacity: .18; opacity: .9; }
+        .mode-ic .mc-lens { fill: currentColor; fill-opacity: .9; stroke: none; }
+        .mode-btn.m-inter .mode-ic { color: #0d9488; }
+        .mode-btn.m-union .mode-ic { color: #6366f1; }
+        .mode-btn.m-both  .mode-ic { color: #d97706; }
+        /* Meaning tag (the professor's interpretation, e.g. "질환 공통 유발요인") */
+        .mode-btn .mb-tag {
+            align-self: flex-start; font-size: 0.7rem; font-weight: 700; letter-spacing: .2px;
+            padding: 3px 9px; border-radius: 999px;
+        }
+        .mode-btn.m-inter .mb-tag { color: #0f766e; background: #ccfbf1; }
+        .mode-btn.m-union .mb-tag { color: #4338ca; background: #e0e7ff; }
+        .mode-btn.m-both  .mb-tag { color: #b45309; background: #fef3c7; }
         .mode-btn .mb-desc { font-size: 0.83rem; color: #6b7280; line-height: 1.5; }
         .mode-btn .mb-count {
             margin-top: auto; font-size: 0.76rem; font-weight: 700; color: #374151;
@@ -238,21 +251,46 @@
                 <div class="mode-choices">
                     <button type="submit" name="disease_gene_mode" value="intersection"
                             class="mode-btn m-inter" {% if not venn.has_intersection %}disabled{% endif %}>
-                        <span class="mb-head"><i class="fas fa-circle-dot"></i> <span data-i18n="choose.intersectionLabel">Intersection</span></span>
+                        <span class="mb-head">
+                            <svg class="mode-ic" viewBox="0 0 44 26" aria-hidden="true">
+                                <defs><clipPath id="miInt"><circle cx="28" cy="13" r="9"/></clipPath></defs>
+                                <circle cx="16" cy="13" r="9" class="mc"/>
+                                <circle cx="28" cy="13" r="9" class="mc"/>
+                                <circle cx="16" cy="13" r="9" class="mc-lens" clip-path="url(#miInt)"/>
+                            </svg>
+                            <span data-i18n="choose.intersectionLabel">Intersection</span>
+                        </span>
+                        <span class="mb-tag" data-i18n="choose.intersectionMeaning">Common disease drivers</span>
                         <span class="mb-desc" data-i18n="choose.intersectionDesc">Analyse only the genes shared by every selected disease &mdash; the common core.</span>
                         <span class="mb-count">{{ venn.intersection_count }} <span data-i18n="choose.genesWord">genes</span></span>
                     </button>
 
                     <button type="submit" name="disease_gene_mode" value="union"
                             class="mode-btn m-union">
-                        <span class="mb-head"><i class="fas fa-circle-nodes"></i> <span data-i18n="choose.unionLabel">Union</span></span>
+                        <span class="mb-head">
+                            <svg class="mode-ic" viewBox="0 0 44 26" aria-hidden="true">
+                                <circle cx="16" cy="13" r="9" class="mc mc-on"/>
+                                <circle cx="28" cy="13" r="9" class="mc mc-on"/>
+                            </svg>
+                            <span data-i18n="choose.unionLabel">Union</span>
+                        </span>
+                        <span class="mb-tag" data-i18n="choose.unionMeaning">Full disease-gene landscape</span>
                         <span class="mb-desc" data-i18n="choose.unionDesc">Analyse every gene linked to any of the selected diseases.</span>
                         <span class="mb-count">{{ venn.union_count }} <span data-i18n="choose.genesWord">genes</span></span>
                     </button>
 
                     <button type="submit" name="disease_gene_mode" value="both"
                             class="mode-btn m-both" {% if not venn.has_intersection %}disabled{% endif %}>
-                        <span class="mb-head"><i class="fas fa-layer-group"></i> <span data-i18n="choose.bothLabel">Both</span></span>
+                        <span class="mb-head">
+                            <svg class="mode-ic" viewBox="0 0 44 26" aria-hidden="true">
+                                <defs><clipPath id="miBoth"><circle cx="28" cy="13" r="9"/></clipPath></defs>
+                                <circle cx="16" cy="13" r="9" class="mc mc-on"/>
+                                <circle cx="28" cy="13" r="9" class="mc mc-on"/>
+                                <circle cx="16" cy="13" r="9" class="mc-lens" clip-path="url(#miBoth)"/>
+                            </svg>
+                            <span data-i18n="choose.bothLabel">Both</span>
+                        </span>
+                        <span class="mb-tag" data-i18n="choose.bothMeaning">Compare both</span>
                         <span class="mb-desc" data-i18n="choose.bothDesc">Run both analyses and compare them side by side in two tabs.</span>
                         <span class="mb-count" data-i18n="choose.bothCount">intersection + union</span>
                     </button>
