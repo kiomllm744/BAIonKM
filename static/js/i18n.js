@@ -351,7 +351,7 @@
       'index.heroSubtitle': '한약 성분과 질환의 공통 타겟 유전자를 중심으로 핵심이 되는 생물학적 기전을 탐색하여 한의 처방 간의 감별진단 포인트를 생물학적 관점에서 추천합니다.',
       'index.selectDisease': '질병 선택',
       'index.diseaseLabel': '질병/증상명',
-      'index.diseasePlaceholder': '질병/증상명을 입력한 뒤 목록에서 선택하세요 (최대 3개)...',
+      'index.diseasePlaceholder': '질병/증상명을 입력한 뒤...',
       'index.diseaseHint': '최대 3개의 질병을 추가할 수 있습니다 — 유전자를 합집합으로 결합하며 공통 유전자를 강조 표시합니다. 추천 목록에서 선택해 추가하세요.',
       'index.prescriptions': '한의 처방 선택',
       'index.addPrescription': '처방 추가',
