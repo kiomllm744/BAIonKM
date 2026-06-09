@@ -1097,7 +1097,6 @@
             <div class="card-header">
                 <i class="fas fa-virus"></i>
                 <h2 data-i18n="result.diseaseSummary">Disease Summary</h2>
-                {% if results.diseases %}<span class="badge">{{ results.disease_gene_count }} genes analysed</span>{% endif %}
             </div>
             <div class="card-body">
                 {% if results.diseases %}
@@ -1182,9 +1181,10 @@
                     </div>
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.disease_gene_count }}</span>
-                        <span class="disease-kpi-label" data-i18n="result.kpiTotalGenes">Total genes used (union)</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiTotalGenes{% if results.disease_gene_mode == 'intersection' %}Intersection{% endif %}">Total genes used{% if results.disease_gene_mode == 'intersection' %} (intersection){% else %} (union){% endif %}</span>
                     </div>
-                    {% if results.diseases | length > 1 %}
+                    {# "Shared by all diseases" is redundant in intersection mode (the used genes ARE the shared ones), so hide it there. #}
+                    {% if results.diseases | length > 1 and results.disease_gene_mode != 'intersection' %}
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.shared_core_genes | length }}</span>
                         <span class="disease-kpi-label" data-i18n="result.kpiSharedAll">Shared by all diseases</span>
@@ -1332,7 +1332,6 @@
             <div class="card-header">
                 <i class="fas fa-dna"></i>
                 <h2 data-i18n="result.sharedTargets">Shared Disease Targets Across Prescriptions</h2>
-                <span class="badge">{{ results.common_union_count }} <span data-i18n="result.genesUnit">genes</span></span>
             </div>
             <div class="card-body">
                 <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
@@ -1374,7 +1373,7 @@
                 <div class="disease-kpis">
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.common_union_count }}</span>
-                        <span class="disease-kpi-label">Disease genes hit (any prescription)</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiDiseaseGenesHit">Disease genes hit (any prescription)</span>
                     </div>
                     <div class="disease-kpi">
                         <span class="disease-kpi-value">{{ results.gene_overlap.shared_core | length }}</span>
@@ -1842,10 +1841,19 @@
             
             // Get column headers from first row
             const columns = Object.keys(tableData[0]);
-            
+
+            // Translate the AI's English header keys (Feature / Finding / Group N)
+            const headerLabel = (col) => {
+                if (col === 'Feature') return i18n.t('result.aiFeature');
+                if (col === 'Finding') return i18n.t('result.aiFinding');
+                const m = /^Group\s+(\d+)$/.exec(col);
+                if (m) return i18n.t('result.rxLabel') + ' ' + m[1];
+                return col;
+            };
+
             let html = '<table class="ai-summary-table"><thead><tr>';
             columns.forEach(col => {
-                html += `<th>${col}</th>`;
+                html += `<th>${headerLabel(col)}</th>`;
             });
             html += '</tr></thead><tbody>';
             
