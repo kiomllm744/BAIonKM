@@ -277,13 +277,27 @@
                 both: () => t('choose.hlBoth', 'Both → runs the whole diagram and the shared centre.'),
             };
             const hint = () => t('choose.hlHint', 'Hover an option below to preview which genes it analyses.');
+            let bothTimer = null;
+            function stopBoth() { if (bothTimer) { clearInterval(bothTimer); bothTimer = null; } }
             function preview(mode, btn) {
-                // union & both both light up the whole diagram; intersection the centre
-                venn.setAttribute('data-hl', mode === 'intersection' ? 'intersection' : 'union');
+                stopBoth();
                 if (caption) caption.textContent = (captionFor[mode] || hint)();
                 if (btn) btn.classList.add('is-previewing');
+                if (mode === 'both') {
+                    // "Both" runs both analyses, so keep switching the highlight
+                    // intersection <-> union to show it covers each in turn.
+                    let cur = 'intersection';
+                    venn.setAttribute('data-hl', cur);
+                    bothTimer = setInterval(() => {
+                        cur = (cur === 'intersection') ? 'union' : 'intersection';
+                        venn.setAttribute('data-hl', cur);
+                    }, 1100);
+                } else {
+                    venn.setAttribute('data-hl', mode === 'intersection' ? 'intersection' : 'union');
+                }
             }
             function clear(btn) {
+                stopBoth();
                 venn.removeAttribute('data-hl');
                 if (caption) caption.textContent = hint();
                 if (btn) btn.classList.remove('is-previewing');
