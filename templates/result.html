@@ -1109,7 +1109,7 @@
                                 <span class="disease-dot">{{ dletters[loop.index0 % 3] }}</span>
                                 {{ d.name }}
                             </span>
-                            <span class="disease-item-count">{{ d.total_gene_count or d.gene_count }} <span data-i18n="result.genesUnit">genes</span></span>
+                            <span class="disease-item-count">{{ d.total_gene_count or d.gene_count }}<span data-i18n="result.diseaseGeneUnit"> genes</span></span>
                         </summary>
                         <div class="disease-item-body">
                             <div><span data-i18n="result.totalAssocGenes">Total associated genes:</span> <strong>{{ d.total_gene_count or d.gene_count }}</strong>{% if d.total_gene_count and d.gene_count and d.total_gene_count > d.gene_count %} &middot; top {{ d.gene_count }} <span data-i18n="result.usedInAnalysis">used in analysis</span>{% endif %}</div>

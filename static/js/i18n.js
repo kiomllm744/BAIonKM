@@ -154,7 +154,7 @@
       'login.back': 'Back to Analysis',
 
       /* ---- result page (Phase 1: key labels only) ---- */
-      'result.diseaseSummary': 'Disease Summary',
+      'result.diseaseSummary': 'Disease / Symptom – Gene Correlation',
       'result.prescriptionSummary': 'Prescription Summary',
       'result.sharedTargets': 'Shared Disease Targets Across Prescriptions',
       'result.aiComparative': 'AI Comparative Analysis',
@@ -239,6 +239,7 @@
 
       /* ---- results page deep body + AI (Phase 2) ---- */
       'result.genesUnit': 'genes',
+      'result.diseaseGeneUnit': ' genes',
       'result.totalAssocGenes': 'Total associated genes:',
       'result.usedInAnalysis': 'used in analysis',
       'result.notResolved': 'not resolved',
@@ -463,7 +464,7 @@
       'login.back': '분석 페이지로 돌아가기',
 
       /* ---- result page (Phase 1: key labels only) ---- */
-      'result.diseaseSummary': '질병 요약',
+      'result.diseaseSummary': '질환/증상 - 유전자 상관성',
       'result.prescriptionSummary': '처방 요약',
       'result.sharedTargets': '처방 간 공유 질병 타겟',
       'result.aiComparative': 'AI 비교 분석',
@@ -548,6 +549,7 @@
 
       /* ---- results page deep body + AI (Phase 2) ---- */
       'result.genesUnit': '유전자',
+      'result.diseaseGeneUnit': '종 유전자',
       'result.totalAssocGenes': '전체 연관 유전자:',
       'result.usedInAnalysis': '분석에 사용',
       'result.notResolved': '미해결',
