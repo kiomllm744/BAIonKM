@@ -291,7 +291,7 @@
                     bothTimer = setInterval(() => {
                         cur = (cur === 'intersection') ? 'union' : 'intersection';
                         venn.setAttribute('data-hl', cur);
-                    }, 1100);
+                    }, 600);
                 } else {
                     venn.setAttribute('data-hl', mode === 'intersection' ? 'intersection' : 'union');
                 }
