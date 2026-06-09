@@ -563,7 +563,7 @@
       'choose.unionCount': '어느 질병이든 포함된 유전자 (합집합)',
       'choose.intersectionCount': '모든 질병이 공유하는 유전자 (교집합)',
       'choose.intersectionLabel': '교집합',
-      'choose.intersectionDesc': '선택한 모든 질병이 공유하는 유전자(공통 핵심)만 분석합니다.',
+      'choose.intersectionDesc': '선택한 모든 질병이 공유하는 유전자(질환 공통 유발요인)만 분석합니다.',
       'choose.unionLabel': '합집합',
       'choose.unionDesc': '선택한 질병 중 하나라도 연관된 모든 유전자를 분석합니다.',
       'choose.bothLabel': '둘 다',
