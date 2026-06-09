@@ -1852,20 +1852,25 @@
             });
             html += '</tr></thead><tbody>';
 
-            // Pin the Feature (first) column to fixed template labels by row order so
-            // the row names never depend on the model's wording (always "주요 원인",
-            // not "주요 구동 요인", etc.). The prompt always emits these 3 rows in order.
+            // Feature (first) column: the prompt asks the model to use these exact
+            // labels; this is a light FALLBACK -- keep the model's label when it's
+            // already one of ours, otherwise fall back to the canonical label for
+            // this row position (so it never shows e.g. "주요 구동 요인").
             const featureLabels = [
                 i18n.t('result.aiRowDriver'),
                 i18n.t('result.aiRowTissue'),
                 i18n.t('result.aiRowConsequence'),
             ];
+            const featureSet = new Set(featureLabels);
             tableData.forEach((row, rowIdx) => {
                 html += '<tr>';
                 columns.forEach((col, idx) => {
                     const cellClass = idx === 0 ? 'feature-cell' : '';
-                    const val = (idx === 0 && rowIdx < featureLabels.length)
-                        ? featureLabels[rowIdx] : (row[col] || '-');
+                    let val = row[col] || '-';
+                    if (idx === 0) {
+                        const aiVal = (row[col] || '').trim();
+                        val = featureSet.has(aiVal) ? aiVal : (featureLabels[rowIdx] || aiVal || '-');
+                    }
                     html += `<td class="${cellClass}">${val}</td>`;
                 });
                 html += '</tr>';

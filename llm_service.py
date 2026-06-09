@@ -288,6 +288,22 @@ def _language_directive(language: str) -> str:
     return ""
 
 
+# Fixed row labels for the summary table's "Feature" column, per language. The table
+# always has these three rows; we tell the model the exact wording so it doesn't
+# invent its own translation (the frontend keeps a fallback to these same labels).
+def _feature_row_labels(language):
+    if (language or 'en').strip().lower().startswith('ko'):
+        return ['주요 원인', '주요 조직', '주요 결과']
+    return ['Primary Driver', 'Key Tissue', 'Main Consequence']
+
+
+def _feature_rows_instruction(language):
+    a, b, c = _feature_row_labels(language)
+    return (f'Include EXACTLY three rows, in this order. Each row\'s "Feature" value MUST be '
+            f'one of these EXACT strings, verbatim — do NOT translate, reword, abbreviate, or add '
+            f'others: "{a}", "{b}", "{c}".')
+
+
 def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en') -> dict:
     """
     Generate comparative analysis with summary table and detailed analysis.
@@ -333,7 +349,7 @@ You must return your response in a strict JSON format with exactly two keys: "su
 1. "summary_table":
    - An array of objects representing the rows of a comparison table.
    - Each object must have the keys: "Feature", {group_columns}.
-   - Include rows for: "Primary Driver", "Key Tissue", and "Main Consequence".
+   - {_feature_rows_instruction(language)}
    - Keep the values in this table concise (under 10 words).
 
 2. "detailed_analysis":
@@ -484,7 +500,7 @@ You must return your response in a strict JSON format with exactly two keys: "su
 
 1. "summary_table":
    - An array of objects with keys: "Feature", "Finding".
-   - Include rows for: "Primary Driver", "Key Tissue", "Main Consequence".
+   - {_feature_rows_instruction(language)}
    - Keep values concise (under 10 words).
 
 2. "detailed_analysis":
