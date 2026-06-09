@@ -277,6 +277,15 @@
         .gene-targets[open] .gene-targets-summary::after { content: '\25BE'; }
         .gene-targets > div { margin-top: 10px; }
 
+        /* Long gene-chip lists: show the first N, with a "+N more" / "show less" toggle. */
+        .gene-hidden { display: none !important; }
+        .gene-more-btn {
+            background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca;
+            border-radius: 4px; padding: 2px 9px; font-size: 0.78rem; font-weight: 700;
+            cursor: pointer; font-family: inherit;
+        }
+        .gene-more-btn:hover { background: #e0e7ff; }
+
         .page-header h1 {
             font-size: 1.75rem;
             color: #1f2937;
@@ -1527,7 +1536,7 @@
                     <span class="result-count">{{ results.gene_overlap.shared_core | length }}</span>
                 </h3>
                 {% if results.gene_overlap.shared_core %}
-                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.25rem;">
+                <div class="gene-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.25rem;">
                     {% for g in results.gene_overlap.shared_core %}
                     <span style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:4px;padding:2px 8px;font-size:0.8rem;font-family:monospace;">{{ g }}</span>
                     {% endfor %}
@@ -1545,7 +1554,7 @@
                         <span style="opacity:0.6;font-size:0.8rem;">{{ d.herbs | join(', ') }}</span>
                     </div>
                     {% if d.genes %}
-                    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+                    <div class="gene-chips" style="display:flex;flex-wrap:wrap;gap:5px;">
                         {% for g in d.genes %}
                         <span style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);border-radius:4px;padding:2px 8px;font-size:0.8rem;font-family:monospace;">{{ g }}</span>
                         {% endfor %}
@@ -1595,7 +1604,35 @@
             alignPrescriptionRows();
             loadSidebarStats();
             applyHerbLang();
+            clampGeneLists();
         });
+
+        // Long gene-chip lists (shared core / distinctive targets) can get very long,
+        // so show only the first N chips with a "+N more" / "show less" toggle.
+        function clampGeneLists() {
+            const CAP = 24;
+            document.querySelectorAll('.gene-chips').forEach(function (box) {
+                const chips = Array.from(box.children).filter(el => el.tagName === 'SPAN');
+                if (chips.length <= CAP) return;
+                const hidden = chips.slice(CAP);
+                hidden.forEach(c => c.classList.add('gene-hidden'));
+                const n = hidden.length;
+                const more = () => (window.i18n && i18n.t) ? i18n.t('result.showMoreGenes', { n: n }) : ('+' + n + ' more');
+                const less = () => (window.i18n && i18n.t) ? i18n.t('result.showLessGenes') : 'Show less';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'gene-more-btn';
+                btn.textContent = more();
+                let expanded = false;
+                btn.addEventListener('click', function () {
+                    expanded = !expanded;
+                    hidden.forEach(c => c.classList.toggle('gene-hidden', !expanded));
+                    btn.textContent = expanded ? less() : more();
+                });
+                box.appendChild(btn);
+                document.addEventListener('langchange', () => { btn.textContent = expanded ? less() : more(); });
+            });
+        }
 
         // Show herb names in Korean (Hangul, from the herb dictionary) when the UI
         // is Korean, and in pinyin otherwise. Runs on load and on every language

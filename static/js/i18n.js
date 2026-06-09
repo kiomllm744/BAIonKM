@@ -240,6 +240,8 @@
       /* ---- results page deep body + AI (Phase 2) ---- */
       'result.genesUnit': 'genes',
       'result.diseaseGeneUnit': ' genes',
+      'result.showMoreGenes': '+{n} more',
+      'result.showLessGenes': 'Show less',
       'result.totalAssocGenes': 'Total associated genes:',
       'result.usedInAnalysis': 'used in analysis',
       'result.notResolved': 'not resolved',
@@ -553,6 +555,8 @@
       /* ---- results page deep body + AI (Phase 2) ---- */
       'result.genesUnit': '유전자',
       'result.diseaseGeneUnit': '종 유전자',
+      'result.showMoreGenes': '+{n}개 더보기',
+      'result.showLessGenes': '접기',
       'result.totalAssocGenes': '전체 연관 유전자:',
       'result.usedInAnalysis': '분석에 사용',
       'result.notResolved': '미해결',
