@@ -1432,9 +1432,7 @@
                 <div id="ai-unavailable" class="ai-unavailable" style="display: none;">
                     <i class="fas fa-key"></i>
                     <h4 data-i18n="result.apiKeyRequired">API Key Required</h4>
-                    <p data-i18n="result.setGeminiKey">Set your Gemini API key to enable AI analysis:</p>
-                    <code>GEMINI_API_KEY=your_key</code>
-                    <p><span data-i18n="result.getFreeKey">Get a free key at</span> <a href="https://makersuite.google.com/app/apikey" target="_blank" style="color: #6366f1;">Google AI Studio</a></p>
+                    <p data-i18n="result.setAnyAiKey">No AI model is configured. Set an API key on the server (Gemini, Anthropic, or OpenAI), then pick a model from the top-bar &ldquo;AI Model&rdquo; menu.</p>
                 </div>
             </div>
         </div>
@@ -1678,24 +1676,53 @@
             window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(apply, 120); });
         }
         
+        // GET the saved / in-flight AI for this (result, mode, model). Returns the
+        // server JSON ({has_ai_analysis...} | {status:'processing'} | {status:'absent'})
+        // or null on a network error.
+        async function fetchSavedAi() {
+            try {
+                const id = resultsData.result_id;
+                if (!id) return null;
+                const mode = resultsData.disease_gene_mode || 'union';
+                const prov = window.getAiProvider ? window.getAiProvider() : 'gemini';
+                return await (await fetch(
+                    `/api/ai-analysis/result?result_id=${encodeURIComponent(id)}&mode=${encodeURIComponent(mode)}&provider=${encodeURIComponent(prov)}`
+                )).json();
+            } catch (e) { return null; }
+        }
+
+        // Show the "analyzing..." state (shared by a fresh run and the poll-on-reload path).
+        function showAiLoading() {
+            document.getElementById('ai-loading').style.display = 'block';
+            document.getElementById('ai-results').style.display = 'none';
+            document.getElementById('ai-error').style.display = 'none';
+            document.getElementById('ai-unavailable').style.display = 'none';
+            document.getElementById('clinical-loading').style.display = 'block';
+            document.getElementById('clinical-results').style.display = 'none';
+            document.getElementById('clinical-unavailable').style.display = 'none';
+        }
+
         async function checkAndRunAiAnalysis() {
-            // Check if we have saved AI analysis from history
+            // Saved analysis rendered server-side (history / an already-generated tab).
             if (resultsData.saved_ai_analysis && resultsData.saved_ai_analysis.has_ai_analysis) {
                 console.log('[AI] Using saved AI analysis from history');
                 displayAiResults(resultsData.saved_ai_analysis);
                 return;
             }
-            
             try {
-                const statusResponse = await fetch('/api/ai-analysis/status');
-                const status = await statusResponse.json();
-                
+                const status = await (await fetch('/api/ai-analysis/status')).json();
                 if (!status.available) {
                     showAiUnavailable();
                     showClinicalUnavailable();
                     return;
                 }
-                
+                // Poll-first: a background job for this tab may already be running (e.g.
+                // it was kicked off just before you switched tabs). Latch onto a saved or
+                // in-flight result instead of starting a duplicate run -- so reloading
+                // mid-generation keeps showing "analyzing" rather than a false failure.
+                const existing = await fetchSavedAi();
+                if (existing && existing.has_ai_analysis) { displayAiResults(existing); return; }
+                if (existing && existing.status === 'processing') { showAiLoading(); pollAiResult(0); return; }
                 await runAiAnalysis();
             } catch (error) {
                 console.error('Error:', error);
@@ -1743,15 +1770,8 @@
         
         async function runAiAnalysis() {
             // Show loading states
-            document.getElementById('ai-loading').style.display = 'block';
-            document.getElementById('ai-results').style.display = 'none';
-            document.getElementById('ai-error').style.display = 'none';
-            document.getElementById('ai-unavailable').style.display = 'none';
-            
-            document.getElementById('clinical-loading').style.display = 'block';
-            document.getElementById('clinical-results').style.display = 'none';
-            document.getElementById('clinical-unavailable').style.display = 'none';
-            
+            showAiLoading();
+
             try {
                 const prescriptionEnrichments = {};
                 
@@ -1837,33 +1857,32 @@
         // in when the analysis is ready, whichever tab you happen to be on.
         let aiRetriggers = 0;
         async function pollAiResult(attempt) {
-            const MAX_ATTEMPTS = 60; // ~4 min at 4s between polls
-            if (attempt > MAX_ATTEMPTS) {
-                showAiError(i18n.t('result.aiAnalysisFailed'));
-                showClinicalUnavailable();
-                return;
-            }
+            const MAX_ATTEMPTS = 60; // ~4 min between polls
+            if (attempt > MAX_ATTEMPTS) { await finalCheckThenError(); return; }
             // keep the loading state visible while the background job runs
             document.getElementById('ai-loading').style.display = 'block';
             document.getElementById('clinical-loading').style.display = 'block';
             // check soon on the first pass (fast generations), then back off
             await new Promise(r => setTimeout(r, attempt === 0 ? 1500 : 3500));
-            try {
-                const id = resultsData.result_id;
-                const mode = resultsData.disease_gene_mode || 'union';
-                const prov = window.getAiProvider ? window.getAiProvider() : 'gemini';
-                const data = await (await fetch(
-                    `/api/ai-analysis/result?result_id=${encodeURIComponent(id)}&mode=${encodeURIComponent(mode)}&provider=${encodeURIComponent(prov)}`
-                )).json();
-                if (data.has_ai_analysis) { displayAiResults(data); return; }
-                if (data.status === 'processing') { pollAiResult(attempt + 1); return; }
-                // 'absent': whoever was generating it stopped without saving. Re-run
-                // once or twice via the normal path, then give up.
-                if (aiRetriggers < 2) { aiRetriggers++; runAiAnalysis(); }
-                else { showAiError(i18n.t('result.aiAnalysisFailed')); showClinicalUnavailable(); }
-            } catch (e) {
-                pollAiResult(attempt + 1);
-            }
+            const data = await fetchSavedAi();
+            if (!data) { pollAiResult(attempt + 1); return; }            // network blip -> keep polling
+            if (data.has_ai_analysis) { displayAiResults(data); return; }
+            if (data.status === 'processing') { pollAiResult(attempt + 1); return; }
+            // 'absent': the generation stopped without saving. Re-run once or twice,
+            // then fall back to a final saved-result check before showing any error.
+            if (aiRetriggers < 2) { aiRetriggers++; runAiAnalysis(); }
+            else { await finalCheckThenError(); }
+        }
+
+        // Last-chance saved-result check before showing an error. The background job
+        // commonly finishes right as the poller would give up (which is exactly why a
+        // manual Retry looked instant) -- re-checking here turns that false "failed"
+        // into the finished analysis, with no Retry click needed.
+        async function finalCheckThenError() {
+            const data = await fetchSavedAi();
+            if (data && data.has_ai_analysis) { displayAiResults(data); return; }
+            showAiError(i18n.t('result.aiAnalysisFailed'));
+            showClinicalUnavailable();
         }
 
         // Re-run the AI analysis when the user switches the AI model in the top bar.

@@ -98,8 +98,16 @@ def _call_openai(prompt, json_mode, temperature, max_tokens, retries, json_array
         return None
     model = Config.OPENAI_MODEL
     headers = {"Authorization": f"Bearer {api_key}", "content-type": "application/json"}
-    body = {"model": model, "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature, "max_tokens": max_tokens}
+    body = {"model": model, "messages": [{"role": "user", "content": prompt}]}
+    # GPT-5 / o-series models use `max_completion_tokens` (not `max_tokens`) and only
+    # accept the default temperature — sending the old params returns a 400. Older
+    # models (gpt-4o, gpt-4.1, ...) use `max_tokens` + `temperature`. The completion
+    # cap is raised for the new models so reasoning tokens don't crowd out the answer.
+    if model.startswith(("gpt-5", "o1", "o3", "o4")):
+        body["max_completion_tokens"] = max(int(max_tokens), 16000)
+    else:
+        body["max_tokens"] = max_tokens
+        body["temperature"] = temperature
     # OpenAI's json_object mode can ONLY return a top-level object — using it for a
     # prompt that asks for an array yields empty/malformed output. So enable it only
     # for object responses; for arrays we rely on the prompt + array extraction.

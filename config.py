@@ -116,7 +116,7 @@ class Config:
     CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-6')
     # OpenAI (GPT)
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-5.4')
 
     # Demo Login Credentials (for professor access)
     # You can change these or set via environment variables
