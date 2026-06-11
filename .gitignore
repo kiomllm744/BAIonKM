@@ -43,3 +43,7 @@ server.err
 
 # Instance folder
 instance/
+
+# Internal security audit — NEVER commit to the public repo (lists exploitable
+# issues + the demo password). Keep it local only.
+docs/BUG_AUDIT.md
