@@ -1,0 +1,156 @@
+REAL PROMPT(S) SENT TO THE AI - INTERSECTION MODE  [AFTER FIXES]
+Disease: type 2 diabetes mellitus + myofascial pain syndrome
+Mode: intersection | identical for Claude/GPT/Gemini
+Rx1: 6mi-jihwang-tang (shu di huang, shan yao, shan zhu yu, ze xie, mu dan pi, fu ling)
+Rx2: hwangnyeon-haedok-tang (huang lian, huang bai, huang qin, zhi zi)
+Enrichment library: DisGeNET
+Fixes applied: full gene list (no cap) | 'DisGeNET' label -> 'Open Targets score' | syndrome/disease false-match removed
+Computed live from Open Targets + your herb DB.
+
+
+===============================================================================================
+PROMPT 1 of 2 - COMPARATIVE ANALYSIS (summary_table + detailed_analysis)
+===============================================================================================
+
+You are an expert Research Scientist in pathology and bioinformatics. Your task is to perform a comparative analysis of multiple disease clusters provided by the user.
+
+The user is studying **type 2 diabetes mellitus + myofascial pain syndrome** with the following enrichment analysis results:
+
+**Group 1 (Prescription 1):**
+1. Hyperalgesia, Thermal (p-value: 5.79e-14, score: 3731.5)
+2. Pain (p-value: 8.67e-13, score: 1149.0)
+3. Mechanical Allodynia (p-value: 1.62e-12, score: 2876.9)
+4. Autistic Disorder (p-value: 2.34e-12, score: 867.1)
+5. Hyperalgesia (p-value: 2.63e-12, score: 2509.3)
+6. Degenerative polyarthritis (p-value: 4.19e-10, score: 488.5)
+7. Hyperalgesia, Secondary (p-value: 4.19e-10, score: 2214.3)
+8. Allodynia (p-value: 4.19e-10, score: 2214.3)
+9. Hyperalgesia, Primary (p-value: 4.19e-10, score: 2177.6)
+10. Tactile Allodynia (p-value: 5.51e-10, score: 2041.1)
+
+**Group 2 (Prescription 2):**
+1. Autistic Disorder (p-value: 1.62e-13, score: 1162.0)
+2. Pain (p-value: 4.61e-13, score: 1232.2)
+3. Channelopathies (p-value: 2.74e-11, score: 4137.2)
+4. Hyperalgesia, Thermal (p-value: 7.30e-11, score: 2226.7)
+5. Mechanical Allodynia (p-value: 3.84e-09, score: 1633.9)
+6. Infantile Severe Myoclonic Epilepsy (p-value: 6.04e-09, score: 4109.0)
+7. Hyperalgesia (p-value: 6.04e-09, score: 1426.0)
+8. Familial Periodic Paralysis (p-value: 9.20e-09, score: 8680.2)
+9. Hyperactive behavior (p-value: 1.07e-08, score: 432.2)
+10. periodic paralysis (finding) (p-value: 1.07e-08, score: 7769.6)
+
+### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
+The following official ClinGen Gene-Disease Validity data has been matched to common target genes. Items shown as "Open Targets score bucket" have NO ClinGen entry (their level is just the Open Targets association score) and must be treated as low-confidence context:
+
+Official ClinGen matches found: 31. Genes not in ClinGen (Open Targets score only): 36.
+### Prescription 1 (Herbs: shu di huang, shan yao, shan zhu yu, ze xie, mu dan pi, fu ling)
+  * **Official ClinGen Definitive targets**: SCN5A (ClinGen: Definitive for SCN5A-related cardiac rhythm disorder [different disease], score: 0.3747, evidence: clinical), SCN4A (ClinGen: Definitive for SCN4A-related myopathy, autosomal recessive [different disease], score: 0.3737, evidence: clinical), CACNA1D (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3592, evidence: clinical), SCN2A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3294, evidence: clinical), SCN1A (ClinGen: Definitive for generalized epilepsy with febrile seizures plus [different disease], score: 0.2854, evidence: clinical), SCN8A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.2854, evidence: clinical), SCN3A (ClinGen: Definitive for genetic developmental and epileptic encephalopathy [different disease], score: 0.2854, evidence: clinical), IGF2 (ClinGen: Definitive for Silver-Russell syndrome 3 [different disease], score: 0.2653, evidence: literature), FGFR1 (ClinGen: Definitive for Pfeiffer syndrome type 1 [different disease], score: 0.211, evidence: literature), CACNA1C (ClinGen: Definitive for Timothy syndrome [different disease], score: 0.0467, evidence: clinical), MSN (ClinGen: Definitive for combined immunodeficiency due to moesin deficiency [different disease], score: 0.0456, evidence: literature)
+  * **Official ClinGen Moderate targets**: CACNA1S (ClinGen: Moderate for malignant hyperthermia, susceptibility to, 5 [different disease], score: 0.0379, evidence: clinical), CACNA1B (ClinGen: Moderate for complex neurodevelopmental disorder with motor features [different disease], score: 0.0318, evidence: clinical), CACNA2D2 (ClinGen: Moderate for complex neurodevelopmental disorder [different disease], score: 0.0078, evidence: clinical)
+  * **Official ClinGen Limited targets**: SCN9A (ClinGen: Refuted for epilepsy [different disease], score: 0.2854, evidence: clinical)
+  * **Not in ClinGen — Open Targets association-score only**: PTGS2 (Open Targets score bucket: Moderate, score: 0.3978, evidence: literature), SCN7A (Open Targets score bucket: Moderate, score: 0.2854, evidence: clinical), CACNA1H (Open Targets score bucket: Moderate, score: 0.2161, evidence: clinical), CRP (Open Targets score bucket: Limited, score: 0.1167, evidence: literature), IGF1 (Open Targets score bucket: Limited, score: 0.1166, evidence: literature), GOT1 (Open Targets score bucket: Limited, score: 0.1112, evidence: literature), TRPV1 (Open Targets score bucket: Limited, score: 0.1063, evidence: clinical/literature), PRKAA2 (Open Targets score bucket: Limited, score: 0.1005, evidence: literature), PRKAB1 (Open Targets score bucket: Limited, score: 0.0972, evidence: literature), PRKAA1 (Open Targets score bucket: Limited, score: 0.0872, evidence: literature), CALCA (Open Targets score bucket: Limited, score: 0.0774, evidence: literature), MAPK1 (Open Targets score bucket: Limited, score: 0.0692, evidence: literature), NR1I2 (Open Targets score bucket: Limited, score: 0.0427, evidence: literature), FOS (Open Targets score bucket: Limited, score: 0.0376, evidence: literature), TAC1 (Open Targets score bucket: Limited, score: 0.0339, evidence: literature), CHKA (Open Targets score bucket: Limited, score: 0.0318, evidence: literature), F2RL1 (Open Targets score bucket: Limited, score: 0.0123, evidence: literature), CACNA1A (Open Targets score bucket: Limited, score: 0.0115, evidence: clinical), IL17RA (Open Targets score bucket: Limited, score: 0.0067, evidence: literature)
+### Prescription 2 (Herbs: huang lian, huang bai, huang qin, zhi zi)
+  * **Official ClinGen Definitive targets**: SCN5A (ClinGen: Definitive for SCN5A-related cardiac rhythm disorder [different disease], score: 0.3747, evidence: clinical), SCN4A (ClinGen: Definitive for SCN4A-related myopathy, autosomal recessive [different disease], score: 0.3737, evidence: clinical), CACNA1D (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3592, evidence: clinical), SCN2A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3294, evidence: clinical), SCN1A (ClinGen: Definitive for generalized epilepsy with febrile seizures plus [different disease], score: 0.2854, evidence: clinical), SCN8A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.2854, evidence: clinical), SCN3A (ClinGen: Definitive for genetic developmental and epileptic encephalopathy [different disease], score: 0.2854, evidence: clinical), IGF2 (ClinGen: Definitive for Silver-Russell syndrome 3 [different disease], score: 0.2653, evidence: literature), CACNA1C (ClinGen: Definitive for Timothy syndrome [different disease], score: 0.0467, evidence: clinical), CACNA1F (ClinGen: Definitive for CACNA1F-related retinopathy [different disease], score: 0.0388, evidence: clinical), CACNA1G (ClinGen: Definitive for spinocerebellar ataxia type 42 [different disease], score: 0.0093, evidence: clinical)
+  * **Official ClinGen Moderate targets**: CACNA1S (ClinGen: Moderate for malignant hyperthermia, susceptibility to, 5 [different disease], score: 0.0379, evidence: clinical), CACNA1B (ClinGen: Moderate for complex neurodevelopmental disorder with motor features [different disease], score: 0.0318, evidence: clinical), CACNA2D2 (ClinGen: Moderate for complex neurodevelopmental disorder [different disease], score: 0.0078, evidence: clinical)
+  * **Official ClinGen Limited targets**: SCN9A (ClinGen: Refuted for epilepsy [different disease], score: 0.2854, evidence: clinical), CACNB2 (ClinGen: Disputed for cardiogenetic disease [different disease], score: 0.0098, evidence: clinical)
+  * **Not in ClinGen — Open Targets association-score only**: PTGS2 (Open Targets score bucket: Moderate, score: 0.3978, evidence: literature), SCN7A (Open Targets score bucket: Moderate, score: 0.2854, evidence: clinical), CACNA1H (Open Targets score bucket: Moderate, score: 0.2161, evidence: clinical), CRP (Open Targets score bucket: Limited, score: 0.1167, evidence: literature), IGF1 (Open Targets score bucket: Limited, score: 0.1166, evidence: literature), GPT (Open Targets score bucket: Limited, score: 0.1142, evidence: literature), GOT1 (Open Targets score bucket: Limited, score: 0.1112, evidence: literature), TRPV1 (Open Targets score bucket: Limited, score: 0.1063, evidence: clinical/literature), PRKAA2 (Open Targets score bucket: Limited, score: 0.1005, evidence: literature), PRKAB1 (Open Targets score bucket: Limited, score: 0.0972, evidence: literature), FGF2 (Open Targets score bucket: Limited, score: 0.0905, evidence: literature), PRKAA1 (Open Targets score bucket: Limited, score: 0.0872, evidence: literature), CALCA (Open Targets score bucket: Limited, score: 0.0774, evidence: literature), MAPK1 (Open Targets score bucket: Limited, score: 0.0692, evidence: literature), NR1I2 (Open Targets score bucket: Limited, score: 0.0427, evidence: literature), TAC1 (Open Targets score bucket: Limited, score: 0.0339, evidence: literature), CACNA1A (Open Targets score bucket: Limited, score: 0.0115, evidence: clinical)
+
+CRITICAL MOA REASONING RULES:
+1. **Prioritize Official ClinGen Targets**: Base primary therapeutic mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets only.
+2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Open Targets score bucket" (non-ClinGen) genes as speculative or low-confidence associations only.
+3. **Clinical Integration**: Explain how the high-confidence targets interact with standard pathological pathways of type 2 diabetes mellitus + myofascial pain syndrome.
+
+
+You must return your response in a strict JSON format with exactly two keys: "summary_table" and "detailed_analysis".
+
+1. "summary_table":
+   - An array of objects representing the rows of a comparison table.
+   - Each object must have the keys: "Feature", "Group 1", "Group 2".
+   - Include EXACTLY three rows, in this order. Each row's "Feature" value MUST be one of these EXACT strings, verbatim — do NOT translate, reword, abbreviate, or add others: "주요 원인", "주요 조직", "주요 결과".
+   - Keep the values in this table concise (under 10 words).
+
+2. "detailed_analysis":
+   - A single string containing a comprehensive, Markdown-formatted report.
+   - This report must include:
+     - "1. The High-Level Comparison": A brief summary of the fundamental differences.
+     - "2. Deep Dive into Pathways": A detailed breakdown of the mechanism for each group (Group 1, Group 2). Analyze ONLY the groups listed above; do NOT add, mention, or describe any group that was not provided.
+     - Use bolding and bullet points for readability.
+
+EVIDENCE CALIBRATION (important):
+- These terms come from gene-set overlap; a group may rest on only a few genes or terms.
+- Do NOT infer a mechanism from a single gene or a single enriched term.
+- If groups largely overlap, or a group's evidence is sparse, say so explicitly and label those conclusions LOW-CONFIDENCE rather than asserting distinct mechanisms.
+
+Do not include any text outside the JSON object.
+
+LANGUAGE REQUIREMENT: Write EVERY human-readable VALUE -- all table cell contents (including the "Feature" column), the entire detailed_analysis report (INCLUDING every Markdown section heading and title inside it -- translate those too), and all questions and rationales -- in KOREAN (한국어), in professional clinical and scientific Korean. BUT keep ALL JSON keys and the overall structure EXACTLY as specified above, in English (e.g. "summary_table", "detailed_analysis", "Feature", "Finding", "Group 1", "clinical_questions", "group_label", "suspected_driver", "rationale_hidden"). Do NOT translate the keys. Keep gene symbols (e.g. TP53), pathway names, and EFO/MONDO IDs in their original form.
+
+
+
+===============================================================================================
+PROMPT 2 of 2 - CLINICAL INTERVIEW QUESTIONS
+===============================================================================================
+
+You are a senior clinical diagnostician. Your task is to analyze the provided disease groups and generate a structured clinical interview guide.
+
+The patient is being evaluated for **type 2 diabetes mellitus + myofascial pain syndrome**. Here are the enrichment analysis results showing associated conditions and pathways:
+
+**Group 1 (Prescription 1):**
+1. Hyperalgesia, Thermal (p-value: 5.79e-14, score: 3731.5)
+2. Pain (p-value: 8.67e-13, score: 1149.0)
+3. Mechanical Allodynia (p-value: 1.62e-12, score: 2876.9)
+4. Autistic Disorder (p-value: 2.34e-12, score: 867.1)
+5. Hyperalgesia (p-value: 2.63e-12, score: 2509.3)
+
+**Group 2 (Prescription 2):**
+1. Autistic Disorder (p-value: 1.62e-13, score: 1162.0)
+2. Pain (p-value: 4.61e-13, score: 1232.2)
+3. Channelopathies (p-value: 2.74e-11, score: 4137.2)
+4. Hyperalgesia, Thermal (p-value: 7.30e-11, score: 2226.7)
+5. Mechanical Allodynia (p-value: 3.84e-09, score: 1633.9)
+
+### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
+To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items shown as "Open Targets score bucket" have no ClinGen entry:
+
+Official ClinGen matches found: 31. Genes not in ClinGen (Open Targets score only): 36.
+### Prescription 1 (Herbs: shu di huang, shan yao, shan zhu yu, ze xie, mu dan pi, fu ling)
+  * **Official ClinGen Definitive targets**: SCN5A (ClinGen: Definitive for SCN5A-related cardiac rhythm disorder [different disease], score: 0.3747, evidence: clinical), SCN4A (ClinGen: Definitive for SCN4A-related myopathy, autosomal recessive [different disease], score: 0.3737, evidence: clinical), CACNA1D (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3592, evidence: clinical), SCN2A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3294, evidence: clinical), SCN1A (ClinGen: Definitive for generalized epilepsy with febrile seizures plus [different disease], score: 0.2854, evidence: clinical), SCN8A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.2854, evidence: clinical), SCN3A (ClinGen: Definitive for genetic developmental and epileptic encephalopathy [different disease], score: 0.2854, evidence: clinical), IGF2 (ClinGen: Definitive for Silver-Russell syndrome 3 [different disease], score: 0.2653, evidence: literature), FGFR1 (ClinGen: Definitive for Pfeiffer syndrome type 1 [different disease], score: 0.211, evidence: literature), CACNA1C (ClinGen: Definitive for Timothy syndrome [different disease], score: 0.0467, evidence: clinical), MSN (ClinGen: Definitive for combined immunodeficiency due to moesin deficiency [different disease], score: 0.0456, evidence: literature)
+  * **Official ClinGen Moderate targets**: CACNA1S (ClinGen: Moderate for malignant hyperthermia, susceptibility to, 5 [different disease], score: 0.0379, evidence: clinical), CACNA1B (ClinGen: Moderate for complex neurodevelopmental disorder with motor features [different disease], score: 0.0318, evidence: clinical), CACNA2D2 (ClinGen: Moderate for complex neurodevelopmental disorder [different disease], score: 0.0078, evidence: clinical)
+  * **Official ClinGen Limited targets**: SCN9A (ClinGen: Refuted for epilepsy [different disease], score: 0.2854, evidence: clinical)
+  * **Not in ClinGen — Open Targets association-score only**: PTGS2 (Open Targets score bucket: Moderate, score: 0.3978, evidence: literature), SCN7A (Open Targets score bucket: Moderate, score: 0.2854, evidence: clinical), CACNA1H (Open Targets score bucket: Moderate, score: 0.2161, evidence: clinical), CRP (Open Targets score bucket: Limited, score: 0.1167, evidence: literature), IGF1 (Open Targets score bucket: Limited, score: 0.1166, evidence: literature), GOT1 (Open Targets score bucket: Limited, score: 0.1112, evidence: literature), TRPV1 (Open Targets score bucket: Limited, score: 0.1063, evidence: clinical/literature), PRKAA2 (Open Targets score bucket: Limited, score: 0.1005, evidence: literature), PRKAB1 (Open Targets score bucket: Limited, score: 0.0972, evidence: literature), PRKAA1 (Open Targets score bucket: Limited, score: 0.0872, evidence: literature), CALCA (Open Targets score bucket: Limited, score: 0.0774, evidence: literature), MAPK1 (Open Targets score bucket: Limited, score: 0.0692, evidence: literature), NR1I2 (Open Targets score bucket: Limited, score: 0.0427, evidence: literature), FOS (Open Targets score bucket: Limited, score: 0.0376, evidence: literature), TAC1 (Open Targets score bucket: Limited, score: 0.0339, evidence: literature), CHKA (Open Targets score bucket: Limited, score: 0.0318, evidence: literature), F2RL1 (Open Targets score bucket: Limited, score: 0.0123, evidence: literature), CACNA1A (Open Targets score bucket: Limited, score: 0.0115, evidence: clinical), IL17RA (Open Targets score bucket: Limited, score: 0.0067, evidence: literature)
+### Prescription 2 (Herbs: huang lian, huang bai, huang qin, zhi zi)
+  * **Official ClinGen Definitive targets**: SCN5A (ClinGen: Definitive for SCN5A-related cardiac rhythm disorder [different disease], score: 0.3747, evidence: clinical), SCN4A (ClinGen: Definitive for SCN4A-related myopathy, autosomal recessive [different disease], score: 0.3737, evidence: clinical), CACNA1D (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3592, evidence: clinical), SCN2A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.3294, evidence: clinical), SCN1A (ClinGen: Definitive for generalized epilepsy with febrile seizures plus [different disease], score: 0.2854, evidence: clinical), SCN8A (ClinGen: Definitive for complex neurodevelopmental disorder [different disease], score: 0.2854, evidence: clinical), SCN3A (ClinGen: Definitive for genetic developmental and epileptic encephalopathy [different disease], score: 0.2854, evidence: clinical), IGF2 (ClinGen: Definitive for Silver-Russell syndrome 3 [different disease], score: 0.2653, evidence: literature), CACNA1C (ClinGen: Definitive for Timothy syndrome [different disease], score: 0.0467, evidence: clinical), CACNA1F (ClinGen: Definitive for CACNA1F-related retinopathy [different disease], score: 0.0388, evidence: clinical), CACNA1G (ClinGen: Definitive for spinocerebellar ataxia type 42 [different disease], score: 0.0093, evidence: clinical)
+  * **Official ClinGen Moderate targets**: CACNA1S (ClinGen: Moderate for malignant hyperthermia, susceptibility to, 5 [different disease], score: 0.0379, evidence: clinical), CACNA1B (ClinGen: Moderate for complex neurodevelopmental disorder with motor features [different disease], score: 0.0318, evidence: clinical), CACNA2D2 (ClinGen: Moderate for complex neurodevelopmental disorder [different disease], score: 0.0078, evidence: clinical)
+  * **Official ClinGen Limited targets**: SCN9A (ClinGen: Refuted for epilepsy [different disease], score: 0.2854, evidence: clinical), CACNB2 (ClinGen: Disputed for cardiogenetic disease [different disease], score: 0.0098, evidence: clinical)
+  * **Not in ClinGen — Open Targets association-score only**: PTGS2 (Open Targets score bucket: Moderate, score: 0.3978, evidence: literature), SCN7A (Open Targets score bucket: Moderate, score: 0.2854, evidence: clinical), CACNA1H (Open Targets score bucket: Moderate, score: 0.2161, evidence: clinical), CRP (Open Targets score bucket: Limited, score: 0.1167, evidence: literature), IGF1 (Open Targets score bucket: Limited, score: 0.1166, evidence: literature), GPT (Open Targets score bucket: Limited, score: 0.1142, evidence: literature), GOT1 (Open Targets score bucket: Limited, score: 0.1112, evidence: literature), TRPV1 (Open Targets score bucket: Limited, score: 0.1063, evidence: clinical/literature), PRKAA2 (Open Targets score bucket: Limited, score: 0.1005, evidence: literature), PRKAB1 (Open Targets score bucket: Limited, score: 0.0972, evidence: literature), FGF2 (Open Targets score bucket: Limited, score: 0.0905, evidence: literature), PRKAA1 (Open Targets score bucket: Limited, score: 0.0872, evidence: literature), CALCA (Open Targets score bucket: Limited, score: 0.0774, evidence: literature), MAPK1 (Open Targets score bucket: Limited, score: 0.0692, evidence: literature), NR1I2 (Open Targets score bucket: Limited, score: 0.0427, evidence: literature), TAC1 (Open Targets score bucket: Limited, score: 0.0339, evidence: literature), CACNA1A (Open Targets score bucket: Limited, score: 0.0115, evidence: clinical)
+
+CRITICAL DIAGNOSTIC QUESTION RULES:
+1. Focus questions on clinical features or comorbidities associated with official ClinGen **Definitive** and **Strong** gene targets.
+2. Avoid formulating primary screening questions around pathways driven solely by **Limited**, weak, or non-ClinGen (Open Targets score) targets.
+
+
+You must return your response in a strict JSON format. 
+The JSON must be a single list (array) of objects, where each object represents one disease group.
+
+Each object in the list must contain exactly these keys:
+1. "group_label": A short, descriptive title for the group (e.g., "Group 1: Vascular & Tobacco").
+2. "suspected_driver": A concise summary of the underlying pathology (e.g., "Systemic Nicotine Toxicity").
+3. "clinical_questions": An array of strings. Each string is a specific high-yield question the doctor should ask the patient.
+4. "rationale_hidden": A Markdown-formatted string explaining *why* these questions are critical and what the doctor should look for. This will be shown only when requested.
+
+Example Structure:
+[
+  {
+    "group_label": "Group 1...",
+    "suspected_driver": "...",
+    "clinical_questions": ["Question 1?", "Question 2?"],
+    "rationale_hidden": "**Why this matters:** This tests for..."
+  }
+]
+
+Generate exactly 2 group objects, one for each prescription group.
+
+Do not include any text outside the JSON array.
+
+LANGUAGE REQUIREMENT: Write EVERY human-readable VALUE -- all table cell contents (including the "Feature" column), the entire detailed_analysis report (INCLUDING every Markdown section heading and title inside it -- translate those too), and all questions and rationales -- in KOREAN (한국어), in professional clinical and scientific Korean. BUT keep ALL JSON keys and the overall structure EXACTLY as specified above, in English (e.g. "summary_table", "detailed_analysis", "Feature", "Finding", "Group 1", "clinical_questions", "group_label", "suspected_driver", "rationale_hidden"). Do NOT translate the keys. Keep gene symbols (e.g. TP53), pathway names, and EFO/MONDO IDs in their original form.
+
