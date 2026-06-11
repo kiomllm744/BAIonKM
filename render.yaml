@@ -18,6 +18,13 @@ services:
         generateValue: true
       - key: GEMINI_API_KEY
         sync: false
+      # Optional AI providers — the user picks Gemini / Claude / GPT in the top bar.
+      # Set the matching key in the Render dashboard to enable each (leave unset to
+      # disable that option).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
       - key: UMLS_API_KEY
         sync: false
       - key: FLASK_ENV

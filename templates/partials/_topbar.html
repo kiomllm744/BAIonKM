@@ -59,6 +59,20 @@
             <div class="lib-menu-hint" data-i18n="lib.hint">Sent to Enrichr. If none are selected, DisGeNET is used.</div>
         </div>
     </div>
+    <div class="lib-picker" id="model-picker">
+        <button type="button" class="lib-picker-btn" id="model-picker-btn" aria-haspopup="true" aria-expanded="false" data-i18n-title="ai.modelTitle" title="AI model">
+            <i class="fas fa-robot"></i>
+            <span data-i18n="nav.aiModel">AI Model</span>
+            <span class="lib-badge" id="model-picker-current"></span>
+        </button>
+        <div class="lib-menu" id="model-picker-menu" hidden>
+            <div class="lib-menu-title" data-i18n="ai.modelTitle">AI model</div>
+            <label class="lib-menu-opt"><input type="radio" name="ai-provider" class="ai-opt" value="gemini"><span>Gemini</span></label>
+            <label class="lib-menu-opt"><input type="radio" name="ai-provider" class="ai-opt" value="claude"><span>Claude (Sonnet)</span></label>
+            <label class="lib-menu-opt"><input type="radio" name="ai-provider" class="ai-opt" value="gpt"><span>GPT</span></label>
+            <div class="lib-menu-hint" data-i18n="ai.modelHint">Which AI writes the analysis. Set the matching API key on the server.</div>
+        </div>
+    </div>
     <button type="button" id="lang-toggle" class="lang-toggle" aria-label="Switch language">
         <span data-lang="en">EN</span>
         <span class="lang-sep">|</span>
@@ -104,6 +118,44 @@
             window.getEnrichmentLibraries = selected;
             boxes.forEach(function(b){ b.addEventListener('change', persist); });
             if (Array.isArray(saved)) { updateCount(); } else { persist(); }
+            btn.addEventListener('click', function(e){
+                e.stopPropagation();
+                var show = menu.hidden;
+                menu.hidden = !show;
+                btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+            });
+            document.addEventListener('click', function(e){
+                if (!picker.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+            });
+        })();
+
+        // Top-bar AI-model picker. Single choice (Gemini / Claude / GPT), persisted in
+        // localStorage and exposed as window.getAiProvider() for the AI-analysis call.
+        // Changing it fires an 'aimodelchange' event so the result page can re-run.
+        (function(){
+            var KEY = 'baionkm.aimodel';
+            var DEFAULT = 'gemini';
+            var LABELS = { gemini: 'Gemini', claude: 'Claude', gpt: 'GPT' };
+            var picker = document.getElementById('model-picker');
+            if (!picker) return;
+            var btn = document.getElementById('model-picker-btn');
+            var menu = document.getElementById('model-picker-menu');
+            var curEl = document.getElementById('model-picker-current');
+            var opts = Array.prototype.slice.call(picker.querySelectorAll('.ai-opt'));
+            var saved = null;
+            try { saved = localStorage.getItem(KEY); } catch (e) {}
+            if (!LABELS[saved]) saved = DEFAULT;
+            opts.forEach(function(o){ o.checked = (o.value === saved); });
+            function current(){ var c = opts.filter(function(o){ return o.checked; })[0]; return c ? c.value : DEFAULT; }
+            function refresh(){ if (curEl) curEl.textContent = LABELS[current()] || ''; }
+            window.getAiProvider = current;
+            function persist(){
+                try { localStorage.setItem(KEY, current()); } catch (e) {}
+                refresh();
+                document.dispatchEvent(new CustomEvent('aimodelchange', { detail: { provider: current() } }));
+            }
+            opts.forEach(function(o){ o.addEventListener('change', persist); });
+            refresh();   // reflect the saved choice on load (no event dispatch)
             btn.addEventListener('click', function(e){
                 e.stopPropagation();
                 var show = menu.hidden;

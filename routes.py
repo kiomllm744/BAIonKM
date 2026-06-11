@@ -17,7 +17,10 @@ from sqlalchemy.exc import IntegrityError
 from models import Herb, AnalysisResult, ExternalLookupCache, Disease
 from services import analyze_prescriptions, compute_disease_venn
 from config import Config
-from llm_service import generate_full_ai_analysis
+from llm_service import (
+    generate_full_ai_analysis, normalize_provider, provider_api_key,
+    provider_label, provider_env_var,
+)
 from umls_service import candidate_names_for_open_targets, translate_clinical_text
 
 from herb_mappings import (
@@ -1299,11 +1302,21 @@ def _is_ai_inflight(result_id, mode):
         s.close()
 
 
-def _saved_ai_for(result_id, mode):
+def _saved_ai_for(result_id, mode, provider=None):
     """Return the saved AI dict for (result_id, mode) if present and complete,
-    else None. Handles the mode-keyed blob and the legacy bare blob."""
+    else None. Handles the mode-keyed blob and the legacy bare blob.
+
+    If `provider` is given, only return the entry when it was produced by that
+    provider (legacy entries with no recorded provider count as 'gemini'), so
+    switching the AI model re-runs instead of returning a stale other-model run."""
     if not result_id:
         return None
+
+    def _provider_ok(entry):
+        if provider is None:
+            return True
+        return (entry.get('provider') or 'gemini') == normalize_provider(provider)
+
     s = Session()
     try:
         row = s.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
@@ -1312,9 +1325,11 @@ def _saved_ai_for(result_id, mode):
         blob = json.loads(row.ai_analysis_json)
         if isinstance(blob, dict):
             if 'has_ai_analysis' in blob:            # legacy bare blob (single mode)
-                return blob if blob.get('has_ai_analysis') else None
+                if blob.get('has_ai_analysis') and _provider_ok(blob):
+                    return blob
+                return None
             entry = blob.get(mode)
-            if isinstance(entry, dict) and entry.get('has_ai_analysis'):
+            if isinstance(entry, dict) and entry.get('has_ai_analysis') and _provider_ok(entry):
                 return entry
         return None
     except Exception:
@@ -1323,10 +1338,10 @@ def _saved_ai_for(result_id, mode):
         s.close()
 
 
-def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language):
-    """Build the inputs, run the Gemini analysis, and (when result_id is given)
-    save it mode-keyed onto the row. Returns the ai_results dict. Runs either
-    synchronously (no result_id) or inside a background thread (result_id)."""
+def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language, provider='gemini'):
+    """Build the inputs, run the analysis on the selected provider, and (when
+    result_id is given) save it mode-keyed onto the row. Returns the ai_results
+    dict. Runs either synchronously (no result_id) or in a background thread."""
     analysis_results = {'prescription_enrichments': prescription_enrichments}
 
     # Pull saved prescriptions (with the ClinGen overlay) for the active mode.
@@ -1346,7 +1361,7 @@ def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, 
         finally:
             _sess.close()
 
-    ai_results = generate_full_ai_analysis(disease_name, analysis_results, language=language)
+    ai_results = generate_full_ai_analysis(disease_name, analysis_results, language=language, provider=provider)
 
     # Save mode-keyed, merging so a 'both' row keeps the other tab's AI.
     if result_id and ai_results.get('has_ai_analysis'):
@@ -1417,13 +1432,16 @@ def ai_analysis():
     mode = (data.get('mode') or 'union')  # which disease-gene mode this AI run is for
     if mode not in ('union', 'intersection'):
         mode = 'union'
+    # which AI model the user picked in the top bar (gemini | claude | gpt)
+    provider = normalize_provider(data.get('provider') or Config.AI_PROVIDER_DEFAULT)
 
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
 
-    if not Config.GEMINI_API_KEY:
+    if not provider_api_key(provider):
         return jsonify({
-            'error': 'AI analysis not configured. Please set the GEMINI_API_KEY environment variable.',
+            'error': (f'{provider_label(provider)} AI is not configured. '
+                      f'Set the {provider_env_var(provider)} environment variable.'),
             'has_ai_analysis': False
         }), 503
 
@@ -1431,20 +1449,20 @@ def ai_analysis():
     # return a finished analysis directly, or tell the client to poll if a
     # generation is already running (don't start a duplicate).
     if result_id:
-        already = _saved_ai_for(result_id, mode)
+        already = _saved_ai_for(result_id, mode, provider)
         if already:
             return jsonify(already)
         if not _claim_ai_inflight(result_id, mode):
             # another worker is already generating this (result_id, mode)
             return jsonify({'status': 'processing', 'has_ai_analysis': False}), 202
 
-        # We claimed it: run Gemini in a background thread so the request returns
+        # We claimed it: run the model in a background thread so the request returns
         # immediately (never cut off by the gunicorn timeout). The client polls
         # /api/ai-analysis/result -- which now reads the shared marker -- until saved.
         def _bg(disease_name=disease_name, prescription_enrichments=prescription_enrichments,
-                result_id=result_id, mode=mode, language=language):
+                result_id=result_id, mode=mode, language=language, provider=provider):
             try:
-                _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language)
+                _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, language, provider)
             except Exception as e:
                 print(f"[ai-analysis] background generation failed: {e}")
             finally:
@@ -1455,7 +1473,7 @@ def ai_analysis():
 
     # No result_id: cannot save or poll, so run synchronously and return the result.
     try:
-        ai_results = _run_ai_generation(disease_name, prescription_enrichments, None, mode, language)
+        ai_results = _run_ai_generation(disease_name, prescription_enrichments, None, mode, language, provider)
         return jsonify(ai_results)
     except Exception as e:
         return jsonify({
@@ -1480,9 +1498,10 @@ def ai_analysis_result():
     mode = request.args.get('mode') or 'union'
     if mode not in ('union', 'intersection'):
         mode = 'union'
+    provider = normalize_provider(request.args.get('provider'))
     if not result_id:
         return jsonify({'status': 'absent', 'has_ai_analysis': False})
-    saved = _saved_ai_for(result_id, mode)
+    saved = _saved_ai_for(result_id, mode, provider)
     if saved:
         return jsonify(saved)
     # Shared marker -> a poll on ANY worker sees a generation started on any other.
@@ -1492,8 +1511,12 @@ def ai_analysis_result():
 
 @main_bp.route('/api/ai-analysis/status')
 def ai_analysis_status():
-    """Check if AI analysis is available (API key configured)."""
+    """Check if AI analysis is available (any provider key configured), and report
+    which providers are usable so the UI can hint at missing keys."""
+    providers = {p: bool(provider_api_key(p)) for p in ('gemini', 'claude', 'gpt')}
+    any_key = any(providers.values())
     return jsonify({
-        'available': bool(Config.GEMINI_API_KEY),
-        'message': 'AI analysis is available' if Config.GEMINI_API_KEY else 'GEMINI_API_KEY not configured'
+        'available': any_key,
+        'providers': providers,
+        'message': 'AI analysis is available' if any_key else 'No AI provider key configured'
     })

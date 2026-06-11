@@ -107,6 +107,17 @@ class Config:
         ).split(',') if m.strip()
     ]
 
+    # AI provider for the analysis. The user picks one per analysis in the top bar
+    # (Gemini / Claude / GPT); this is only the server-side fallback default.
+    # Each provider needs ITS OWN key — set whichever you intend to use.
+    AI_PROVIDER_DEFAULT = (os.environ.get('AI_PROVIDER', 'gemini') or 'gemini').strip().lower()
+    # Anthropic (Claude)
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+    CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-6')
+    # OpenAI (GPT)
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o')
+
     # Demo Login Credentials (for professor access)
     # You can change these or set via environment variables
     DEMO_USERNAME = os.environ.get('DEMO_USERNAME', 'professor')

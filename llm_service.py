@@ -13,8 +13,134 @@ from config import Config
 # HTTP statuses worth retrying on the same model (overload / transient server errors)
 _TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 
+# Providers the analysis can run on. The user picks one in the top bar; each needs
+# its OWN API key (see config.py). Gemini stays the default to preserve behavior.
+AI_PROVIDERS = ('gemini', 'claude', 'gpt')
+_PROVIDER_LABELS = {'gemini': 'Gemini', 'claude': 'Claude', 'gpt': 'GPT'}
+_PROVIDER_ENV = {'gemini': 'GEMINI_API_KEY', 'claude': 'ANTHROPIC_API_KEY', 'gpt': 'OPENAI_API_KEY'}
 
-def get_gemini_response(prompt, json_mode=False, temperature=0.3, max_tokens=8192, retries=2):
+
+def normalize_provider(provider) -> str:
+    p = (provider or 'gemini').strip().lower()
+    return p if p in AI_PROVIDERS else 'gemini'
+
+
+def provider_api_key(provider: str):
+    """Return the configured API key for a provider, or None if not set."""
+    p = normalize_provider(provider)
+    if p == 'claude':
+        return Config.ANTHROPIC_API_KEY
+    if p == 'gpt':
+        return Config.OPENAI_API_KEY
+    return Config.GEMINI_API_KEY
+
+
+def provider_label(provider: str) -> str:
+    return _PROVIDER_LABELS.get(normalize_provider(provider), 'Gemini')
+
+
+def provider_env_var(provider: str) -> str:
+    return _PROVIDER_ENV.get(normalize_provider(provider), 'GEMINI_API_KEY')
+
+
+def _call_claude(prompt, json_mode, temperature, max_tokens, retries):
+    """Anthropic Messages API via raw HTTP (matches the project's single outbound
+    convention + the EXTERNAL_API_VERIFY_SSL toggle). Returns text or None."""
+    api_key = Config.ANTHROPIC_API_KEY
+    if not api_key:
+        print("[LLM] Error: No Anthropic (Claude) API key configured")
+        return None
+    model = Config.CLAUDE_MODEL
+    headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+    body = {"model": model, "max_tokens": max_tokens, "messages": [{"role": "user", "content": prompt}]}
+    if json_mode:
+        body["system"] = ("You output ONLY a single valid JSON value — no prose, no "
+                          "explanations, and no markdown code fences.")
+    for attempt in range(1, retries + 1):
+        try:
+            print(f"[LLM] claude {model} attempt {attempt}/{retries} (prompt {len(prompt)} chars, json={json_mode})")
+            r = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=body,
+                              timeout=90, verify=Config.EXTERNAL_API_VERIFY_SSL)
+            if r.ok:
+                blocks = r.json().get("content") or []
+                text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
+                if text:
+                    print(f"[LLM] claude OK ({len(text)} chars)")
+                    return text
+                print("[LLM] claude 200 but empty content -> give up")
+                return None
+            print(f"[LLM] claude HTTP {r.status_code}: {r.text[:160]}")
+            if r.status_code in _TRANSIENT_STATUS and attempt < retries:
+                time.sleep(1.2 * attempt)
+                continue
+            return None
+        except requests.exceptions.Timeout:
+            print(f"[LLM] claude timed out (attempt {attempt})")
+            if attempt < retries:
+                time.sleep(1.0)
+                continue
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"[LLM] claude request error: {e}")
+            return None
+        except Exception as e:
+            print(f"[LLM] claude unexpected error: {e}")
+            traceback.print_exc()
+            return None
+    return None
+
+
+def _call_openai(prompt, json_mode, temperature, max_tokens, retries, json_array=False):
+    """OpenAI Chat Completions API via raw HTTP. Returns text or None."""
+    api_key = Config.OPENAI_API_KEY
+    if not api_key:
+        print("[LLM] Error: No OpenAI (GPT) API key configured")
+        return None
+    model = Config.OPENAI_MODEL
+    headers = {"Authorization": f"Bearer {api_key}", "content-type": "application/json"}
+    body = {"model": model, "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature, "max_tokens": max_tokens}
+    # OpenAI's json_object mode can ONLY return a top-level object — using it for a
+    # prompt that asks for an array yields empty/malformed output. So enable it only
+    # for object responses; for arrays we rely on the prompt + array extraction.
+    if json_mode and not json_array:
+        body["response_format"] = {"type": "json_object"}   # prompts already say "JSON"
+    for attempt in range(1, retries + 1):
+        try:
+            print(f"[LLM] gpt {model} attempt {attempt}/{retries} (prompt {len(prompt)} chars, json={json_mode})")
+            r = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=body,
+                              timeout=90, verify=Config.EXTERNAL_API_VERIFY_SSL)
+            if r.ok:
+                choices = r.json().get("choices") or []
+                if choices:
+                    text = (choices[0].get("message") or {}).get("content") or ""
+                    if text:
+                        print(f"[LLM] gpt OK ({len(text)} chars)")
+                        return text
+                print("[LLM] gpt 200 but empty content -> give up")
+                return None
+            print(f"[LLM] gpt HTTP {r.status_code}: {r.text[:160]}")
+            if r.status_code in _TRANSIENT_STATUS and attempt < retries:
+                time.sleep(1.2 * attempt)
+                continue
+            return None
+        except requests.exceptions.Timeout:
+            print(f"[LLM] gpt timed out (attempt {attempt})")
+            if attempt < retries:
+                time.sleep(1.0)
+                continue
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"[LLM] gpt request error: {e}")
+            return None
+        except Exception as e:
+            print(f"[LLM] gpt unexpected error: {e}")
+            traceback.print_exc()
+            return None
+    return None
+
+
+def get_gemini_response(prompt, json_mode=False, temperature=0.3, max_tokens=8192, retries=2, provider='gemini', json_array=False):
     """
     Send a prompt to Google Gemini and return the text response.
 
@@ -26,6 +152,13 @@ def get_gemini_response(prompt, json_mode=False, temperature=0.3, max_tokens=819
     - Larger maxOutputTokens (avoids truncated JSON) and low temperature
       (consistent structured output). Flags MAX_TOKENS truncation.
     """
+    # Route to the selected provider; Gemini is the default and keeps the original path.
+    provider = normalize_provider(provider)
+    if provider == 'claude':
+        return _call_claude(prompt, json_mode, temperature, max_tokens, retries)
+    if provider == 'gpt':
+        return _call_openai(prompt, json_mode, temperature, max_tokens, retries, json_array)
+
     api_key = Config.GEMINI_API_KEY
     if not api_key:
         print("[LLM] Error: No Gemini API key configured")
@@ -88,15 +221,16 @@ def get_gemini_response(prompt, json_mode=False, temperature=0.3, max_tokens=819
     return None
 
 
-def get_gemini_json(prompt, expect="object", temperature=0.3):
+def get_gemini_json(prompt, expect="object", temperature=0.3, provider='gemini'):
     """
-    Get parsed JSON (object or array) from Gemini using JSON mode, with one
-    automatic re-ask if the first response can't be parsed. Returns the parsed
-    value or None.
+    Get parsed JSON (object or array) from the selected provider using JSON mode,
+    with one automatic re-ask if the first response can't be parsed. Returns the
+    parsed value or None.
     """
     attempt_prompt = prompt
     for attempt in range(2):
-        text = get_gemini_response(attempt_prompt, json_mode=True, temperature=temperature)
+        text = get_gemini_response(attempt_prompt, json_mode=True, temperature=temperature,
+                                   provider=provider, json_array=(expect == "array"))
         if text:
             parsed = (extract_json_from_response(text) if expect == "object"
                       else extract_json_array_from_response(text))
@@ -304,7 +438,7 @@ def _feature_rows_instruction(language):
             f'others: "{a}", "{b}", "{c}".')
 
 
-def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en') -> dict:
+def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> dict:
     """
     Generate comparative analysis with summary table and detailed analysis.
     Uses the exact prompt format specified.
@@ -366,7 +500,7 @@ EVIDENCE CALIBRATION (important):
 
 Do not include any text outside the JSON object."""
 
-    parsed = get_gemini_json(prompt + _language_directive(language), expect="object")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="object", provider=provider)
     if parsed and 'summary_table' in parsed and 'detailed_analysis' in parsed:
         return parsed
     if isinstance(parsed, dict):  # JSON came back but missing a key -> use what we got
@@ -378,7 +512,7 @@ Do not include any text outside the JSON object."""
     return None
 
 
-def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en') -> list:
+def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> list:
     """
     Generate clinical interview questions for diagnosis.
     Returns a structured JSON array with group cards.
@@ -436,7 +570,7 @@ Generate exactly {num_groups} group objects, one for each prescription group.
 
 Do not include any text outside the JSON array."""
 
-    parsed = get_gemini_json(prompt + _language_directive(language), expect="array")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="array", provider=provider)
     if isinstance(parsed, list) and parsed:
         return parsed
     return None
@@ -470,7 +604,7 @@ def extract_json_array_from_response(text: str) -> list:
         return None
 
 
-def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en') -> dict:
+def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> dict:
     """
     Generate analysis for a single prescription (when only one Rx is provided).
     """
@@ -516,7 +650,7 @@ EVIDENCE CALIBRATION (important):
 
 Do not include any text outside the JSON object."""
 
-    parsed = get_gemini_json(prompt + _language_directive(language), expect="object")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="object", provider=provider)
     if parsed and 'summary_table' in parsed and 'detailed_analysis' in parsed:
         return parsed
     if isinstance(parsed, dict):
@@ -528,7 +662,7 @@ Do not include any text outside the JSON object."""
     return None
 
 
-def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en') -> list:
+def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> list:
     """
     Generate clinical questions for a single prescription.
     Returns a structured JSON array with one group card.
@@ -576,7 +710,7 @@ Example Structure:
 
 Do not include any text outside the JSON array."""
 
-    parsed = get_gemini_json(prompt + _language_directive(language), expect="array")
+    parsed = get_gemini_json(prompt + _language_directive(language), expect="array", provider=provider)
     if isinstance(parsed, list) and parsed:
         return parsed
     return None
@@ -600,27 +734,32 @@ def _flatten_rx_enrichment(rx_data):
     return terms
 
 
-def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 'en') -> dict:
+def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 'en', provider: str = 'gemini') -> dict:
     """
     Generate complete AI analysis with:
     - summary_table: Comparison table data
     - detailed_analysis: Full markdown analysis
     - clinical_questions: Diagnostic interview questions
+
+    `provider` selects the LLM (gemini | claude | gpt); each needs its own key.
     """
-    print(f"[LLM] Starting AI analysis for disease: {disease_name}")
-    
+    provider = normalize_provider(provider)
+    print(f"[LLM] Starting AI analysis for disease: {disease_name} (provider={provider})")
+
     ai_results = {
         'summary_table': [],
         'detailed_analysis': None,
         'clinical_questions': None,
         'has_ai_analysis': False,
+        'provider': provider,
+        'provider_label': provider_label(provider),
         'error': None
     }
-    
-    # Check if API key is configured
-    if not Config.GEMINI_API_KEY:
-        ai_results['error'] = "Gemini API key not configured"
-        print("[LLM] Error: No API key configured")
+
+    # Check if the SELECTED provider's API key is configured
+    if not provider_api_key(provider):
+        ai_results['error'] = f"{provider_label(provider)} API key not configured ({provider_env_var(provider)})"
+        print(f"[LLM] Error: no API key for provider={provider}")
         return ai_results
     
     # Extract prescription enrichment data
@@ -649,7 +788,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         if prescription_data:
             print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
             # Generate comparative analysis
-            analysis = generate_comparative_analysis(disease_name, prescription_data, clingen_context, language)
+            analysis = generate_comparative_analysis(disease_name, prescription_data, clingen_context, language, provider)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -660,7 +799,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
                 print("[LLM] Comparative analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_clinical_questions(disease_name, prescription_data, clingen_context, language)
+            clinical = generate_clinical_questions(disease_name, prescription_data, clingen_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -675,7 +814,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         
         if rx_data:
             # Generate single analysis
-            analysis = generate_single_prescription_analysis(disease_name, rx_data, clingen_context, language)
+            analysis = generate_single_prescription_analysis(disease_name, rx_data, clingen_context, language, provider)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -685,7 +824,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
                 print("[LLM] Single prescription analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_single_clinical_questions(disease_name, rx_data, clingen_context, language)
+            clinical = generate_single_clinical_questions(disease_name, rx_data, clingen_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -702,13 +841,13 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         
         if disgenet_results:
             print(f"[LLM] Using fallback enrichment data: {len(disgenet_results)} entries")
-            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, clingen_context, language)
+            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, clingen_context, language, provider)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
             
-            clinical = generate_single_clinical_questions(disease_name, disgenet_results, clingen_context, language)
+            clinical = generate_single_clinical_questions(disease_name, disgenet_results, clingen_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:

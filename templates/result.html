@@ -1804,7 +1804,8 @@
                         prescription_enrichments: prescriptionEnrichments,
                         result_id: resultsData.result_id,  // Pass result_id to save AI analysis
                         mode: resultsData.disease_gene_mode || 'union',  // which tab's AI to save
-                        language: (window.i18n && i18n.getLang) ? i18n.getLang() : 'en'
+                        language: (window.i18n && i18n.getLang) ? i18n.getLang() : 'en',
+                        provider: (window.getAiProvider ? window.getAiProvider() : 'gemini')  // top-bar AI model
                     })
                 });
                 
@@ -1850,8 +1851,9 @@
             try {
                 const id = resultsData.result_id;
                 const mode = resultsData.disease_gene_mode || 'union';
+                const prov = window.getAiProvider ? window.getAiProvider() : 'gemini';
                 const data = await (await fetch(
-                    `/api/ai-analysis/result?result_id=${encodeURIComponent(id)}&mode=${encodeURIComponent(mode)}`
+                    `/api/ai-analysis/result?result_id=${encodeURIComponent(id)}&mode=${encodeURIComponent(mode)}&provider=${encodeURIComponent(prov)}`
                 )).json();
                 if (data.has_ai_analysis) { displayAiResults(data); return; }
                 if (data.status === 'processing') { pollAiResult(attempt + 1); return; }
@@ -1863,7 +1865,14 @@
                 pollAiResult(attempt + 1);
             }
         }
-        
+
+        // Re-run the AI analysis when the user switches the AI model in the top bar.
+        // The server is provider-aware, so this regenerates with the chosen model
+        // (and replaces this tab's analysis) instead of returning the previous one.
+        document.addEventListener('aimodelchange', function () {
+            if (typeof runAiAnalysis === 'function') { aiRetriggers = 0; runAiAnalysis(); }
+        });
+
         function renderSummaryTable(tableData) {
             if (!tableData || tableData.length === 0) {
                 document.getElementById('ai-table-container').innerHTML = 
