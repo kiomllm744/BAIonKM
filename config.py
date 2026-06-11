@@ -110,7 +110,7 @@ class Config:
     # AI provider for the analysis. The user picks one per analysis in the top bar
     # (Gemini / Claude / GPT); this is only the server-side fallback default.
     # Each provider needs ITS OWN key — set whichever you intend to use.
-    AI_PROVIDER_DEFAULT = (os.environ.get('AI_PROVIDER', 'gemini') or 'gemini').strip().lower()
+    AI_PROVIDER_DEFAULT = (os.environ.get('AI_PROVIDER', 'claude') or 'claude').strip().lower()
     # Anthropic (Claude)
     ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
     CLAUDE_MODEL = os.environ.get('CLAUDE_MODEL', 'claude-sonnet-4-6')
