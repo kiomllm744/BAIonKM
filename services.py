@@ -363,8 +363,21 @@ _CLINGEN_LEVEL = {
 }
 
 
+# Generic words that appear in many unrelated disease names. Matching on these alone
+# produces false "same disease" hits -- e.g. "Dravet SYNDROME" vs "myofascial pain
+# SYNDROME", or "...DISORDER" vs "...DISORDER" -- which wrongly turns other-disease
+# ClinGen genes green ("this disease"). They are excluded from the match tokens.
+_GENERIC_DISEASE_TOKENS = {
+    'syndrome', 'syndromes', 'disease', 'diseases', 'disorder', 'disorders',
+    'deficiency', 'complex', 'related', 'type', 'autosomal', 'recessive',
+    'dominant', 'familial', 'congenital', 'hereditary', 'idiopathic',
+    'susceptibility', 'onset', 'with', 'without', 'and', 'the',
+}
+
+
 def _disease_tokens(name):
-    return {t for t in re.findall(r'[a-z0-9]+', (name or '').lower()) if len(t) > 3}
+    return {t for t in re.findall(r'[a-z0-9]+', (name or '').lower())
+            if len(t) > 3 and t not in _GENERIC_DISEASE_TOKENS}
 
 
 def _score_bucket(score):
@@ -383,8 +396,8 @@ def _clingen_validity_for(common_genes, gene_scores, diseases, gene_evidence=Non
 
     Each common gene gets either an official ClinGen classification (clinical-grade
     gene-disease validity, with the ClinGen disease named for transparency, and a
-    disease_specific flag when it matches the analysed disease) or a local
-    DisGeNET/Open-Targets score bucket as fallback.
+    disease_specific flag when it matches the analysed disease) or, when the gene is
+    not in ClinGen, an Open Targets association-score bucket as fallback.
     """
     clingen_rows = {}
     try:
@@ -442,7 +455,9 @@ def _clingen_validity_for(common_genes, gene_scores, diseases, gene_evidence=Non
             validity[gene] = {
                 'score': score,
                 'evidence': evidence,
-                'clingen': {'level': _score_bucket(score), 'source': 'disgenet'},
+                # No ClinGen entry -> bucket by the Open Targets association score
+                # (this is NOT DisGeNET; the level is purely the OT score band).
+                'clingen': {'level': _score_bucket(score), 'source': 'ot_score'},
             }
     return validity
 

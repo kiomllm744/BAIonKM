@@ -1241,9 +1241,10 @@ def delete_result(result_id):
 # generation and the worker that handles a poll disagree, the poll wrongly reports
 # "absent", and the UI shows a spurious error / re-triggers. A timestamp lets a
 # crashed generation's marker go stale and be reclaimed.
-# Above the client's max polling window (~210s) so a slow generation never goes
-# stale mid-run; only a crashed worker's marker is reclaimed (its finally never ran).
-AI_INFLIGHT_TTL_SECONDS = 300
+# Above the client's max polling window (~420s) so a slow generation (e.g. union with
+# the full, uncapped ClinGen prompt) never goes stale mid-run and get re-triggered into
+# a loop; only a crashed worker's marker is reclaimed (its finally never ran).
+AI_INFLIGHT_TTL_SECONDS = 600
 
 
 def _ai_inflight_stale_before():

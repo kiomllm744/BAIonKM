@@ -60,7 +60,7 @@ def _call_claude(prompt, json_mode, temperature, max_tokens, retries):
         try:
             print(f"[LLM] claude {model} attempt {attempt}/{retries} (prompt {len(prompt)} chars, json={json_mode})")
             r = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=body,
-                              timeout=90, verify=Config.EXTERNAL_API_VERIFY_SSL)
+                              timeout=180, verify=Config.EXTERNAL_API_VERIFY_SSL)
             if r.ok:
                 blocks = r.json().get("content") or []
                 text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
@@ -117,7 +117,7 @@ def _call_openai(prompt, json_mode, temperature, max_tokens, retries, json_array
         try:
             print(f"[LLM] gpt {model} attempt {attempt}/{retries} (prompt {len(prompt)} chars, json={json_mode})")
             r = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=body,
-                              timeout=90, verify=Config.EXTERNAL_API_VERIFY_SSL)
+                              timeout=180, verify=Config.EXTERNAL_API_VERIFY_SSL)
             if r.ok:
                 choices = r.json().get("choices") or []
                 if choices:
@@ -185,7 +185,7 @@ def get_gemini_response(prompt, json_mode=False, temperature=0.3, max_tokens=819
         for attempt in range(1, retries + 1):
             try:
                 print(f"[LLM] {model} attempt {attempt}/{retries} (prompt {len(prompt)} chars, json={json_mode})")
-                response = requests.post(url, headers=headers, json=data, timeout=90,
+                response = requests.post(url, headers=headers, json=data, timeout=180,
                                          verify=Config.EXTERNAL_API_VERIFY_SSL)
                 if response.ok:
                     candidates = response.json().get("candidates") or []
@@ -339,7 +339,7 @@ def format_enrichment_data_for_llm(enrichment_results: list, top_n: int = 10) ->
 
 def format_clingen_data_for_llm(prescriptions: list) -> str:
     """
-    Format official ClinGen validity data and clearly labeled local fallback buckets.
+    Format official ClinGen validity data and clearly labeled Open Targets score buckets.
     """
     if not prescriptions:
         return "No official ClinGen validity data available."
@@ -390,10 +390,10 @@ def format_clingen_data_for_llm(prescriptions: list) -> str:
         if fallback_genes:
             fallback_genes.sort(key=lambda x: x[1], reverse=True)
             fallback_str = ", ".join([
-                f"{gene} ({level} bucket, score: {score}{_ev(evidence)})"
-                for gene, score, level, evidence in fallback_genes[:12]
+                f"{gene} (Open Targets score bucket: {level}, score: {score}{_ev(evidence)})"
+                for gene, score, level, evidence in fallback_genes
             ])
-            lines.append(f"  * **Not ClinGen - local fallback only**: {fallback_str}")
+            lines.append(f"  * **Not in ClinGen — Open Targets association-score only**: {fallback_str}")
         
         if not has_official_genes and not fallback_genes:
             lines.append("  No common genes or validity data found.")
@@ -401,12 +401,12 @@ def format_clingen_data_for_llm(prescriptions: list) -> str:
     if official_count == 0:
         lines.insert(
             0,
-            "No official ClinGen validity matches were found. Any listed fallback buckets are local DisGeNET score buckets, not ClinGen evidence."
+            "No official ClinGen validity matches were found. Any listed buckets are Open Targets association-score buckets (no ClinGen entry), not ClinGen evidence."
         )
     else:
         lines.insert(
             0,
-            f"Official ClinGen matches found: {official_count}. Local fallback-only genes: {fallback_count}."
+            f"Official ClinGen matches found: {official_count}. Genes not in ClinGen (Open Targets score only): {fallback_count}."
         )
                 
     return "\n".join(lines)
@@ -469,13 +469,13 @@ def generate_comparative_analysis(disease_name: str, prescription_data: dict, cl
     if clingen_context and "Official ClinGen matches found" in clingen_context:
         clingen_section = f"""
 ### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-The following official ClinGen Gene-Disease Validity data has been matched to common target genes. Items labeled "Not ClinGen" are local DisGeNET score buckets only and must be treated as low-confidence fallback context:
+The following official ClinGen Gene-Disease Validity data has been matched to common target genes. Items shown as "Open Targets score bucket" have NO ClinGen entry (their level is just the Open Targets association score) and must be treated as low-confidence context:
 
 {clingen_context}
 
 CRITICAL MOA REASONING RULES:
 1. **Prioritize Official ClinGen Targets**: Base primary therapeutic mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets only.
-2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Not ClinGen" DisGeNET score buckets as speculative or low-confidence associations only.
+2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Open Targets score bucket" (non-ClinGen) genes as speculative or low-confidence associations only.
 3. **Clinical Integration**: Explain how the high-confidence targets interact with standard pathological pathways of {disease_name}.
 """
     
@@ -539,13 +539,13 @@ def generate_clinical_questions(disease_name: str, prescription_data: dict, clin
     if clingen_context and "Official ClinGen matches found" in clingen_context:
         clingen_section = f"""
 ### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items labeled "Not ClinGen" are local DisGeNET fallback buckets only:
+To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items shown as "Open Targets score bucket" have no ClinGen entry:
 
 {clingen_context}
 
 CRITICAL DIAGNOSTIC QUESTION RULES:
 1. Focus questions on clinical features or comorbidities associated with official ClinGen **Definitive** and **Strong** gene targets.
-2. Avoid formulating primary screening questions around pathways driven solely by **Limited**, weak, or "Not ClinGen" fallback targets.
+2. Avoid formulating primary screening questions around pathways driven solely by **Limited**, weak, or non-ClinGen (Open Targets score) targets.
 """
     
     prompt = f"""You are a senior clinical diagnostician. Your task is to analyze the provided disease groups and generate a structured clinical interview guide.
@@ -622,13 +622,13 @@ def generate_single_prescription_analysis(disease_name: str, enrichment_data: li
     if clingen_context and "Official ClinGen matches found" in clingen_context:
         clingen_section = f"""
 ### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-The following official ClinGen Gene-Disease Validity data has been matched to target genes. Items labeled "Not ClinGen" are local DisGeNET score buckets only:
+The following official ClinGen Gene-Disease Validity data has been matched to target genes. Items shown as "Open Targets score bucket" have no ClinGen entry (level is just the Open Targets score):
 
 {clingen_context}
 
 CRITICAL MOA REASONING RULES:
 1. **Prioritize Official ClinGen Targets**: Base mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets.
-2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Not ClinGen" fallback buckets as speculative or low-confidence.
+2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Open Targets score bucket" (non-ClinGen) genes as speculative or low-confidence.
 3. **Pathology Relevance**: Connect high-confidence targets explicitly to the standard pathological process of {disease_name}.
 """
     
@@ -681,13 +681,13 @@ def generate_single_clinical_questions(disease_name: str, enrichment_data: list,
     if clingen_context and "Official ClinGen matches found" in clingen_context:
         clingen_section = f"""
 ### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items labeled "Not ClinGen" are local DisGeNET fallback buckets only:
+To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items shown as "Open Targets score bucket" have no ClinGen entry:
 
 {clingen_context}
 
 CRITICAL DIAGNOSTIC QUESTION RULES:
 1. Focus questions on clinical symptoms associated with official ClinGen **Definitive** and **Strong** targets.
-2. Avoid clinical screening questions for pathways driven only by **Limited**, weak, or "Not ClinGen" fallback targets.
+2. Avoid clinical screening questions for pathways driven only by **Limited**, weak, or non-ClinGen (Open Targets score) targets.
 """
     
     prompt = f"""You are a senior clinical diagnostician. Your task is to analyze the provided disease pathway data and generate a structured clinical interview guide.
