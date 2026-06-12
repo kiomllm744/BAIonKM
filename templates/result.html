@@ -1326,68 +1326,6 @@
             </div>
         </div>
 
-        <!-- Shared targets across prescriptions (Venn of common genes) -->
-        {% if results.prescription_venn %}
-        {% set pv = results.prescription_venn %}
-        {% set pr = pv.regions %}
-        {% set pcolors = ['#6366f1', '#8b5cf6', '#ec4899'] %}
-        {% set pletters = ['A', 'B', 'C'] %}
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-dna"></i>
-                <h2 data-i18n="result.sharedTargets">Shared Disease Targets Across Prescriptions</h2>
-            </div>
-            <div class="card-body">
-                <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
-                <div class="venn-wrap viz-collapsed">
-                    {% if pv.n == 2 %}
-                    <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
-                        <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
-                        <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: {{ pcolors[1] }};"/>
-                        <text x="92" y="117" class="venn-count">{{ pr.A }}</text>
-                        <text x="180" y="117" class="venn-count venn-core">{{ pr.AB }}</text>
-                        <text x="268" y="117" class="venn-count">{{ pr.B }}</text>
-                        <text x="42" y="50" class="venn-letter" style="fill: {{ pcolors[0] }};">A</text>
-                        <text x="318" y="50" class="venn-letter" style="fill: {{ pcolors[1] }};">B</text>
-                    </svg>
-                    {% elif pv.n == 3 %}
-                    <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
-                        <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
-                        <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ pcolors[1] }};"/>
-                        <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ pcolors[2] }};"/>
-                        <text x="92" y="116" class="venn-count">{{ pr.A }}</text>
-                        <text x="268" y="116" class="venn-count">{{ pr.B }}</text>
-                        <text x="180" y="270" class="venn-count">{{ pr.C }}</text>
-                        <text x="180" y="96" class="venn-count">{{ pr.AB }}</text>
-                        <text x="122" y="194" class="venn-count">{{ pr.AC }}</text>
-                        <text x="238" y="194" class="venn-count">{{ pr.BC }}</text>
-                        <text x="180" y="160" class="venn-count venn-core">{{ pr.ABC }}</text>
-                        <text x="48" y="58" class="venn-letter" style="fill: {{ pcolors[0] }};">A</text>
-                        <text x="312" y="58" class="venn-letter" style="fill: {{ pcolors[1] }};">B</text>
-                        <text x="180" y="336" class="venn-letter" style="fill: {{ pcolors[2] }};">C</text>
-                    </svg>
-                    {% endif %}
-                    <div class="venn-legend">
-                        {% for idx in pv.indices %}
-                        <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ pcolors[loop.index0 % 3] }};">{{ pletters[loop.index0 % 3] }}</span><span data-i18n="result.rxLabel">Prescription</span> {{ idx }} ({{ pv.sizes[loop.index0] }})</span>
-                        {% endfor %}
-                    </div>
-                    <div class="venn-note" data-i18n="result.vennNote2">Each number = disease-associated genes hit by exactly that set of prescriptions &middot; center = hit by all</div>
-                </div>
-                <div class="disease-kpis">
-                    <div class="disease-kpi">
-                        <span class="disease-kpi-value">{{ results.common_union_count }}</span>
-                        <span class="disease-kpi-label" data-i18n="result.kpiDiseaseGenesHit">Disease genes hit (any prescription)</span>
-                    </div>
-                    <div class="disease-kpi">
-                        <span class="disease-kpi-value">{{ results.gene_overlap.shared_core | length }}</span>
-                        <span class="disease-kpi-label" data-i18n="result.kpiSharedAllRx">Shared by all prescriptions</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
         <!-- AI Analysis Card -->
         <div class="card ai-card">
             <div class="card-header">
@@ -1511,6 +1449,68 @@
                         {% endif %}
                     </div>
                     {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Shared targets across prescriptions (Venn of common genes) -->
+        {% if results.prescription_venn %}
+        {% set pv = results.prescription_venn %}
+        {% set pr = pv.regions %}
+        {% set pcolors = ['#6366f1', '#8b5cf6', '#ec4899'] %}
+        {% set pletters = ['A', 'B', 'C'] %}
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-dna"></i>
+                <h2 data-i18n="result.sharedTargets">Shared Disease Targets Across Prescriptions</h2>
+            </div>
+            <div class="card-body">
+                <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                <div class="venn-wrap viz-collapsed">
+                    {% if pv.n == 2 %}
+                    <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
+                        <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
+                        <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: {{ pcolors[1] }};"/>
+                        <text x="92" y="117" class="venn-count">{{ pr.A }}</text>
+                        <text x="180" y="117" class="venn-count venn-core">{{ pr.AB }}</text>
+                        <text x="268" y="117" class="venn-count">{{ pr.B }}</text>
+                        <text x="42" y="50" class="venn-letter" style="fill: {{ pcolors[0] }};">A</text>
+                        <text x="318" y="50" class="venn-letter" style="fill: {{ pcolors[1] }};">B</text>
+                    </svg>
+                    {% elif pv.n == 3 %}
+                    <svg viewBox="0 0 360 352" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
+                        <circle cx="132" cy="132" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
+                        <circle cx="228" cy="132" r="92" class="venn-circle" style="fill: {{ pcolors[1] }};"/>
+                        <circle cx="180" cy="212" r="92" class="venn-circle" style="fill: {{ pcolors[2] }};"/>
+                        <text x="92" y="116" class="venn-count">{{ pr.A }}</text>
+                        <text x="268" y="116" class="venn-count">{{ pr.B }}</text>
+                        <text x="180" y="270" class="venn-count">{{ pr.C }}</text>
+                        <text x="180" y="96" class="venn-count">{{ pr.AB }}</text>
+                        <text x="122" y="194" class="venn-count">{{ pr.AC }}</text>
+                        <text x="238" y="194" class="venn-count">{{ pr.BC }}</text>
+                        <text x="180" y="160" class="venn-count venn-core">{{ pr.ABC }}</text>
+                        <text x="48" y="58" class="venn-letter" style="fill: {{ pcolors[0] }};">A</text>
+                        <text x="312" y="58" class="venn-letter" style="fill: {{ pcolors[1] }};">B</text>
+                        <text x="180" y="336" class="venn-letter" style="fill: {{ pcolors[2] }};">C</text>
+                    </svg>
+                    {% endif %}
+                    <div class="venn-legend">
+                        {% for idx in pv.indices %}
+                        <span class="venn-legend-item"><span class="venn-legend-letter" style="background: {{ pcolors[loop.index0 % 3] }};">{{ pletters[loop.index0 % 3] }}</span><span data-i18n="result.rxLabel">Prescription</span> {{ idx }} ({{ pv.sizes[loop.index0] }})</span>
+                        {% endfor %}
+                    </div>
+                    <div class="venn-note" data-i18n="result.vennNote2">Each number = disease-associated genes hit by exactly that set of prescriptions &middot; center = hit by all</div>
+                </div>
+                <div class="disease-kpis">
+                    <div class="disease-kpi">
+                        <span class="disease-kpi-value">{{ results.common_union_count }}</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiDiseaseGenesHit">Disease genes hit (any prescription)</span>
+                    </div>
+                    <div class="disease-kpi">
+                        <span class="disease-kpi-value">{{ results.gene_overlap.shared_core | length }}</span>
+                        <span class="disease-kpi-label" data-i18n="result.kpiSharedAllRx">Shared by all prescriptions</span>
+                    </div>
                 </div>
             </div>
         </div>
