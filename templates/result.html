@@ -1135,8 +1135,8 @@
                 {% set v = results.venn %}
                 {% set r = v.regions %}
                 {% set used_mode = 'intersection' if results.disease_gene_mode == 'intersection' else 'union' %}
-                <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
-                <div class="venn-wrap viz-collapsed used-venn" data-hl="{{ used_mode }}">
+                <button type="button" class="viz-toggle" aria-expanded="true"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                <div class="venn-wrap used-venn" data-hl="{{ used_mode }}">
                     {% if v.n == 2 %}
                     <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease gene overlap">
                         <defs><clipPath id="rvClipB2"><circle cx="220" cy="110" r="92"/></clipPath></defs>
@@ -1257,8 +1257,8 @@
                         {% set du = results.disease_gene_count %}
                         {% set cg = prescription.common_gene_count | default(0) %}
                         {% set hg = prescription.gene_count | default(0) %}
-                        <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
-                        <div class="venn-wrap rx-venn viz-collapsed">
+                        <button type="button" class="viz-toggle" aria-expanded="true"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                        <div class="venn-wrap rx-venn">
                             <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Disease genes vs prescription genes overlap">
                                 <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: #64748b;"/>
                                 <circle cx="220" cy="110" r="92" class="venn-circle" style="fill: #8b5cf6;"/>
@@ -1466,8 +1466,8 @@
                 <h2 data-i18n="result.sharedTargets">Shared Disease Targets Across Prescriptions</h2>
             </div>
             <div class="card-body">
-                <button type="button" class="viz-toggle" aria-expanded="false"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
-                <div class="venn-wrap viz-collapsed">
+                <button type="button" class="viz-toggle" aria-expanded="true"><i class="fas fa-chevron-right viz-caret"></i> <span data-i18n="result.diagramToggle">Diagram</span></button>
+                <div class="venn-wrap">
                     {% if pv.n == 2 %}
                     <svg viewBox="0 0 360 220" class="venn-svg" role="img" aria-label="Common genes shared across prescriptions">
                         <circle cx="140" cy="110" r="92" class="venn-circle" style="fill: {{ pcolors[0] }};"/>
@@ -2068,7 +2068,7 @@
     </script>
     <script>
         // Collapsible Venn diagrams: each .viz-toggle controls the next .venn-wrap sibling.
-        // Diagrams render collapsed by default (class viz-collapsed); clicking expands them.
+        // Diagrams render EXPANDED by default; clicking toggles viz-collapsed to hide/show.
         document.addEventListener('click', function(e){
             var btn = e.target.closest('.viz-toggle');
             if (!btn) return;
