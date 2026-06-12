@@ -160,11 +160,15 @@ def search_herb_genes_batch(herb_names):
         for herbName, gene in herb_records:
             found_herbs.add(herbName.lower())
             gene_symbols.append(gene)
-        
+
         # Find missing herbs
         missing_herbs = [herb_names_map[h] for h in herb_names_lower if h not in found_herbs]
-        
-        return gene_symbols, missing_herbs
+
+        # De-duplicate: the herbs table is at the (herb, compound, gene) level, so the
+        # same gene appears once per compound (and once per herb). Return UNIQUE gene
+        # symbols (dropping any empty/None) so gene_count / the Venn reflect the real
+        # number of distinct herb-target genes, not the raw row count.
+        return sorted({g for g in gene_symbols if g}), missing_herbs
     finally:
         session.close()
 
