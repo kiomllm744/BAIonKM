@@ -337,78 +337,68 @@ def format_enrichment_data_for_llm(enrichment_results: list, top_n: int = 10) ->
     return "\n".join(lines)
 
 
-def format_clingen_data_for_llm(prescriptions: list) -> str:
-    """
-    Format official ClinGen validity data and clearly labeled Open Targets score buckets.
+def format_targets_for_llm(prescriptions, strong_n=10, moderate_n=10):
+    """Open-Targets-ONLY target-gene section for the prompt (ClinGen removed).
+
+    For each prescription, rank its disease-relevant ("common") genes by Open Targets
+    association score (desc) and show two small tiers:
+      - "Strongest": up to `strong_n` genes with score >= 0.4; if fewer than that exist,
+        top up with the next-highest genes (cascading DOWN) until the tier is full.
+      - "Next": up to `moderate_n` of the remaining genes with score in [0.2, 0.4);
+        cascade DOWN to weaker genes if fewer exist.
+    The rest are summarised as a count. This keeps the prompt small and roughly constant
+    for any mode (intersection / union / both) since union's long low-score tail is dropped.
     """
     if not prescriptions:
-        return "No official ClinGen validity data available."
-    
+        return "No target data available."
     lines = []
-    official_count = 0
-    fallback_count = 0
     for rx in prescriptions:
         rx_idx = rx.get('index', '?')
         herbs = ", ".join(rx.get('herbs', []))
         lines.append(f"### Prescription {rx_idx} (Herbs: {herbs})")
-        
-        validity_map = rx.get('common_genes_validity', {})
-        if not validity_map:
-            lines.append("  No common genes or validity data found.")
+        vmap = rx.get('common_genes_validity', {}) or {}
+        if not vmap:
+            lines.append("  No disease-relevant target genes found.")
             continue
-        
-        official_by_level = {}
-        fallback_genes = []
-        
-        for gene, info in validity_map.items():
-            clingen = info.get('clingen', {})
-            level = clingen.get('level', 'Limited')
-            score = info.get('score', 0.0)
-            evidence = info.get('evidence', [])
-            if clingen.get('source') == 'clingen':
-                official_by_level.setdefault(level, []).append((gene, score, clingen, evidence))
-                official_count += 1
-            else:
-                fallback_genes.append((gene, score, level, evidence))
-                fallback_count += 1
-
-        def _ev(evidence):
-            return f", evidence: {'/'.join(evidence)}" if evidence else ""
-
-        has_official_genes = False
-        for level in ['Definitive', 'Strong', 'Moderate', 'Limited']:
-            genes = official_by_level.get(level, [])
-            if genes:
-                has_official_genes = True
-                genes.sort(key=lambda x: x[1], reverse=True)
-                genes_str = ", ".join([
-                    f"{gene} (ClinGen: {clingen.get('classification', level)}, score: {score}{_ev(evidence)})"
-                    for gene, score, clingen, evidence in genes
-                ])
-                lines.append(f"  * **Official ClinGen {level} targets**: {genes_str}")
-
-        if fallback_genes:
-            fallback_genes.sort(key=lambda x: x[1], reverse=True)
-            fallback_str = ", ".join([
-                f"{gene} (Open Targets score bucket: {level}, score: {score}{_ev(evidence)})"
-                for gene, score, level, evidence in fallback_genes
-            ])
-            lines.append(f"  * **Not in ClinGen — Open Targets association-score only**: {fallback_str}")
-        
-        if not has_official_genes and not fallback_genes:
-            lines.append("  No common genes or validity data found.")
-    
-    if official_count == 0:
-        lines.insert(
-            0,
-            "No official ClinGen validity matches were found. Any listed buckets are Open Targets association-score buckets (no ClinGen entry), not ClinGen evidence."
+        # (gene, OT score, evidence) ranked by score desc, then name
+        ranked = sorted(
+            ((g, round(v.get('score', 0.0) or 0.0, 4), v.get('evidence', []) or [])
+             for g, v in vmap.items()),
+            key=lambda x: (-x[1], x[0]),
         )
-    else:
-        lines.insert(
-            0,
-            f"Official ClinGen matches found: {official_count}. Genes not in ClinGen (Open Targets score only): {fallback_count}."
-        )
-                
+        strong = [x for x in ranked if x[1] >= 0.4][:strong_n]
+        if len(strong) < strong_n:                       # cascade down: next-highest <0.4
+            chosen = set(g for g, _, _ in strong)
+            for x in ranked:
+                if x[0] not in chosen and x[1] < 0.4:
+                    strong.append(x); chosen.add(x[0])
+                    if len(strong) == strong_n:
+                        break
+        used = set(g for g, _, _ in strong)
+        moderate = [x for x in ranked if x[0] not in used and 0.2 <= x[1] < 0.4][:moderate_n]
+        if len(moderate) < moderate_n:                   # cascade down to weaker genes
+            chosen = used | set(g for g, _, _ in moderate)
+            for x in ranked:
+                if x[0] not in chosen and x[1] < 0.2:
+                    moderate.append(x); chosen.add(x[0])
+                    if len(moderate) == moderate_n:
+                        break
+
+        def _fmt(group):
+            return ", ".join(
+                f"{g} (OT score: {s}{', evidence: ' + '/'.join(ev) if ev else ''})"
+                for g, s, ev in group
+            )
+        shown = len(strong) + len(moderate)
+        lines.append(f"  Total disease-relevant target genes: {len(ranked)} "
+                     f"(showing the top {shown} by Open Targets association score)")
+        if strong:
+            lines.append(f"  * **Strongest targets** (highest Open Targets score first): {_fmt(strong)}")
+        if moderate:
+            lines.append(f"  * **Next targets** (Open Targets score): {_fmt(moderate)}")
+        omitted = len(ranked) - shown
+        if omitted > 0:
+            lines.append(f"  * (+{omitted} more lower-scored targets omitted to keep the prompt focused)")
     return "\n".join(lines)
 
 
@@ -446,7 +436,7 @@ def _feature_rows_instruction(language):
             f'others: "{a}", "{b}", "{c}".')
 
 
-def generate_comparative_analysis(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> dict:
+def generate_comparative_analysis(disease_name: str, prescription_data: dict, targets_context: str = None, language: str = 'en', provider: str = 'gemini') -> dict:
     """
     Generate comparative analysis with summary table and detailed analysis.
     Uses the exact prompt format specified.
@@ -465,18 +455,21 @@ def generate_comparative_analysis(disease_name: str, prescription_data: dict, cl
     group_columns = ", ".join([f'"Group {i}"' for i in range(1, num_groups + 1)])
     group_names = ", ".join([f"Group {i}" for i in range(1, num_groups + 1)])
     
-    clingen_section = ""
-    if clingen_context and "Official ClinGen matches found" in clingen_context:
-        clingen_section = f"""
-### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-The following official ClinGen Gene-Disease Validity data has been matched to common target genes. Items shown as "Open Targets score bucket" have NO ClinGen entry (their level is just the Open Targets association score) and must be treated as low-confidence context:
+    targets_section = ""
+    if targets_context:
+        targets_section = f"""
+### DISEASE-RELEVANT TARGET GENES (Open Targets)
+The prescription's disease-relevant ("common") genes, ranked by Open Targets association
+score (0-1) -- how strongly each gene is linked to {disease_name}. Higher = more
+disease-relevant. The score aggregates many evidence types; it is an association strength,
+not proof of causation.
 
-{clingen_context}
+{targets_context}
 
-CRITICAL MOA REASONING RULES:
-1. **Prioritize Official ClinGen Targets**: Base primary therapeutic mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets only.
-2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Open Targets score bucket" (non-ClinGen) genes as speculative or low-confidence associations only.
-3. **Clinical Integration**: Explain how the high-confidence targets interact with standard pathological pathways of {disease_name}.
+TARGET REASONING RULES:
+1. Base the primary mechanism hypotheses on the highest-scored targets (the top of each list).
+2. Treat low-scored targets as weak or speculative associations.
+3. Explain how the high-scored targets connect to the standard pathology of {disease_name}.
 """
     
     prompt = f"""You are an expert Research Scientist in pathology and bioinformatics. Your task is to perform a comparative analysis of multiple disease clusters provided by the user.
@@ -484,7 +477,7 @@ CRITICAL MOA REASONING RULES:
 The user is studying **{disease_name}** with the following enrichment analysis results:
 
 {all_groups}
-{clingen_section}
+{targets_section}
 
 You must return your response in a strict JSON format with exactly two keys: "summary_table" and "detailed_analysis".
 
@@ -520,7 +513,7 @@ Do not include any text outside the JSON object."""
     return None
 
 
-def generate_clinical_questions(disease_name: str, prescription_data: dict, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> list:
+def generate_clinical_questions(disease_name: str, prescription_data: dict, targets_context: str = None, language: str = 'en', provider: str = 'gemini') -> list:
     """
     Generate clinical interview questions for diagnosis.
     Returns a structured JSON array with group cards.
@@ -535,17 +528,18 @@ def generate_clinical_questions(disease_name: str, prescription_data: dict, clin
     
     all_groups = "\n\n".join(groups_text)
     
-    clingen_section = ""
-    if clingen_context and "Official ClinGen matches found" in clingen_context:
-        clingen_section = f"""
-### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items shown as "Open Targets score bucket" have no ClinGen entry:
+    targets_section = ""
+    if targets_context:
+        targets_section = f"""
+### DISEASE-RELEVANT TARGET GENES (Open Targets)
+The disease-relevant ("common") genes for each group, ranked by Open Targets association
+score (0-1) -- how strongly each gene is linked to {disease_name}. Higher = more relevant.
 
-{clingen_context}
+{targets_context}
 
-CRITICAL DIAGNOSTIC QUESTION RULES:
-1. Focus questions on clinical features or comorbidities associated with official ClinGen **Definitive** and **Strong** gene targets.
-2. Avoid formulating primary screening questions around pathways driven solely by **Limited**, weak, or non-ClinGen (Open Targets score) targets.
+DIAGNOSTIC QUESTION RULES:
+1. Focus questions on clinical features or comorbidities of the highest-scored targets.
+2. Avoid building primary screening questions around low-scored targets.
 """
     
     prompt = f"""You are a senior clinical diagnostician. Your task is to analyze the provided disease groups and generate a structured clinical interview guide.
@@ -553,7 +547,7 @@ CRITICAL DIAGNOSTIC QUESTION RULES:
 The patient is being evaluated for **{disease_name}**. Here are the enrichment analysis results showing associated conditions and pathways:
 
 {all_groups}
-{clingen_section}
+{targets_section}
 
 You must return your response in a strict JSON format. 
 The JSON must be a single list (array) of objects, where each object represents one disease group.
@@ -612,31 +606,33 @@ def extract_json_array_from_response(text: str) -> list:
         return None
 
 
-def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> dict:
+def generate_single_prescription_analysis(disease_name: str, enrichment_data: list, targets_context: str = None, language: str = 'en', provider: str = 'gemini') -> dict:
     """
     Generate analysis for a single prescription (when only one Rx is provided).
     """
     formatted_data = format_enrichment_data_for_llm(enrichment_data)
     
-    clingen_section = ""
-    if clingen_context and "Official ClinGen matches found" in clingen_context:
-        clingen_section = f"""
-### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-The following official ClinGen Gene-Disease Validity data has been matched to target genes. Items shown as "Open Targets score bucket" have no ClinGen entry (level is just the Open Targets score):
+    targets_section = ""
+    if targets_context:
+        targets_section = f"""
+### DISEASE-RELEVANT TARGET GENES (Open Targets)
+The prescription's disease-relevant ("common") genes, ranked by Open Targets association
+score (0-1) -- how strongly each gene is linked to {disease_name}. Higher = more relevant.
+The score is an association strength, not proof of causation.
 
-{clingen_context}
+{targets_context}
 
-CRITICAL MOA REASONING RULES:
-1. **Prioritize Official ClinGen Targets**: Base mechanism hypotheses on official ClinGen 'Definitive' and 'Strong' targets.
-2. **Exercise Skepticism on Weak or Fallback Targets**: Treat 'Limited', 'Moderate', and all "Open Targets score bucket" (non-ClinGen) genes as speculative or low-confidence.
-3. **Pathology Relevance**: Connect high-confidence targets explicitly to the standard pathological process of {disease_name}.
+TARGET REASONING RULES:
+1. Base the mechanism hypotheses on the highest-scored targets.
+2. Treat low-scored targets as weak or speculative.
+3. Connect the high-scored targets to the standard pathology of {disease_name}.
 """
     
     prompt = f"""You are an expert Research Scientist in pathology and bioinformatics. Analyze the gene enrichment results for a traditional Chinese medicine prescription targeting **{disease_name}**.
 
 Enrichment Results:
 {formatted_data}
-{clingen_section}
+{targets_section}
 
 You must return your response in a strict JSON format with exactly two keys: "summary_table" and "detailed_analysis".
 
@@ -670,24 +666,25 @@ Do not include any text outside the JSON object."""
     return None
 
 
-def generate_single_clinical_questions(disease_name: str, enrichment_data: list, clingen_context: str = None, language: str = 'en', provider: str = 'gemini') -> list:
+def generate_single_clinical_questions(disease_name: str, enrichment_data: list, targets_context: str = None, language: str = 'en', provider: str = 'gemini') -> list:
     """
     Generate clinical questions for a single prescription.
     Returns a structured JSON array with one group card.
     """
     formatted_data = format_enrichment_data_for_llm(enrichment_data, top_n=8)
     
-    clingen_section = ""
-    if clingen_context and "Official ClinGen matches found" in clingen_context:
-        clingen_section = f"""
-### CLINICAL GENE VALIDITY EVIDENCE (CLINGEN)
-To ensure questions address clinically validated pathology, target your questions toward pathways driven by official ClinGen validated genes. Items shown as "Open Targets score bucket" have no ClinGen entry:
+    targets_section = ""
+    if targets_context:
+        targets_section = f"""
+### DISEASE-RELEVANT TARGET GENES (Open Targets)
+The disease-relevant ("common") genes, ranked by Open Targets association score (0-1) --
+how strongly each gene is linked to {disease_name}. Higher = more relevant.
 
-{clingen_context}
+{targets_context}
 
-CRITICAL DIAGNOSTIC QUESTION RULES:
-1. Focus questions on clinical symptoms associated with official ClinGen **Definitive** and **Strong** targets.
-2. Avoid clinical screening questions for pathways driven only by **Limited**, weak, or non-ClinGen (Open Targets score) targets.
+DIAGNOSTIC QUESTION RULES:
+1. Focus questions on clinical symptoms of the highest-scored targets.
+2. Avoid screening questions for low-scored targets.
 """
     
     prompt = f"""You are a senior clinical diagnostician. Your task is to analyze the provided disease pathway data and generate a structured clinical interview guide.
@@ -695,7 +692,7 @@ CRITICAL DIAGNOSTIC QUESTION RULES:
 The patient is being evaluated for **{disease_name}**. Here are the enrichment analysis results:
 
 {formatted_data}
-{clingen_section}
+{targets_section}
 
 You must return your response in a strict JSON format. 
 The JSON must be a single list (array) containing exactly ONE object representing this analysis.
@@ -774,10 +771,10 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
     prescription_enrichments = results.get('prescription_enrichments', {})
     print(f"[LLM] Found {len(prescription_enrichments)} prescription enrichments")
     
-    # Extract ClinGen validity context
+    # Build the Open-Targets-only target-gene context
     prescriptions = results.get('prescriptions', [])
-    clingen_context = format_clingen_data_for_llm(prescriptions)
-    print(f"[LLM] Prepared ClinGen validity context: {len(clingen_context)} chars")
+    targets_context = format_targets_for_llm(prescriptions)   # OT-only disease-relevant target genes
+    print(f"[LLM] Prepared target-gene context: {len(targets_context)} chars")
     
     # Debug: Print structure of enrichment data
     for rx_key, rx_data in prescription_enrichments.items():
@@ -796,7 +793,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         if prescription_data:
             print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
             # Generate comparative analysis
-            analysis = generate_comparative_analysis(disease_name, prescription_data, clingen_context, language, provider)
+            analysis = generate_comparative_analysis(disease_name, prescription_data, targets_context, language, provider)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -807,7 +804,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
                 print("[LLM] Comparative analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_clinical_questions(disease_name, prescription_data, clingen_context, language, provider)
+            clinical = generate_clinical_questions(disease_name, prescription_data, targets_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -822,7 +819,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         
         if rx_data:
             # Generate single analysis
-            analysis = generate_single_prescription_analysis(disease_name, rx_data, clingen_context, language, provider)
+            analysis = generate_single_prescription_analysis(disease_name, rx_data, targets_context, language, provider)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -832,7 +829,7 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
                 print("[LLM] Single prescription analysis returned None")
             
             # Generate clinical questions
-            clinical = generate_single_clinical_questions(disease_name, rx_data, clingen_context, language, provider)
+            clinical = generate_single_clinical_questions(disease_name, rx_data, targets_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -849,13 +846,13 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         
         if disgenet_results:
             print(f"[LLM] Using fallback enrichment data: {len(disgenet_results)} entries")
-            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, clingen_context, language, provider)
+            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, targets_context, language, provider)
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
             
-            clinical = generate_single_clinical_questions(disease_name, disgenet_results, clingen_context, language, provider)
+            clinical = generate_single_clinical_questions(disease_name, disgenet_results, targets_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:

@@ -355,114 +355,30 @@ def process_enrichment_data(data, enrichment_data, library=None):
                 })
 
 
-# ClinGen classification ranking + mapping to the levels the LLM formatter uses.
-_CLINGEN_RANK = {
-    'Definitive': 6, 'Strong': 5, 'Moderate': 4, 'Limited': 3,
-    'Disputed': 2, 'Refuted': 1, 'No Known Disease Relationship': 0,
-}
-_CLINGEN_LEVEL = {
-    'Definitive': 'Definitive', 'Strong': 'Strong', 'Moderate': 'Moderate',
-    'Limited': 'Limited', 'Disputed': 'Limited', 'Refuted': 'Limited',
-    'No Known Disease Relationship': 'Limited',
-}
-
-
-# Generic words that appear in many unrelated disease names. Matching on these alone
-# produces false "same disease" hits -- e.g. "Dravet SYNDROME" vs "myofascial pain
-# SYNDROME", or "...DISORDER" vs "...DISORDER" -- which wrongly turns other-disease
-# ClinGen genes green ("this disease"). They are excluded from the match tokens.
-_GENERIC_DISEASE_TOKENS = {
-    'syndrome', 'syndromes', 'disease', 'diseases', 'disorder', 'disorders',
-    'deficiency', 'complex', 'related', 'type', 'autosomal', 'recessive',
-    'dominant', 'familial', 'congenital', 'hereditary', 'idiopathic',
-    'susceptibility', 'onset', 'with', 'without', 'and', 'the',
-}
-
-
-def _disease_tokens(name):
-    return {t for t in re.findall(r'[a-z0-9]+', (name or '').lower())
-            if len(t) > 3 and t not in _GENERIC_DISEASE_TOKENS}
-
-
 def _score_bucket(score):
+    """Open Targets association-score tier (drives gene-chip colour + the prompt)."""
     if score >= 0.4:
         return 'Strong'
     if score >= 0.2:
         return 'Moderate'
-    return 'Limited'
+    return 'Weak'
 
 
-def _clingen_validity_for(common_genes, gene_scores, diseases, gene_evidence=None):
-    """Build the common_genes_validity map consumed by the LLM ClinGen formatter.
+def _target_validity_for(common_genes, gene_scores, gene_evidence=None):
+    """Build the common_genes_validity map -- Open Targets ONLY (ClinGen removed).
 
-    `diseases` is a list of {'name', 'efo_id'} (one or several). A ClinGen entry
-    is "disease_specific" if it matches ANY of the analysed diseases.
-
-    Each common gene gets either an official ClinGen classification (clinical-grade
-    gene-disease validity, with the ClinGen disease named for transparency, and a
-    disease_specific flag when it matches the analysed disease) or, when the gene is
-    not in ClinGen, an Open Targets association-score bucket as fallback.
+    Each common gene carries its Open Targets association score (0-1, for the analysed
+    disease), the evidence datatypes, and a tier (Strong >=0.4 / Moderate >=0.2 / Weak).
     """
-    clingen_rows = {}
-    try:
-        if common_genes and 'clingen_validity' in sa_inspect(engine).get_table_names():
-            session = Session()
-            try:
-                genes = list(common_genes)
-                placeholders = ','.join(f':g{i}' for i in range(len(genes)))
-                params = {f'g{i}': g for i, g in enumerate(genes)}
-                res = session.execute(
-                    text(f"SELECT gene, disease, mondo_id, classification "
-                         f"FROM clingen_validity WHERE gene IN ({placeholders})"),
-                    params,
-                )
-                for gene, disease, mondo, classification in res:
-                    clingen_rows.setdefault(gene, []).append((disease, mondo, classification))
-            finally:
-                session.close()
-    except Exception as exc:
-        print(f"[ClinGen] lookup failed: {exc}")
-
     gene_evidence = gene_evidence or {}
-    match_efos = {(d.get('efo_id') or '') for d in (diseases or []) if d.get('efo_id')}
-    match_tokens = set()
-    for d in (diseases or []):
-        match_tokens |= _disease_tokens(d.get('name'))
     validity = {}
     for gene in common_genes:
         score = round(gene_scores.get(gene, 0.0), 4)
-        evidence = gene_evidence.get(gene, [])
-        rows = clingen_rows.get(gene)
-        if rows:
-            def is_match(mondo, label):
-                if mondo and mondo in match_efos:
-                    return True
-                return bool(match_tokens & _disease_tokens(label))
-            matched = [(d, m, c) for (d, m, c) in rows if is_match(m, d)]
-            pool = matched or rows
-            disease, mondo, classification = max(pool, key=lambda r: _CLINGEN_RANK.get(r[2], 0))
-            ds = bool(matched)
-            text_label = f"{classification} for {disease}" if disease else classification
-            if not ds:
-                text_label += " [different disease]"
-            validity[gene] = {
-                'score': score,
-                'evidence': evidence,
-                'clingen': {
-                    'level': _CLINGEN_LEVEL.get(classification, 'Limited'),
-                    'classification': text_label,
-                    'source': 'clingen',
-                    'disease_specific': ds,
-                },
-            }
-        else:
-            validity[gene] = {
-                'score': score,
-                'evidence': evidence,
-                # No ClinGen entry -> bucket by the Open Targets association score
-                # (this is NOT DisGeNET; the level is purely the OT score band).
-                'clingen': {'level': _score_bucket(score), 'source': 'ot_score'},
-            }
+        validity[gene] = {
+            'score': score,
+            'evidence': gene_evidence.get(gene, []),
+            'tier': _score_bucket(score),
+        }
     return validity
 
 
@@ -577,7 +493,6 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
     else:
         disease_genes = union_genes                  # union (also used for 1 disease)
     results['disease_gene_count'] = len(disease_genes)
-    match_diseases = [{'name': r['name'], 'efo_id': r['efo_id']} for r in resolved]
 
     # Venn region counts for the gene sets used (2 or 3 diseases) -> overlap diagram
     results['venn'] = None
@@ -639,28 +554,13 @@ def analyze_prescriptions(disease_name, herb_lists, efo_id=None, diseases=None,
 
     for i, genes in enumerate(common_genes):
         results['prescriptions'][i]['common_gene_count'] = len(genes)
-        # ClinGen clinical-validity overlay first -- it defines the display groups
-        # (this-disease / other-disease / other) that drive BOTH the chip colours
-        # and the ordering below.
-        validity = _clingen_validity_for(genes, gene_scores, match_diseases, gene_evidence)
+        # Open Targets association-score overlay (score + evidence + Strong/Moderate/Weak
+        # tier) -- drives both the gene-chip colours and the ordering below.
+        validity = _target_validity_for(genes, gene_scores, gene_evidence)
 
-        def _group_rank(g, _validity=validity):
-            # Mirror the result.html chip-colour logic exactly so each colour
-            # category forms one contiguous block:
-            #   0 = ClinGen-validated for THIS disease (green, most valid)
-            #   1 = ClinGen-validated for another disease (blue)
-            #   2 = no ClinGen (other, slate)
-            cg = (_validity.get(g) or {}).get('clingen') or {}
-            is_clingen = cg.get('source') == 'clingen'
-            if is_clingen and cg.get('disease_specific'):
-                return 0
-            if is_clingen:
-                return 1
-            return 2
-
-        # Order by validity GROUP first, then Open Targets score (desc) within each
-        # group, then gene name -- most clinically-valid genes first, OT-ranked.
-        ordered = sorted(genes, key=lambda g: (_group_rank(g), -gene_scores.get(g, 0.0), g))
+        # Order by Open Targets association score (desc), then gene name -- most
+        # disease-relevant targets first.
+        ordered = sorted(genes, key=lambda g: (-gene_scores.get(g, 0.0), g))
         results['prescriptions'][i]['common_genes'] = ordered
         results['prescriptions'][i]['common_genes_scores'] = {
             gene: round(gene_scores.get(gene, 0.0), 4) for gene in ordered

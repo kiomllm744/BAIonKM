@@ -1292,10 +1292,10 @@
                                 <i class="fas fa-dna" style="color: #6366f1;"></i> <span data-i18n="result.intersectingTargets">Intersecting Gene Targets</span> ({{ prescription.common_gene_count | default(0) }})
                             </summary>
                             <div style="font-size: 0.68rem; color: #9ca3af; margin-bottom: 8px;">
-                                <span style="color:#16a34a;">&#9679;</span> <span data-i18n="result.legendClinGenThis">ClinGen-validated (this disease)</span> &nbsp;
-                                <span style="color:#2563eb;">&#9679;</span> <span data-i18n="result.legendClinGenOther">ClinGen (other disease)</span> &nbsp;
-                                <span style="color:#64748b;">&#9679;</span> <span data-i18n="result.legendOther">other</span>
-                                {% if results.diseases and results.diseases | length > 1 %}
+                                <span style="color:#16a34a;">&#9679;</span> <span data-i18n="result.legendStrong">Strong (OT &ge;0.4)</span> &nbsp;
+                                <span style="color:#2563eb;">&#9679;</span> <span data-i18n="result.legendModerate">Moderate (0.2&ndash;0.4)</span> &nbsp;
+                                <span style="color:#dc2626;">&#9679;</span> <span data-i18n="result.legendWeak">Weak (&lt;0.2)</span>
+                                {% if results.disease_gene_mode == 'union' and results.diseases and results.diseases | length > 1 %}
                                 &nbsp; <span style="display:inline-block;width:9px;height:9px;border-radius:2px;box-shadow:0 0 0 2px #fbbf24;"></span> <span data-i18n="result.legendSharedAll">shared by all diseases</span>
                                 {% endif %}
                                 &nbsp;&middot; <span data-i18n="result.hoverEvidence">hover a gene for evidence</span>
@@ -1305,13 +1305,13 @@
                                     {% for gene in prescription.common_genes %}
                                         {% set v = (prescription.common_genes_validity or {}).get(gene) %}
                                         {% set sc = (prescription.common_genes_scores or {}).get(gene) %}
-                                        {% set cg = v.clingen if v else None %}
-                                        {% set is_clingen = cg and cg.get('source') == 'clingen' %}
-                                        {% set ds = cg and cg.get('disease_specific') %}
+                                        {% set tier = v.tier if v else None %}
+                                        {% set strong = tier == 'Strong' %}
+                                        {% set moderate = tier == 'Moderate' %}
                                         {% set dz = (prescription.common_genes_diseases or {}).get(gene) %}
-                                        {% set core = results.shared_core_genes and gene in results.shared_core_genes %}
-                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: {% if ds %}#f0fdf4{% elif is_clingen %}#eff6ff{% else %}#f8fafc{% endif %}; border: 1px solid {% if ds %}#86efac{% elif is_clingen %}#bfdbfe{% else %}#cbd5e1{% endif %};{% if core %} box-shadow: 0 0 0 2px #fbbf24;{% endif %} color: #4338ca; cursor: default;" title="{{ gene }}{% if sc %} &mdash; OT score {{ sc }}{% endif %}{% if is_clingen %} &mdash; ClinGen: {{ cg.get('classification') }}{% endif %}{% if v and v.evidence %} &mdash; evidence: {{ v.evidence | join('/') }}{% endif %}{% if dz %} &mdash; linked to: {{ dz | join(', ') }}{% endif %}{% if core %} (shared by all selected diseases){% endif %}">
-                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: {% if ds %}#16a34a{% elif is_clingen %}#2563eb{% else %}#64748b{% endif %};"></i>
+                                        {% set core = results.disease_gene_mode == 'union' and results.diseases and results.diseases | length > 1 and results.shared_core_genes and gene in results.shared_core_genes %}
+                                        <span class="gene-tag" style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: {% if strong %}#f0fdf4{% elif moderate %}#eff6ff{% else %}#fef2f2{% endif %}; border: 1px solid {% if strong %}#86efac{% elif moderate %}#bfdbfe{% else %}#fecaca{% endif %};{% if core %} box-shadow: 0 0 0 2px #fbbf24;{% endif %} color: #4338ca; cursor: default;" title="{{ gene }}{% if sc %} &mdash; OT score {{ sc }}{% endif %}{% if tier %} ({{ tier }}){% endif %}{% if v and v.evidence %} &mdash; evidence: {{ v.evidence | join('/') }}{% endif %}{% if dz %} &mdash; linked to: {{ dz | join(', ') }}{% endif %}{% if core %} (shared by all selected diseases){% endif %}">
+                                            <i class="fas fa-circle" style="font-size: 0.35rem; color: {% if strong %}#16a34a{% elif moderate %}#2563eb{% else %}#dc2626{% endif %};"></i>
                                             <strong>{{ gene }}</strong>
                                         </span>
                                     {% endfor %}
