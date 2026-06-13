@@ -1706,11 +1706,29 @@
             document.getElementById('clinical-unavailable').style.display = 'none';
         }
 
+        // Client cache of this tab's (mode's) AI keyed by model, seeded with every
+        // model the server already has saved -> switching to an already-run model is
+        // instant (no re-generation, no overwrite).
+        var _aiCache = {};
+        function _curMode() { return (resultsData.disease_gene_mode || 'union'); }
+        function _curProvider() { return (window.getAiProvider ? window.getAiProvider() : 'gemini') || 'gemini'; }
+        function cacheAi(res) {
+            if (res && res.has_ai_analysis && res.provider) _aiCache[_curMode() + '|' + res.provider] = res;
+        }
+        function cachedAi(provider) { return _aiCache[_curMode() + '|' + provider]; }
+        (function seedAiCache() {
+            var byp = resultsData.saved_ai_by_provider || {};
+            Object.keys(byp).forEach(function (p) {
+                if (byp[p] && byp[p].has_ai_analysis) _aiCache[_curMode() + '|' + p] = byp[p];
+            });
+        })();
+
         async function checkAndRunAiAnalysis() {
-            // Saved analysis rendered server-side (history / an already-generated tab).
-            if (resultsData.saved_ai_analysis && resultsData.saved_ai_analysis.has_ai_analysis) {
-                console.log('[AI] Using saved AI analysis from history');
-                displayAiResults(resultsData.saved_ai_analysis);
+            // Saved analysis for the CURRENTLY-selected model, rendered server-side
+            // (history / an already-generated tab) -> show instantly, no fetch.
+            var seeded = (resultsData.saved_ai_by_provider || {})[_curProvider()];
+            if (seeded && seeded.has_ai_analysis) {
+                displayAiResults(seeded);
                 return;
             }
             try {
@@ -1748,6 +1766,7 @@
         }
 
         function displayAiResults(aiResults) {
+            cacheAi(aiResults);   // remember this model's run so switching back is instant
             // Hide loading states
             document.getElementById('ai-loading').style.display = 'none';
             document.getElementById('clinical-loading').style.display = 'none';
@@ -1942,7 +1961,11 @@
         // The server is provider-aware, so this regenerates with the chosen model
         // (and replaces this tab's analysis) instead of returning the previous one.
         document.addEventListener('aimodelchange', function () {
-            if (typeof runAiAnalysis === 'function') { aiRetriggers = 0; runAiAnalysis(); }
+            // If this tab's analysis was already generated with the newly-selected
+            // model, show it instantly from cache instead of re-running it.
+            var cached = cachedAi(_curProvider());
+            if (cached && cached.has_ai_analysis) { displayAiResults(cached); }
+            else if (typeof runAiAnalysis === 'function') { aiRetriggers = 0; runAiAnalysis(); }
             prewarmOtherModes();   // re-warm the other tab with the newly-selected model
         });
 

@@ -176,14 +176,21 @@ def _saved_result_data(result, tab=None):
 
     ctx['result_id'] = result.id
 
+    # Hand the client EVERY model's saved AI for this mode ({provider: ai}) so it
+    # renders the selected model instantly and can switch between already-run models
+    # without re-generating. Older blob shapes are normalized to that form.
     if result.ai_analysis_json:
         try:
             ai = json.loads(result.ai_analysis_json)
-            if isinstance(ai, dict) and 'has_ai_analysis' in ai:
-                ai = {current_mode: ai}          # legacy bare blob -> key by mode
-            ctx['saved_ai_analysis'] = ai.get(current_mode) if isinstance(ai, dict) else None
+            if isinstance(ai, dict) and 'has_ai_analysis' in ai:          # legacy bare blob
+                slot = {(ai.get('provider') or 'gemini'): ai}
+            else:
+                slot = ai.get(current_mode) if isinstance(ai, dict) else None
+                if isinstance(slot, dict) and 'has_ai_analysis' in slot:  # old per-mode single
+                    slot = {(slot.get('provider') or 'gemini'): slot}
+            ctx['saved_ai_by_provider'] = slot if isinstance(slot, dict) else {}
         except Exception:
-            ctx['saved_ai_analysis'] = None
+            ctx['saved_ai_by_provider'] = {}
     return ctx
 
 
@@ -1301,6 +1308,35 @@ def view_last_result():
         db_session.close()
 
 
+def _ai_models_in(blob_json):
+    """List the AI models (providers) that have a completed analysis on a result,
+    across all modes and all blob shapes. Used for the history model badge."""
+    try:
+        blob = json.loads(blob_json) if blob_json else None
+    except Exception:
+        return []
+    if not isinstance(blob, dict):
+        return []
+    models = set()
+
+    def _add(entry):
+        if isinstance(entry, dict) and entry.get('has_ai_analysis'):
+            models.add(entry.get('provider') or 'gemini')
+
+    if 'has_ai_analysis' in blob:                 # legacy bare blob
+        _add(blob)
+    else:
+        for slot in blob.values():                # per-mode
+            if isinstance(slot, dict):
+                if 'has_ai_analysis' in slot:     # old per-mode single blob
+                    _add(slot)
+                else:                             # new per-provider {provider: ai}
+                    for entry in slot.values():
+                        _add(entry)
+    order = {'claude': 0, 'gpt': 1, 'gemini': 2}
+    return sorted(models, key=lambda p: order.get(p, 9))
+
+
 @main_bp.route('/api/results/history')
 @login_required
 def get_results_history():
@@ -1333,6 +1369,7 @@ def get_results_history():
                 'prescriptions_count': len(prescriptions),
                 'herbs_count': herb_count,
                 'common_genes_count': r.common_genes_count,
+                'ai_models': _ai_models_in(r.ai_analysis_json),
                 'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else 'Unknown'
             })
         
@@ -1485,19 +1522,37 @@ def _is_ai_inflight(result_id, mode):
 
 
 def _saved_ai_for(result_id, mode, provider=None):
-    """Return the saved AI dict for (result_id, mode) if present and complete,
-    else None. Handles the mode-keyed blob and the legacy bare blob.
+    """Return the saved AI dict for (result_id, mode[, provider]) if present and
+    complete, else None.
 
-    If `provider` is given, only return the entry when it was produced by that
-    provider (legacy entries with no recorded provider count as 'gemini'), so
-    switching the AI model re-runs instead of returning a stale other-model run."""
+    The blob is keyed {mode: {provider: ai}} so every model's analysis is kept
+    side by side (switching the model never overwrites another). Older shapes are
+    still handled: a per-mode single blob ({mode: ai}) and a legacy bare blob
+    ({has_ai_analysis: ...}); both count as 'gemini' when they carry no provider.
+    When `provider` is given we return only that model's entry (so switching the
+    model shows its own run, not a stale other-model one); with no provider we
+    return any complete entry for the mode."""
     if not result_id:
         return None
+    want = normalize_provider(provider) if provider is not None else None
 
-    def _provider_ok(entry):
-        if provider is None:
-            return True
-        return (entry.get('provider') or 'gemini') == normalize_provider(provider)
+    def _entry_ok(entry):
+        if not (isinstance(entry, dict) and entry.get('has_ai_analysis')):
+            return False
+        return want is None or (entry.get('provider') or 'gemini') == want
+
+    def _pick(slot):
+        # one mode's slot: either a single ai blob (old) or {provider: ai} (new)
+        if not isinstance(slot, dict):
+            return None
+        if 'has_ai_analysis' in slot:                 # old per-mode single blob
+            return slot if _entry_ok(slot) else None
+        if want is not None:                          # new per-provider: pick the model
+            return slot.get(want) if _entry_ok(slot.get(want)) else None
+        for entry in slot.values():                   # no model asked: any complete one
+            if _entry_ok(entry):
+                return entry
+        return None
 
     s = Session()
     try:
@@ -1505,15 +1560,11 @@ def _saved_ai_for(result_id, mode, provider=None):
         if not row or not row.ai_analysis_json:
             return None
         blob = json.loads(row.ai_analysis_json)
-        if isinstance(blob, dict):
-            if 'has_ai_analysis' in blob:            # legacy bare blob (single mode)
-                if blob.get('has_ai_analysis') and _provider_ok(blob):
-                    return blob
-                return None
-            entry = blob.get(mode)
-            if isinstance(entry, dict) and entry.get('has_ai_analysis') and _provider_ok(entry):
-                return entry
-        return None
+        if not isinstance(blob, dict):
+            return None
+        if 'has_ai_analysis' in blob:                 # legacy bare blob (single mode)
+            return blob if _entry_ok(blob) else None
+        return _pick(blob.get(mode))
     except Exception:
         return None
     finally:
@@ -1545,8 +1596,11 @@ def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, 
 
     ai_results = generate_full_ai_analysis(disease_name, analysis_results, language=language, provider=provider)
 
-    # Save mode-keyed, merging so a 'both' row keeps the other tab's AI.
+    # Save keyed {mode: {provider: ai}} so every model's analysis is kept side by
+    # side (switching the model never overwrites another); merge so a 'both' row
+    # keeps the other tab's AI and older blob shapes are migrated forward.
     if result_id and ai_results.get('has_ai_analysis'):
+        prov_key = normalize_provider(provider)
         _save_sess = Session()
         try:
             result = _save_sess.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
@@ -1555,15 +1609,28 @@ def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, 
                 if result.ai_analysis_json:
                     try:
                         _prev = json.loads(result.ai_analysis_json)
-                        if isinstance(_prev, dict) and 'has_ai_analysis' not in _prev:
+                        if isinstance(_prev, dict) and _prev.get('has_ai_analysis'):
+                            # legacy bare blob -> migrate under (this mode, its model)
+                            payload = {mode: {(_prev.get('provider') or 'gemini'): _prev}}
+                        elif isinstance(_prev, dict):
                             payload = _prev
                     except Exception:
                         payload = {}
-                payload[mode] = ai_results
+
+                def _slot(p):
+                    """This mode's {provider: ai} dict, migrating an old single blob."""
+                    cur = p.get(mode)
+                    if isinstance(cur, dict) and 'has_ai_analysis' in cur:   # old per-mode single
+                        return {(cur.get('provider') or 'gemini'): cur}
+                    return cur if isinstance(cur, dict) else {}
+
+                slot = _slot(payload)
+                slot[prov_key] = ai_results
+                payload[mode] = slot
                 try:
                     result.ai_analysis_json = json.dumps(payload, default=str, ensure_ascii=False)
                     _save_sess.commit()
-                    print(f"[DB] Saved AI analysis ({mode}) for result {result_id}")
+                    print(f"[DB] Saved AI analysis ({mode}/{prov_key}) for result {result_id}")
                 except (TypeError, ValueError) as json_err:
                     print(f"[DB] JSON serialization error: {json_err}")
                     import re
@@ -1575,10 +1642,11 @@ def _run_ai_generation(disease_name, prescription_enrichments, result_id, mode, 
                         elif isinstance(obj, list):
                             return [clean_for_json(i) for i in obj]
                         return obj
-                    payload[mode] = clean_for_json(ai_results)
+                    slot[prov_key] = clean_for_json(ai_results)
+                    payload[mode] = slot
                     result.ai_analysis_json = json.dumps(payload, default=str)
                     _save_sess.commit()
-                    print(f"[DB] Saved cleaned AI analysis ({mode}) for result {result_id}")
+                    print(f"[DB] Saved cleaned AI analysis ({mode}/{prov_key}) for result {result_id}")
         except Exception as e:
             print(f"[DB] Error saving AI analysis: {e}")
             _save_sess.rollback()
