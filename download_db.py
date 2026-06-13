@@ -62,7 +62,7 @@ def download_db(url: str, destination: str):
             "(asset missing, repo private, or wrong URL)."
         )
 
-    tmp = destination + ".tmp"
+    tmp = destination + f".tmp.{os.getpid()}"   # per-process so concurrent workers don't clobber
     total = int(response.headers.get("content-length", 0))
     downloaded = 0
     try:
@@ -88,18 +88,49 @@ def download_db(url: str, destination: str):
     print(f"Download complete! Size: {os.path.getsize(destination) / (1024*1024):.1f} MB")
 
 
-if __name__ == "__main__":
-    # Ensure the target directory exists (the persistent-disk mount, or a local dir).
-    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
-    if is_valid_db(DB_PATH):
-        size_mb = os.path.getsize(DB_PATH) / (1024 * 1024)
-        print(f"Database already present and valid at {DB_PATH} ({size_mb:.1f} MB)")
-    else:
-        if os.path.exists(DB_PATH):
-            print(f"Existing DB at {DB_PATH} is invalid/too small; re-downloading.")
-            os.remove(DB_PATH)
+def ensure_db(destination=None):
+    """Make sure a valid SQLite DB exists at `destination` (default DB_PATH).
+
+    Downloads it if missing/invalid AND the target directory is writable. Safe to
+    call at app startup and from multiple workers (atomic replace, per-process tmp);
+    a no-op when the DB is already present. Returns True if a valid DB is in place.
+
+    On Render the DB lives on a persistent disk that is only writable at RUNTIME
+    (read-only during the build). If the directory isn't writable yet, this logs and
+    returns False instead of crashing, so the build can't fail on it -- the app
+    re-runs ensure_db() at startup when the disk is mounted."""
+    dest = destination or DB_PATH
+    if is_valid_db(dest):
+        print(f"Database already present and valid at {dest} "
+              f"({os.path.getsize(dest) / (1024 * 1024):.1f} MB)")
+        return True
+    target_dir = os.path.dirname(os.path.abspath(dest))
+    try:
+        os.makedirs(target_dir, exist_ok=True)
+    except OSError as exc:
+        print(f"[download_db] {target_dir} not writable yet ({exc}); "
+              f"deferring download to runtime when the disk is mounted.")
+        return False
+    if not os.access(target_dir, os.W_OK):
+        print(f"[download_db] {target_dir} is read-only (the persistent disk mounts "
+              f"at runtime, not at build time); deferring download to startup.")
+        return False
+    if os.path.exists(dest):
+        print(f"Existing DB at {dest} is invalid/too small; re-downloading.")
         try:
-            download_db(DB_DOWNLOAD_URL, DB_PATH)
-        except Exception as exc:
-            print(f"ERROR: database download failed: {exc}", file=sys.stderr)
-            sys.exit(1)
+            os.remove(dest)
+        except OSError:
+            pass
+    try:
+        download_db(DB_DOWNLOAD_URL, dest)
+        return True
+    except Exception as exc:
+        print(f"ERROR: database download failed: {exc}", file=sys.stderr)
+        return False
+
+
+if __name__ == "__main__":
+    # Always exit 0: a deferred (read-only disk) or failed download must not break
+    # the build or block gunicorn start -- the app calls ensure_db() at startup too.
+    ensure_db()
+    sys.exit(0)
