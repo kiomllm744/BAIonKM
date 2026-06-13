@@ -153,11 +153,20 @@ def _saved_result_data(result, tab=None):
         modes = data.get('modes', {}) or {}
         active = tab if tab in modes else 'intersection'
         ctx = modes.get(active) or {}
+        order = [m for m in ('intersection', 'union') if m in modes]
         ctx['_tabs'] = {
             'active': active,
-            'order': [m for m in ('intersection', 'union') if m in modes],
+            'order': order,
             'disease_name': data.get('disease_name', ''),
         }
+        # Pre-warm payload: hand the client the OTHER tab(s)' enrichment data so it
+        # can kick off that tab's AI generation in the background on load. Both tabs
+        # then generate concurrently and switching tabs never restarts anything (the
+        # backend dedups via ai_inflight and saves per mode).
+        ctx['_prewarm'] = [
+            {'mode': m, 'enrichment_data': (modes.get(m) or {}).get('enrichment_data') or []}
+            for m in order if m != active
+        ]
         if data.get('provenance') and not ctx.get('provenance'):
             ctx['provenance'] = data.get('provenance')
         current_mode = active

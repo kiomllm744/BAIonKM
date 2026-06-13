@@ -1599,6 +1599,7 @@
         
         document.addEventListener('DOMContentLoaded', () => {
             checkAndRunAiAnalysis();
+            setTimeout(prewarmOtherModes, 1200);  // kick off the other tab's AI in the background
             alignPrescriptionRows();
             loadSidebarStats();
             applyHerbLang();
@@ -1786,41 +1787,75 @@
             }
         }
         
+        // Reusable: turn a mode's enrichment_data array (as injected in resultsData)
+        // into the {"Prescription N": {Library: [{term, adjusted_p_value, combined_score}]}}
+        // shape the /api/ai-analysis endpoint expects.
+        function buildPrescriptionEnrichments(enrichmentList) {
+            const prescriptionEnrichments = {};
+            if (enrichmentList && enrichmentList.length > 0) {
+                enrichmentList.forEach((rxData, index) => {
+                    const rxNum = rxData.prescription_index || (index + 1);
+                    const rxKey = `Prescription ${rxNum}`;
+                    const byLib = {};   // group terms by source library (KEGG / Reactome / GO ...)
+                    if (rxData.enrichment_data && rxData.enrichment_data.length > 0) {
+                        rxData.enrichment_data.forEach(item => {
+                            const lib = item['Library'] || 'Enrichment';
+                            (byLib[lib] = byLib[lib] || []).push({
+                                term: item['Term name'],
+                                adjusted_p_value: item['Adjusted p-value'],
+                                combined_score: item['Combined score']
+                            });
+                        });
+                    }
+                    prescriptionEnrichments[rxKey] = byLib;
+                });
+            }
+            return prescriptionEnrichments;
+        }
+
+        // In "both" mode the server hands us the OTHER tab(s)' enrichment data in
+        // resultsData._prewarm. Fire a background (fire-and-forget) generation for
+        // each so BOTH tabs' AI run concurrently from page load. The backend dedups
+        // (ai_inflight) and saves per mode, so switching tabs never restarts work --
+        // the other tab is then already done (instant) or still running (just polls).
+        var _prewarmed = {};
+        function prewarmOtherModes() {
+            var list = (resultsData && resultsData._prewarm) || [];
+            if (!list.length) return;
+            var provider = (window.getAiProvider ? window.getAiProvider() : 'gemini') || 'gemini';
+            var lang = (window.i18n && i18n.getLang) ? i18n.getLang() : 'en';
+            list.forEach(function (entry) {
+                if (!entry || !entry.mode) return;
+                var key = entry.mode + '|' + provider;
+                if (_prewarmed[key]) return;                 // already kicked off for this model
+                var enr = buildPrescriptionEnrichments(entry.enrichment_data || []);
+                var hasData = Object.values(enr).some(function (rx) {
+                    return Object.values(rx).some(function (t) { return t && t.length; });
+                });
+                if (!hasData) return;
+                _prewarmed[key] = true;
+                // No render / no poll here -- navigating to that tab picks up the saved result.
+                fetch('/api/ai-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        disease_name: resultsData.disease_name,
+                        prescription_enrichments: enr,
+                        result_id: resultsData.result_id,
+                        mode: entry.mode,
+                        language: lang,
+                        provider: provider
+                    })
+                }).catch(function () { /* background pre-warm; ignore failures */ });
+            });
+        }
+
         async function runAiAnalysis() {
             // Show loading states
             showAiLoading();
 
             try {
-                const prescriptionEnrichments = {};
-                
-                console.log('[AI Debug] resultsData:', resultsData);
-                console.log('[AI Debug] enrichment_data:', resultsData.enrichment_data);
-                
-                if (resultsData.enrichment_data && resultsData.enrichment_data.length > 0) {
-                    resultsData.enrichment_data.forEach((rxData, index) => {
-                        const rxNum = rxData.prescription_index || (index + 1);
-                        const rxKey = `Prescription ${rxNum}`;
-                        // Group terms by their source library (KEGG / Reactome / GO ...)
-                        const byLib = {};
-
-                        if (rxData.enrichment_data && rxData.enrichment_data.length > 0) {
-                            rxData.enrichment_data.forEach(item => {
-                                const lib = item['Library'] || 'Enrichment';
-                                (byLib[lib] = byLib[lib] || []).push({
-                                    term: item['Term name'],
-                                    adjusted_p_value: item['Adjusted p-value'],
-                                    combined_score: item['Combined score']
-                                });
-                            });
-                        }
-
-                        prescriptionEnrichments[rxKey] = byLib;
-                    });
-                } else {
-                    console.warn('[AI Debug] No enrichment_data found in results');
-                }
-
-                console.log('[AI Debug] Final prescriptionEnrichments:', prescriptionEnrichments);
+                const prescriptionEnrichments = buildPrescriptionEnrichments(resultsData.enrichment_data);
 
                 // Valid if ANY prescription has terms in ANY library bucket
                 const hasEnrichmentData = Object.values(prescriptionEnrichments).some(
@@ -1908,6 +1943,7 @@
         // (and replaces this tab's analysis) instead of returning the previous one.
         document.addEventListener('aimodelchange', function () {
             if (typeof runAiAnalysis === 'function') { aiRetriggers = 0; runAiAnalysis(); }
+            prewarmOtherModes();   // re-warm the other tab with the newly-selected model
         });
 
         function renderSummaryTable(tableData) {
