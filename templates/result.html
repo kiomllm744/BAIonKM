@@ -1777,14 +1777,14 @@
         
         var AI_LABELS = { gemini: 'Gemini', claude: 'Claude', gpt: 'GPT' };
         function aiModelLabel(p){ return AI_LABELS[p] || (p ? (p.charAt(0).toUpperCase() + p.slice(1)) : 'AI'); }
-        // The model + timing is HIDDEN by default; it is exposed ONLY as a hover
-        // tooltip on the section's card header (hover the robot/stethoscope icon or title).
+        // Model name + run time are intentionally NOT shown to users (hidden by request).
+        // Kept as a no-op so the existing call sites don't need to change; also clears any
+        // previously-set tooltip/cursor on the header.
         function setSectionMeta(headerSelector, label, secs){
             var hdr = document.querySelector(headerSelector);
             if (!hdr) return;
-            var status = (secs != null && secs !== '') ? (secs + 's') : (window.i18n ? window.i18n.t('ai.generating') : 'Generating…');
-            hdr.title = '🤖 ' + label + ' · ' + status;
-            hdr.style.cursor = 'help';
+            hdr.removeAttribute('title');
+            hdr.style.cursor = '';
         }
 
         function displayAiResults(aiResults) {
