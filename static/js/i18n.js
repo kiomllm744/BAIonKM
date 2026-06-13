@@ -174,6 +174,10 @@
       'signup.createAccount': 'Create account',
       'signup.haveAccount': 'Already have an account?',
       'signup.logIn': 'Log in',
+      'signup.errInvalidEmail': 'Please enter a valid email address.',
+      'signup.errPasswordShort': 'Password must be at least 6 characters.',
+      'signup.errPasswordMismatch': 'Passwords do not match.',
+      'signup.errEmailTaken': 'This email is already in use — log in, or sign up with a different one.',
 
       /* ---- result page (Phase 1: key labels only) ---- */
       'result.diseaseSummary': 'Disease / Symptom – Gene Correlation',
@@ -512,6 +516,10 @@
       'signup.createAccount': '계정 만들기',
       'signup.haveAccount': '이미 계정이 있으신가요?',
       'signup.logIn': '로그인',
+      'signup.errInvalidEmail': '올바른 이메일 주소를 입력하세요.',
+      'signup.errPasswordShort': '비밀번호는 6자 이상이어야 합니다.',
+      'signup.errPasswordMismatch': '비밀번호가 일치하지 않습니다.',
+      'signup.errEmailTaken': '이미 사용 중인 이메일입니다 — 로그인하거나 다른 이메일로 가입하세요.',
 
       /* ---- result page (Phase 1: key labels only) ---- */
       'result.diseaseSummary': '질환/증상 - 유전자 상관성',

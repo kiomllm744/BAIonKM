@@ -387,11 +387,14 @@ def signup():
 
         domain = email.split('@')[-1] if '@' in email else ''
         if not email or '@' not in email or '.' not in domain:
-            return render_template('signup.html', error='Please enter a valid email address.')
+            return render_template('signup.html', error='signup.errInvalidEmail',
+                                   error_text='Please enter a valid email address.')
         if len(password) < 6:
-            return render_template('signup.html', error='Password must be at least 6 characters.')
+            return render_template('signup.html', error='signup.errPasswordShort',
+                                   error_text='Password must be at least 6 characters.')
         if password != confirm:
-            return render_template('signup.html', error='Passwords do not match.')
+            return render_template('signup.html', error='signup.errPasswordMismatch',
+                                   error_text='Passwords do not match.')
 
         ok = False
         new_user_id = None
@@ -412,7 +415,8 @@ def signup():
             db_session.close()
 
         if not ok:
-            return render_template('signup.html', error='That email is already registered — please log in.')
+            return render_template('signup.html', error='signup.errEmailTaken',
+                                   error_text='This email is already in use — log in, or sign up with a different one.')
 
         session['logged_in'] = True
         session['username'] = email
