@@ -1362,13 +1362,19 @@ def get_results_history():
             except:
                 prescriptions = []
                 herb_count = 0
-            
+
+            try:                                  # 'intersection' | 'union' | 'both'
+                mode = (json.loads(r.results_json) or {}).get('disease_gene_mode')
+            except Exception:
+                mode = None
+
             data.append({
                 'id': r.id,
                 'disease_name': r.disease_name,
                 'prescriptions_count': len(prescriptions),
                 'herbs_count': herb_count,
                 'common_genes_count': r.common_genes_count,
+                'mode': mode,
                 'ai_models': _ai_models_in(r.ai_analysis_json),
                 'created_at': r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else 'Unknown'
             })

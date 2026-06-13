@@ -436,6 +436,7 @@
                                             <span><i class="fas fa-prescription"></i> ${i18n.t('hist.rxCount', { n: r.prescriptions_count })}</span>
                                             <span><i class="fas fa-leaf"></i> ${i18n.t('hist.herbsCount', { n: r.herbs_count })}</span>
                                             <span class="result-date"><i class="fas fa-clock"></i> ${r.created_at}</span>
+                                            ${modeBadge(r.mode)}
                                             ${(r.ai_models && r.ai_models.length) ? r.ai_models.map(m => `<span class="ai-model-badge" title="AI: ${aiModelName(m)}" style="display:inline-flex; align-items:center; gap:4px; font-size:0.7rem; font-weight:700; color:#6d28d9; background:#ede9fe; border-radius:10px; padding:2px 9px;"><i class="fas fa-robot"></i> ${aiModelName(m)}</span>`).join('') : ''}
                                         </div>
                                     </div>
@@ -599,6 +600,21 @@
 
         // Map an AI provider id to its display name (proper nouns, not translated).
         function aiModelName(p) { return ({ gemini: 'Gemini', claude: 'Claude', gpt: 'GPT' })[p] || p; }
+
+        // Mode tag for a saved result (intersection / union / both) — reuses the same
+        // bilingual labels + icons as the analysis/choice pages.
+        function modeBadge(mode) {
+            const map = {
+                intersection: { key: 'choose.intersectionLabel', def: 'Intersection', icon: 'fa-circle-dot' },
+                union:        { key: 'choose.unionLabel',        def: 'Union',        icon: 'fa-circle-nodes' },
+                both:         { key: 'choose.bothLabel',         def: 'Both',         icon: 'fa-layer-group' }
+            };
+            const m = map[mode];
+            if (!m) return '';
+            let label = (window.i18n && i18n.t) ? i18n.t(m.key) : m.def;
+            if (!label || label === m.key) label = m.def;   // fall back if key missing
+            return `<span class="result-mode-badge" title="${label}" style="display:inline-flex; align-items:center; gap:4px; font-size:0.7rem; font-weight:700; color:#0e7490; background:#cffafe; border-radius:10px; padding:2px 9px;"><i class="fas ${m.icon}"></i> ${label}</span>`;
+        }
 
         // Escape HTML
         function escapeHtml(text) {
