@@ -109,6 +109,32 @@ def _is_safe_next(target):
     )
 
 
+def _current_user_id():
+    """The logged-in account's id (from the Flask session), or None. Defined as a
+    helper so callers that also bind a local `session = Session()` (the DB session,
+    which shadows the module-level Flask session) can still read it safely."""
+    return session.get('user_id')
+
+
+def _demo_user_id():
+    """Get-or-create the shared demo account's User row, so demo-saved analyses have
+    an owner and the demo sees only its own history -- like any other account."""
+    demo_email = (Config.DEMO_USERNAME or 'demo').strip().lower()
+    s = Session()
+    try:
+        u = s.query(User).filter(func.lower(User.email) == demo_email).first()
+        if not u:
+            u = User(email=demo_email, password_hash=generate_password_hash(Config.DEMO_PASSWORD or 'demo'))
+            s.add(u)
+            s.commit()
+        return u.id
+    except Exception:
+        s.rollback()
+        return None
+    finally:
+        s.close()
+
+
 def _saved_result_data(result, tab=None):
     """Build the result.html context dict from a saved AnalysisResult row.
 
@@ -197,6 +223,7 @@ def _run_and_save(disease_name, disease_id, diseases, herb_lists, selected_libs,
             prescriptions=json.dumps(herb_lists),
             results_json=json.dumps(results, default=str),
             common_genes_count=len(_common),
+            user_id=_current_user_id(),
             created_at=datetime.utcnow()
         )
         db_session.add(new_result)
@@ -239,6 +266,11 @@ def init_results_table():
                 conn.execute(text("ALTER TABLE analysis_results ADD COLUMN ai_analysis_json TEXT"))
                 conn.commit()
                 print("[DB] Added ai_analysis_json column to analysis_results table")
+        if 'user_id' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE analysis_results ADD COLUMN user_id INTEGER"))
+                conn.commit()
+                print("[DB] Added user_id column to analysis_results table")
     else:
         # Create the table
         metadata = MetaData()
@@ -250,6 +282,7 @@ def init_results_table():
             Column('results_json', Text, nullable=False),
             Column('ai_analysis_json', Text, nullable=True),
             Column('common_genes_count', Integer, default=0),
+            Column('user_id', Integer, nullable=True),
             Column('created_at', DateTime, default=datetime.utcnow)
         )
         metadata.create_all(engine)
@@ -310,7 +343,7 @@ def login():
         # 1) Demo account (legacy single login). Constant-time compare.
         if (hmac.compare_digest(identifier, Config.DEMO_USERNAME or '')
                 and hmac.compare_digest(password, Config.DEMO_PASSWORD or '')):
-            return _finish(identifier)
+            return _finish(identifier, _demo_user_id())
 
         # 2) Registered email + password account.
         if identifier and password:
@@ -1268,7 +1301,9 @@ def get_results_history():
     
     session = Session()
     try:
-        query = session.query(AnalysisResult).order_by(desc(AnalysisResult.created_at))
+        query = (session.query(AnalysisResult)
+                 .filter(AnalysisResult.user_id == (_current_user_id() or -1))
+                 .order_by(desc(AnalysisResult.created_at)))
         
         total = query.count()
         
@@ -1309,11 +1344,13 @@ def get_result_detail(result_id):
     """API endpoint to get a specific analysis result (login required)."""
     session = Session()
     try:
-        result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
-        
+        result = session.query(AnalysisResult).filter(
+            AnalysisResult.id == result_id,
+            AnalysisResult.user_id == (_current_user_id() or -1)).first()
+
         if not result:
             return jsonify({'error': 'Result not found'}), 404
-        
+
         try:
             results_data = json.loads(result.results_json)
         except:
@@ -1337,7 +1374,9 @@ def view_result(result_id):
     tab = request.args.get('tab')   # 'intersection' | 'union' for a 'both' result
     db_session = Session()
     try:
-        result = db_session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
+        result = db_session.query(AnalysisResult).filter(
+            AnalysisResult.id == result_id,
+            AnalysisResult.user_id == (_current_user_id() or -1)).first()
         if not result:
             return redirect(url_for('main.results'))
         return render_template('result.html', results=_saved_result_data(result, tab=tab))
@@ -1351,11 +1390,13 @@ def delete_result(result_id):
     """Delete a specific analysis result (login required)."""
     session = Session()
     try:
-        result = session.query(AnalysisResult).filter(AnalysisResult.id == result_id).first()
-        
+        result = session.query(AnalysisResult).filter(
+            AnalysisResult.id == result_id,
+            AnalysisResult.user_id == (_current_user_id() or -1)).first()
+
         if not result:
             return jsonify({'error': 'Result not found'}), 404
-        
+
         session.delete(result)
         session.commit()
         

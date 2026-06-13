@@ -45,6 +45,7 @@ class AnalysisResult(db.Model):
     results_json = db.Column(db.Text, nullable=False)   # Full results as JSON
     ai_analysis_json = db.Column(db.Text, nullable=True)  # AI analysis results (Gemini)
     common_genes_count = db.Column(db.Integer, default=0)
+    user_id = db.Column(db.Integer, nullable=True, index=True)  # owner (User.id); NULL = anonymous
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def __repr__(self):
