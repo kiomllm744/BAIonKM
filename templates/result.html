@@ -1331,7 +1331,6 @@
             <div class="card-header">
                 <i class="fas fa-robot"></i>
                 <h2 data-i18n="result.aiComparative">AI Comparative Analysis</h2>
-                <span class="ai-meta" id="ai-meta" style="font-size:0.72rem; color:#94a3b8; font-weight:600; margin-left:auto;"></span>
             </div>
             <div class="card-body">
                 <!-- Loading State -->
@@ -1382,7 +1381,6 @@
                 <i class="fas fa-stethoscope"></i>
                 <h2 data-i18n="result.clinicalQuestions">Clinical Interview Questions</h2>
                 <span class="badge" data-i18n="result.diagnosticSupport">Diagnostic Support</span>
-                <span class="ai-meta" id="clinical-meta" style="font-size:0.72rem; color:#94a3b8; font-weight:600; margin-left:auto;"></span>
             </div>
             <div class="card-body">
                 <!-- Loading State -->
@@ -1696,8 +1694,8 @@
         // Show the "analyzing..." state (shared by a fresh run and the poll-on-reload path).
         function showAiLoading() {
             var _lbl = aiModelLabel(window.getAiProvider && window.getAiProvider());
-            setSectionMeta('ai-meta', _lbl, null);        // null seconds => "Generating…"
-            setSectionMeta('clinical-meta', _lbl, null);
+            setSectionMeta('.ai-card .card-header', _lbl, null);        // null seconds => "Generating…"
+            setSectionMeta('.clinical-card .card-header', _lbl, null);
             document.getElementById('ai-loading').style.display = 'block';
             document.getElementById('ai-results').style.display = 'none';
             document.getElementById('ai-error').style.display = 'none';
@@ -1738,12 +1736,14 @@
         
         var AI_LABELS = { gemini: 'Gemini', claude: 'Claude', gpt: 'GPT' };
         function aiModelLabel(p){ return AI_LABELS[p] || (p ? (p.charAt(0).toUpperCase() + p.slice(1)) : 'AI'); }
-        function setSectionMeta(id, label, secs){
-            var el = document.getElementById(id);
-            if (!el) return;
+        // The model + timing is HIDDEN by default; it is exposed ONLY as a hover
+        // tooltip on the section's card header (hover the robot/stethoscope icon or title).
+        function setSectionMeta(headerSelector, label, secs){
+            var hdr = document.querySelector(headerSelector);
+            if (!hdr) return;
             var status = (secs != null && secs !== '') ? (secs + 's') : (window.i18n ? window.i18n.t('ai.generating') : 'Generating…');
-            el.textContent = '🤖 ' + label + ' · ' + status;
-            el.title = '🤖 ' + label + ' · ' + status;
+            hdr.title = '🤖 ' + label + ' · ' + status;
+            hdr.style.cursor = 'help';
         }
 
         function displayAiResults(aiResults) {
@@ -1754,8 +1754,8 @@
             if (aiResults.has_ai_analysis) {
                 document.getElementById('ai-results').style.display = 'block';
                 var aiLabel = aiResults.provider_label || aiModelLabel(aiResults.provider) || aiModelLabel(window.getAiProvider && window.getAiProvider());
-                setSectionMeta('ai-meta', aiLabel, aiResults.comparative_seconds);
-                setSectionMeta('clinical-meta', aiLabel, aiResults.clinical_seconds);
+                setSectionMeta('.ai-card .card-header', aiLabel, aiResults.comparative_seconds);
+                setSectionMeta('.clinical-card .card-header', aiLabel, aiResults.clinical_seconds);
                 
                 // Render summary table
                 if (aiResults.summary_table && aiResults.summary_table.length > 0) {
