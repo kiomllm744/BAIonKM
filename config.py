@@ -31,7 +31,10 @@ class Config:
     if database_url and database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     
-    SQLALCHEMY_DATABASE_URI = database_url or f'sqlite:///{os.path.join(BASE_DIR, "diseaseportal.db")}'
+    # The SQLite file lives on a persistent disk in prod (DB_PATH=/var/data/...);
+    # locally it defaults to the repo dir. DATABASE_URL (Postgres) still overrides both.
+    DB_PATH = os.environ.get('DB_PATH') or os.path.join(BASE_DIR, 'diseaseportal.db')
+    SQLALCHEMY_DATABASE_URI = database_url or f'sqlite:///{DB_PATH}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Enrichr API settings
@@ -135,5 +138,7 @@ class Config:
         """
         opts = {'pool_pre_ping': True, 'pool_recycle': 300}
         if cls.SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
-            opts['connect_args'] = {'check_same_thread': False}
+            # check_same_thread=False lets threads share connections; timeout makes a
+            # writer wait for a lock (up to 30s) instead of erroring under concurrency.
+            opts['connect_args'] = {'check_same_thread': False, 'timeout': 30}
         return opts

@@ -2,12 +2,16 @@ services:
   - type: web
     name: baionkm
     runtime: python
-    # build_disease_index.py builds the full local disease catalogue; "|| true"
-    # keeps a build hiccup from failing the deploy (it falls back to live search).
-    buildCommand: pip install -r requirements.txt && python download_db.py && (python build_disease_index.py || true) && (python build_clingen_index.py || true)
-    # 2 workers + threads so a long Gemini AI call doesn't block page loads;
-    # --timeout 120 because AI analysis can take 10-30s (the default 30s would 502).
-    startCommand: gunicorn app:app --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+    # The persistent disk is only mounted at RUNTIME, so the DB download moved to the
+    # start command (below). The prebuilt DB already contains the disease catalogue +
+    # ClinGen, so the build-time index scripts are no longer needed here (run them as a
+    # One-Off Job against the disk if you ever want to refresh them).
+    buildCommand: pip install -r requirements.txt
+    # download_db.py runs first, at runtime, so it writes onto the mounted disk; it
+    # SKIPS when a valid DB is already there, so saved accounts/history survive deploys.
+    # 1 worker keeps SQLite writes contention-free; threads still serve the long AI
+    # calls concurrently. --timeout 120 because AI analysis can take 10-30s.
+    startCommand: python download_db.py && gunicorn app:app --workers 1 --threads 8 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -29,3 +33,11 @@ services:
         sync: false
       - key: FLASK_ENV
         value: production
+      # Keep the SQLite DB on the persistent disk so accounts/history survive deploys.
+      - key: DB_PATH
+        value: /var/data/diseaseportal.db
+    # Persistent SSD: the only files that survive redeploys/restarts live under mountPath.
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

@@ -19,7 +19,9 @@ DB_DOWNLOAD_URL = os.environ.get(
     "https://github.com/kiomllm744/BAIonKM/releases/download/db-v1/diseaseportal.db",
 )
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "diseaseportal.db")
+# In prod the DB lives on a persistent disk (DB_PATH=/var/data/diseaseportal.db);
+# locally it defaults to the repo directory.
+DB_PATH = os.environ.get("DB_PATH") or os.path.join(os.path.dirname(__file__), "diseaseportal.db")
 
 # A valid DB is ~37 MB. Anything well under this is an empty/partial/HTML-error
 # file, which must not be allowed to shadow the real database.
@@ -87,6 +89,8 @@ def download_db(url: str, destination: str):
 
 
 if __name__ == "__main__":
+    # Ensure the target directory exists (the persistent-disk mount, or a local dir).
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     if is_valid_db(DB_PATH):
         size_mb = os.path.getsize(DB_PATH) / (1024 * 1024)
         print(f"Database already present and valid at {DB_PATH} ({size_mb:.1f} MB)")
