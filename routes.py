@@ -1690,6 +1690,7 @@ def ai_analysis():
         mode = 'union'
     # which AI model the user picked in the top bar (gemini | claude | gpt)
     provider = normalize_provider(data.get('provider') or Config.AI_PROVIDER_DEFAULT)
+    force = bool(data.get('force'))   # regenerate: re-run NOW and overwrite this model's saved analysis
 
     if not disease_name:
         return jsonify({'error': 'Disease name is required'}), 400
@@ -1705,6 +1706,17 @@ def ai_analysis():
     # return a finished analysis directly, or tell the client to poll if a
     # generation is already running (don't start a duplicate).
     if result_id:
+        if force:
+            # Regenerate on demand: skip the cached result and run NOW (synchronously),
+            # overwriting THIS model's saved slot. _run_ai_generation saves+replaces it,
+            # leaving any OTHER model's analysis for this result untouched.
+            try:
+                ai_results = _run_ai_generation(disease_name, prescription_enrichments,
+                                                result_id, mode, language, provider)
+                return jsonify(ai_results)
+            except Exception as e:
+                return jsonify({'error': f'AI analysis failed: {str(e)}',
+                                'has_ai_analysis': False}), 500
         already = _saved_ai_for(result_id, mode, provider)
         if already:
             return jsonify(already)

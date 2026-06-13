@@ -410,7 +410,26 @@
             background: rgba(255,255,255,0.2);
             color: white;
         }
-        
+
+        /* Regenerate button in the AI section header */
+        .ai-regen-btn {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.18);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .ai-regen-btn:hover { background: rgba(255,255,255,0.30); }
+        .ai-regen-btn:disabled { opacity: 0.55; cursor: progress; }
+
         /* AI Summary Table */
         .ai-summary-table {
             width: 100%;
@@ -1331,6 +1350,9 @@
             <div class="card-header">
                 <i class="fas fa-robot"></i>
                 <h2 data-i18n="result.aiComparative">AI Comparative Analysis</h2>
+                <button type="button" id="ai-regen-btn" class="ai-regen-btn" data-i18n-title="ai.regenerate" title="Regenerate" onclick="regenerateAi()">
+                    <i class="fas fa-rotate-right"></i> <span data-i18n="ai.regenerate">Regenerate</span>
+                </button>
             </div>
             <div class="card-body">
                 <!-- Loading State -->
@@ -1867,6 +1889,49 @@
                     })
                 }).catch(function () { /* background pre-warm; ignore failures */ });
             });
+        }
+
+        // Regenerate the AI analysis for the CURRENTLY-selected model and OVERWRITE
+        // its saved copy on this result (other models' analyses are left untouched).
+        // Works on the results page and when viewing a saved result from history.
+        async function regenerateAi() {
+            var btn = document.getElementById('ai-regen-btn');
+            if (btn) btn.disabled = true;
+            showAiLoading();
+            try {
+                var enr = buildPrescriptionEnrichments(resultsData.enrichment_data);
+                var hasData = Object.values(enr).some(function (rx) {
+                    return Object.values(rx).some(function (t) { return t && t.length; });
+                });
+                if (!hasData) { showAiError(i18n.t('result.noEnrichmentData')); showClinicalUnavailable(); return; }
+                var resp = await fetch('/api/ai-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        disease_name: resultsData.disease_name,
+                        prescription_enrichments: enr,
+                        result_id: resultsData.result_id,
+                        mode: _curMode(),
+                        language: (window.i18n && i18n.getLang) ? i18n.getLang() : 'en',
+                        provider: _curProvider(),
+                        force: true                       // re-run + overwrite this model's saved slot
+                    })
+                });
+                var data = await resp.json();
+                if (resp.ok && data.has_ai_analysis) {
+                    displayAiResults(data);               // renders both sections + refreshes the cache
+                } else if (data.status === 'processing') {
+                    pollAiResult(0);                      // fallback if a run was already in flight
+                } else {
+                    showAiError((data && data.error) || i18n.t('result.aiAnalysisFailed'));
+                    showClinicalUnavailable();
+                }
+            } catch (e) {
+                showAiError(i18n.t('result.failedInitAi'));
+                showClinicalUnavailable();
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         }
 
         async function runAiAnalysis() {
