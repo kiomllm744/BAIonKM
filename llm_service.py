@@ -7,6 +7,7 @@ import json
 import re
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from config import Config
 
 
@@ -739,6 +740,26 @@ def _flatten_rx_enrichment(rx_data):
     return terms
 
 
+def _run_pair(fn1, fn2):
+    """Run two INDEPENDENT LLM calls concurrently and return (r1, secs1, r2, secs2).
+    The comparative analysis and the clinical questions don't depend on each other,
+    so running them in parallel ~halves wall-clock vs one-after-the-other."""
+    def _timed(fn):
+        t0 = time.time()
+        try:
+            out = fn()
+        except Exception as exc:
+            print(f"[LLM] section error: {exc}")
+            out = None
+        return out, round(time.time() - t0, 1)
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        f1 = ex.submit(_timed, fn1)
+        f2 = ex.submit(_timed, fn2)
+        r1, s1 = f1.result()
+        r2, s2 = f2.result()
+    return r1, s1, r2, s2
+
+
 def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 'en', provider: str = 'gemini') -> dict:
     """
     Generate complete AI analysis with:
@@ -792,8 +813,13 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         
         if prescription_data:
             print(f"[LLM] Valid prescription data for {len(prescription_data)} groups")
-            # Generate comparative analysis
-            analysis = generate_comparative_analysis(disease_name, prescription_data, targets_context, language, provider)
+            # Comparative analysis + clinical questions are INDEPENDENT, so run them
+            # concurrently (~halves wall-clock vs one-after-the-other).
+            analysis, comp_secs, clinical, clin_secs = _run_pair(
+                lambda: generate_comparative_analysis(disease_name, prescription_data, targets_context, language, provider),
+                lambda: generate_clinical_questions(disease_name, prescription_data, targets_context, language, provider))
+            ai_results['comparative_seconds'] = comp_secs
+            ai_results['clinical_seconds'] = clin_secs
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -801,10 +827,6 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
                 print("[LLM] Comparative analysis completed successfully")
             else:
                 ai_results['error'] = "Failed to generate comparative analysis"
-                print("[LLM] Comparative analysis returned None")
-            
-            # Generate clinical questions
-            clinical = generate_clinical_questions(disease_name, prescription_data, targets_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -818,8 +840,11 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         print(f"[LLM] Single prescription mode: {rx_key} with {len(rx_data)} enrichment entries")
         
         if rx_data:
-            # Generate single analysis
-            analysis = generate_single_prescription_analysis(disease_name, rx_data, targets_context, language, provider)
+            analysis, comp_secs, clinical, clin_secs = _run_pair(
+                lambda: generate_single_prescription_analysis(disease_name, rx_data, targets_context, language, provider),
+                lambda: generate_single_clinical_questions(disease_name, rx_data, targets_context, language, provider))
+            ai_results['comparative_seconds'] = comp_secs
+            ai_results['clinical_seconds'] = clin_secs
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
@@ -827,9 +852,6 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
                 print("[LLM] Single prescription analysis completed successfully")
             else:
                 print("[LLM] Single prescription analysis returned None")
-            
-            # Generate clinical questions
-            clinical = generate_single_clinical_questions(disease_name, rx_data, targets_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
@@ -846,13 +868,15 @@ def generate_full_ai_analysis(disease_name: str, results: dict, language: str = 
         
         if disgenet_results:
             print(f"[LLM] Using fallback enrichment data: {len(disgenet_results)} entries")
-            analysis = generate_single_prescription_analysis(disease_name, disgenet_results, targets_context, language, provider)
+            analysis, comp_secs, clinical, clin_secs = _run_pair(
+                lambda: generate_single_prescription_analysis(disease_name, disgenet_results, targets_context, language, provider),
+                lambda: generate_single_clinical_questions(disease_name, disgenet_results, targets_context, language, provider))
+            ai_results['comparative_seconds'] = comp_secs
+            ai_results['clinical_seconds'] = clin_secs
             if analysis:
                 ai_results['summary_table'] = analysis.get('summary_table', [])
                 ai_results['detailed_analysis'] = analysis.get('detailed_analysis', '')
                 ai_results['has_ai_analysis'] = True
-            
-            clinical = generate_single_clinical_questions(disease_name, disgenet_results, targets_context, language, provider)
             if clinical:
                 ai_results['clinical_questions'] = clinical
         else:
