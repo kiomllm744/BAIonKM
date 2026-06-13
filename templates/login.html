@@ -209,10 +209,10 @@
                     
                     <form class="login-form" method="POST" action="{{ url_for('main.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}">
                         <div class="form-group">
-                            <label for="username" data-i18n="login.username">Username</label>
+                            <label for="username" data-i18n="login.identifier">Email or username</label>
                             <div class="input-wrapper">
                                 <i class="fas fa-user"></i>
-                                <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" data-i18n-placeholder="login.usernamePlaceholder" required autofocus>
+                                <input type="text" id="username" name="username" class="form-input" placeholder="Enter your email or username" data-i18n-placeholder="login.identifierPlaceholder" required autofocus>
                             </div>
                         </div>
                         
@@ -232,7 +232,8 @@
                 </div>
                 
                 <div class="login-footer">
-                    <p><a href="/"><i class="fas fa-arrow-left"></i> <span data-i18n="login.back">Back to Analysis</span></a></p>
+                    <p><span data-i18n="login.noAccount">Don't have an account?</span> <a href="{{ url_for('main.signup') }}" data-i18n="login.signUp">Sign up</a></p>
+                    <p><a href="/" style="color: var(--text-muted); font-weight: 400;"><i class="fas fa-arrow-left"></i> <span data-i18n="login.back">Back to Analysis</span></a></p>
                 </div>
             </div>
         </div>

@@ -14,7 +14,8 @@ from sqlalchemy import func, desc, text, case
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
-from models import Herb, AnalysisResult, ExternalLookupCache, Disease
+from models import Herb, AnalysisResult, ExternalLookupCache, Disease, User
+from werkzeug.security import generate_password_hash, check_password_hash
 from services import analyze_prescriptions, compute_disease_venn
 from config import Config
 from llm_service import (
@@ -261,6 +262,10 @@ def init_results_table():
     # makes this a no-op when the table is already present.
     ExternalLookupCache.__table__.create(bind=engine, checkfirst=True)
 
+    # Registered user accounts (email + password login). checkfirst => no-op if
+    # the table already exists; works on both SQLite (local) and Postgres (prod).
+    User.__table__.create(bind=engine, checkfirst=True)
+
     # Shared "AI generation in progress" marker, keyed by (result_id, mode). Lives
     # in the DB so it is visible to ALL gunicorn workers (an in-memory set is not,
     # which made polls on a different worker wrongly report "absent"). Composite PK
@@ -279,24 +284,77 @@ init_results_table()
 
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Handle login for demo access."""
+    """Log in with a registered email + password account, or the demo account."""
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        identifier = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        
-        # Constant-time comparison avoids leaking match length via timing.
-        user_ok = hmac.compare_digest(username, Config.DEMO_USERNAME or '')
-        pass_ok = hmac.compare_digest(password, Config.DEMO_PASSWORD or '')
-        if user_ok and pass_ok:
+
+        def _finish(name):
             session['logged_in'] = True
-            session['username'] = username
+            session['username'] = name
             requested = request.args.get('next')
-            next_url = requested if _is_safe_next(requested) else url_for('main.results')
-            return redirect(next_url)
-        else:
-            return render_template('login.html', error='Invalid username or password')
-    
+            return redirect(requested if _is_safe_next(requested) else url_for('main.results'))
+
+        # 1) Demo account (legacy single login). Constant-time compare.
+        if (hmac.compare_digest(identifier, Config.DEMO_USERNAME or '')
+                and hmac.compare_digest(password, Config.DEMO_PASSWORD or '')):
+            return _finish(identifier)
+
+        # 2) Registered email + password account.
+        if identifier and password:
+            db_session = Session()
+            try:
+                user = db_session.query(User).filter(
+                    func.lower(User.email) == identifier.lower()).first()
+            finally:
+                db_session.close()
+            if user and check_password_hash(user.password_hash, password):
+                return _finish(user.email)
+
+        return render_template('login.html', error='Invalid email/username or password')
+
     return render_template('login.html')
+
+
+@main_bp.route('/signup', methods=['GET', 'POST'])
+def signup():
+    """Create a new email + password account, then log in."""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '') or ''
+        confirm = request.form.get('confirm_password', '') or ''
+
+        domain = email.split('@')[-1] if '@' in email else ''
+        if not email or '@' not in email or '.' not in domain:
+            return render_template('signup.html', error='Please enter a valid email address.')
+        if len(password) < 6:
+            return render_template('signup.html', error='Password must be at least 6 characters.')
+        if password != confirm:
+            return render_template('signup.html', error='Passwords do not match.')
+
+        ok = False
+        db_session = Session()
+        try:
+            if db_session.query(User).filter(func.lower(User.email) == email).first():
+                ok = False
+            else:
+                db_session.add(User(email=email, password_hash=generate_password_hash(password)))
+                db_session.commit()
+                ok = True
+        except IntegrityError:
+            db_session.rollback()
+            ok = False
+        finally:
+            db_session.close()
+
+        if not ok:
+            return render_template('signup.html', error='That email is already registered — please log in.')
+
+        session['logged_in'] = True
+        session['username'] = email
+        return redirect(url_for('main.results'))
+
+    return render_template('signup.html')
 
 
 @main_bp.route('/logout')
