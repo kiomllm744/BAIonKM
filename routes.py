@@ -265,6 +265,14 @@ def init_results_table():
     # Registered user accounts (email + password login). checkfirst => no-op if
     # the table already exists; works on both SQLite (local) and Postgres (prod).
     User.__table__.create(bind=engine, checkfirst=True)
+    # Add per-user preference columns if an older `users` table predates them.
+    _ucols = [c['name'] for c in inspect(engine).get_columns('users')]
+    for _pcol in ('ai_provider', 'enrichment_libraries'):
+        if _pcol not in _ucols:
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {_pcol} TEXT"))
+                conn.commit()
+                print(f"[DB] Added {_pcol} column to users table")
 
     # Shared "AI generation in progress" marker, keyed by (result_id, mode). Lives
     # in the DB so it is visible to ALL gunicorn workers (an in-memory set is not,
@@ -289,9 +297,13 @@ def login():
         identifier = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
 
-        def _finish(name):
+        def _finish(name, user_id=None):
             session['logged_in'] = True
             session['username'] = name
+            if user_id is not None:
+                session['user_id'] = user_id          # real account -> account-saved prefs apply
+            else:
+                session.pop('user_id', None)          # demo account -> no account prefs
             requested = request.args.get('next')
             return redirect(requested if _is_safe_next(requested) else url_for('main.results'))
 
@@ -309,7 +321,7 @@ def login():
             finally:
                 db_session.close()
             if user and check_password_hash(user.password_hash, password):
-                return _finish(user.email)
+                return _finish(user.email, user.id)
 
         return render_template('login.html', error='Invalid email/username or password')
 
@@ -333,13 +345,16 @@ def signup():
             return render_template('signup.html', error='Passwords do not match.')
 
         ok = False
+        new_user_id = None
         db_session = Session()
         try:
             if db_session.query(User).filter(func.lower(User.email) == email).first():
                 ok = False
             else:
-                db_session.add(User(email=email, password_hash=generate_password_hash(password)))
+                u = User(email=email, password_hash=generate_password_hash(password))
+                db_session.add(u)
                 db_session.commit()
+                new_user_id = u.id
                 ok = True
         except IntegrityError:
             db_session.rollback()
@@ -352,6 +367,8 @@ def signup():
 
         session['logged_in'] = True
         session['username'] = email
+        if new_user_id is not None:
+            session['user_id'] = new_user_id
         return redirect(url_for('main.results'))
 
     return render_template('signup.html')
@@ -362,7 +379,63 @@ def logout():
     """Handle logout."""
     session.pop('logged_in', None)
     session.pop('username', None)
+    session.pop('user_id', None)
     return redirect(url_for('main.index'))
+
+
+@main_bp.route('/api/preferences', methods=['POST'])
+def save_preferences():
+    """Persist the logged-in user's AI-model + enrichment-library choices to their
+    account. Anonymous/demo callers get 401 (the client keeps them in localStorage)."""
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({'saved': False, 'reason': 'not_logged_in'}), 401
+    data = request.get_json(silent=True) or {}
+    db_session = Session()
+    try:
+        user = db_session.query(User).filter(User.id == uid).first()
+        if not user:
+            return jsonify({'saved': False, 'reason': 'no_user'}), 404
+        if 'ai_provider' in data:
+            p = (data.get('ai_provider') or '').strip().lower()
+            if p in ('gemini', 'claude', 'gpt'):
+                user.ai_provider = p
+        if 'enrichment_libraries' in data:
+            libs = data.get('enrichment_libraries')
+            if isinstance(libs, list):
+                user.enrichment_libraries = json.dumps([str(x) for x in libs])
+        db_session.commit()
+        return jsonify({'saved': True})
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({'saved': False, 'error': str(e)}), 500
+    finally:
+        db_session.close()
+
+
+@main_bp.context_processor
+def _inject_user_prefs():
+    """Expose the logged-in user's saved preferences (AI model + libraries) and a
+    logged_in flag to every template, so the top-bar pickers can pre-apply them."""
+    prefs = None
+    uid = session.get('user_id')
+    if uid:
+        s = Session()
+        try:
+            u = s.query(User).filter(User.id == uid).first()
+            if u and (u.ai_provider or u.enrichment_libraries):
+                libs = None
+                if u.enrichment_libraries:
+                    try:
+                        libs = json.loads(u.enrichment_libraries)
+                    except Exception:
+                        libs = None
+                prefs = {'ai_provider': u.ai_provider, 'enrichment_libraries': libs}
+        except Exception:
+            prefs = None
+        finally:
+            s.close()
+    return {'user_prefs': prefs, 'logged_in': bool(session.get('logged_in'))}
 
 
 @main_bp.context_processor

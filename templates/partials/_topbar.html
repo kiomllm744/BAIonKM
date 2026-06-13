@@ -57,6 +57,10 @@
             </label>
             {% endfor %}
             <div class="lib-menu-hint" data-i18n="lib.hint">Sent to Enrichr. If none are selected, DisGeNET is used.</div>
+            <div class="lib-menu-save">
+                <button type="button" class="pref-save-btn" id="lib-picker-save" data-i18n="pref.save">Save</button>
+                <span class="pref-save-msg" id="lib-picker-msg"></span>
+            </div>
         </div>
     </div>
     <div class="lib-picker" id="model-picker">
@@ -71,6 +75,10 @@
             <label class="lib-menu-opt"><input type="radio" name="ai-provider" class="ai-opt" value="claude"><span>Claude (Sonnet)</span></label>
             <label class="lib-menu-opt"><input type="radio" name="ai-provider" class="ai-opt" value="gpt"><span>GPT</span></label>
             <div class="lib-menu-hint" data-i18n="ai.modelHint">Which AI writes the analysis. Set the matching API key on the server.</div>
+            <div class="lib-menu-save">
+                <button type="button" class="pref-save-btn" id="model-picker-save" data-i18n="pref.save">Save</button>
+                <span class="pref-save-msg" id="model-picker-msg"></span>
+            </div>
         </div>
     </div>
     <button type="button" id="lang-toggle" class="lang-toggle" aria-label="Switch language">
@@ -97,8 +105,16 @@
         {% endif %}
     </div>
     <script>
-        // Top-bar enrichment-library picker. Persists the selection in localStorage and
-        // exposes window.getEnrichmentLibraries() for the analysis form (index.html).
+        // User preferences injected by the server: who's logged in + their account-saved
+        // AI model / enrichment libraries. Anonymous -> null (browser localStorage is used).
+        window.IS_LOGGED_IN = {% if logged_in %}true{% else %}false{% endif %};
+        window.USER_PREFS = {{ (user_prefs or {}) | tojson }};
+        // On logout, clear browser-saved prefs so it resets to the defaults (Claude / DisGeNET).
+        (function(){ var lo = document.querySelector('a.btn-logout'); if (lo) lo.addEventListener('click', function(){ try { localStorage.removeItem('baionkm.aimodel'); localStorage.removeItem('baionkm.enrichLibs'); } catch (e) {} }); })();
+
+        // Top-bar enrichment-library picker. Selection is STAGED; "Save" commits it to
+        // your account (logged in) or this browser, and exposes the saved set via
+        // window.getEnrichmentLibraries(). Precedence: account > browser > default.
         (function(){
             var KEY = 'baionkm.enrichLibs';
             var picker = document.getElementById('lib-picker');
@@ -106,21 +122,36 @@
             var btn = document.getElementById('lib-picker-btn');
             var menu = document.getElementById('lib-picker-menu');
             var countEl = document.getElementById('lib-picker-count');
+            var saveBtn = document.getElementById('lib-picker-save');
+            var msgEl = document.getElementById('lib-picker-msg');
             var boxes = Array.prototype.slice.call(picker.querySelectorAll('.lib-opt'));
-            var saved = null;
-            try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
-            boxes.forEach(function(b){
-                b.checked = Array.isArray(saved) ? saved.indexOf(b.value) >= 0 : (b.getAttribute('data-default') === '1');
-            });
-            function selected(){ return boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; }); }
-            function updateCount(){ if (countEl) { var n = selected().length; countEl.textContent = n ? String(n) : ''; } }
-            function persist(){ try { localStorage.setItem(KEY, JSON.stringify(selected())); } catch (e) {} updateCount(); }
-            window.getEnrichmentLibraries = selected;
-            boxes.forEach(function(b){ b.addEventListener('change', persist); });
-            if (Array.isArray(saved)) { updateCount(); } else { persist(); }
+            function defaults(){ return boxes.filter(function(b){ return b.getAttribute('data-default') === '1'; }).map(function(b){ return b.value; }); }
+            function readSaved(){
+                var pref = null;
+                if (window.IS_LOGGED_IN && window.USER_PREFS && Array.isArray(window.USER_PREFS.enrichment_libraries)) pref = window.USER_PREFS.enrichment_libraries;
+                if (!pref) { try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (Array.isArray(s)) pref = s; } catch (e) {} }
+                return Array.isArray(pref) ? pref : defaults();
+            }
+            var active = readSaved();
+            function staged(){ return boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; }); }
+            function updateCount(){ if (countEl) countEl.textContent = active.length ? String(active.length) : ''; }
+            function applyActive(){ boxes.forEach(function(b){ b.checked = active.indexOf(b.value) >= 0; }); updateCount(); }
+            applyActive();
+            window.getEnrichmentLibraries = function(){ return active.slice(); };
+            function save(){
+                active = staged();
+                try { localStorage.setItem(KEY, JSON.stringify(active)); } catch (e) {}
+                updateCount();
+                if (window.IS_LOGGED_IN) {
+                    fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enrichment_libraries: active }) }).catch(function(){});
+                }
+                if (msgEl) { msgEl.textContent = (window.i18n ? window.i18n.t('pref.saved') : 'Saved'); setTimeout(function(){ if (msgEl) msgEl.textContent = ''; }, 2000); }
+            }
+            if (saveBtn) saveBtn.addEventListener('click', function(e){ e.stopPropagation(); save(); });
             btn.addEventListener('click', function(e){
                 e.stopPropagation();
                 var show = menu.hidden;
+                if (show) applyActive();
                 menu.hidden = !show;
                 btn.setAttribute('aria-expanded', show ? 'true' : 'false');
             });
@@ -129,9 +160,9 @@
             });
         })();
 
-        // Top-bar AI-model picker. Single choice (Gemini / Claude / GPT), persisted in
-        // localStorage and exposed as window.getAiProvider() for the AI-analysis call.
-        // Changing it fires an 'aimodelchange' event so the result page can re-run.
+        // Top-bar AI-model picker. Single choice (Gemini / Claude / GPT). Selection is
+        // STAGED; "Save" commits it to your account (logged in) or this browser, exposes
+        // window.getAiProvider(), and fires 'aimodelchange'. Precedence: account > browser > Claude.
         (function(){
             var KEY = 'baionkm.aimodel';
             var DEFAULT = 'claude';
@@ -141,24 +172,34 @@
             var btn = document.getElementById('model-picker-btn');
             var menu = document.getElementById('model-picker-menu');
             var curEl = document.getElementById('model-picker-current');
+            var saveBtn = document.getElementById('model-picker-save');
+            var msgEl = document.getElementById('model-picker-msg');
             var opts = Array.prototype.slice.call(picker.querySelectorAll('.ai-opt'));
-            var saved = null;
-            try { saved = localStorage.getItem(KEY); } catch (e) {}
-            if (!LABELS[saved]) saved = DEFAULT;
-            opts.forEach(function(o){ o.checked = (o.value === saved); });
-            function current(){ var c = opts.filter(function(o){ return o.checked; })[0]; return c ? c.value : DEFAULT; }
-            function refresh(){ if (curEl) curEl.textContent = LABELS[current()] || ''; }
-            window.getAiProvider = current;
-            function persist(){
-                try { localStorage.setItem(KEY, current()); } catch (e) {}
-                refresh();
-                document.dispatchEvent(new CustomEvent('aimodelchange', { detail: { provider: current() } }));
+            function readSaved(){
+                var pref = (window.IS_LOGGED_IN && window.USER_PREFS && window.USER_PREFS.ai_provider) || null;
+                if (!pref) { try { pref = localStorage.getItem(KEY); } catch (e) {} }
+                return LABELS[pref] ? pref : DEFAULT;
             }
-            opts.forEach(function(o){ o.addEventListener('change', persist); });
-            refresh();   // reflect the saved choice on load (no event dispatch)
+            var active = readSaved();
+            function staged(){ var c = opts.filter(function(o){ return o.checked; })[0]; return c ? c.value : active; }
+            function applyActive(){ opts.forEach(function(o){ o.checked = (o.value === active); }); if (curEl) curEl.textContent = LABELS[active] || ''; }
+            applyActive();
+            window.getAiProvider = function(){ return active; };
+            function save(){
+                active = staged();
+                try { localStorage.setItem(KEY, active); } catch (e) {}
+                if (curEl) curEl.textContent = LABELS[active] || '';
+                if (window.IS_LOGGED_IN) {
+                    fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ai_provider: active }) }).catch(function(){});
+                }
+                if (msgEl) { msgEl.textContent = (window.i18n ? window.i18n.t('pref.saved') : 'Saved'); setTimeout(function(){ if (msgEl) msgEl.textContent = ''; }, 2000); }
+                document.dispatchEvent(new CustomEvent('aimodelchange', { detail: { provider: active } }));
+            }
+            if (saveBtn) saveBtn.addEventListener('click', function(e){ e.stopPropagation(); save(); });
             btn.addEventListener('click', function(e){
                 e.stopPropagation();
                 var show = menu.hidden;
+                if (show) applyActive();
                 menu.hidden = !show;
                 btn.setAttribute('aria-expanded', show ? 'true' : 'false');
             });

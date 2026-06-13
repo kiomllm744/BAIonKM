@@ -73,6 +73,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email = db.Column(db.Text, nullable=False, unique=True)
     password_hash = db.Column(db.Text, nullable=False)
+    ai_provider = db.Column(db.Text, nullable=True)            # saved AI model: gemini|claude|gpt
+    enrichment_libraries = db.Column(db.Text, nullable=True)   # saved libraries (JSON list)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):

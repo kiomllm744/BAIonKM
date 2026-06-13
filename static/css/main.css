@@ -1434,6 +1434,10 @@ body {
 }
 .lib-menu-opt:hover { background: #f1f5f9; }
 .lib-menu-opt input { accent-color: var(--primary-color, #6366f1); width: 15px; height: 15px; }
+.lib-menu-save { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color, #e2e8f0); }
+.pref-save-btn { background: var(--primary-color, #6366f1); color: #fff; border: none; border-radius: 7px; padding: 6px 16px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.pref-save-btn:hover { background: var(--primary-hover, #4f46e5); }
+.pref-save-msg { font-size: 0.76rem; font-weight: 700; color: #16a34a; }
 .lib-menu-hint {
     font-size: 0.74rem;
     color: #94a3b8;
